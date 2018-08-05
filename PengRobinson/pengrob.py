@@ -17,7 +17,6 @@ R = 8.314/100 # m^3*bar/(kmol*K)
 class fluid(object):
     def __init__(self,compounds,molfracs,T,P):
         self.compounds = compounds
-        self.molfracs = molfracs
         self.molfracs = np.array(molfracs) / sum(molfracs)
         self.T = T # K
         self.P = P # bar
