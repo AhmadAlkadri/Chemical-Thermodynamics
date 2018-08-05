@@ -27,7 +27,7 @@ def Critpropstxt_to_HDF5(fname):
             line[-(9 - i)] = float(num)
         
         while type(line[2]) == str:
-            line = [line[0], line[1] + line[2]] + line[3:]
+            line = [line[0], line[1] + " " + line[2]] + line[3:]
         data.append(line)
     
     data = pd.DataFrame(data[1:],columns=data[0])
@@ -70,7 +70,7 @@ def Cpgastxt_to_HDF5(fname):
             line[-(8 - i)] = float(num)
         
         while type(line[2]) == str:
-            line = [line[0], line[1] + line[2]] + line[3:]
+            line = [line[0], line[1] + " " + line[2]] + line[3:]
         data.append(line)
     
     data = pd.DataFrame(data[1:],columns=data[0])
@@ -78,8 +78,11 @@ def Cpgastxt_to_HDF5(fname):
     store["/Cp/gases"] = data
     store.close()
     
-    
-    
+Cpgastxt_to_HDF5("Cp_gas.txt")
+
+Critpropstxt_to_HDF5("organics.txt")
+Critpropstxt_to_HDF5("inorganics.txt")
+join_HDF5()
     
     
     

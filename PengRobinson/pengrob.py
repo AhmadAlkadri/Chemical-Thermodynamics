@@ -18,6 +18,7 @@ class fluid(object):
     def __init__(self,compounds,molfracs,T,P):
         self.compounds = compounds
         self.molfracs = molfracs
+        self.molfracs = np.array(molfracs) / sum(molfracs)
         self.T = T # K
         self.P = P # bar
         
@@ -66,7 +67,30 @@ class fluid(object):
         gaseous state. If more than one correlation is available, the one that
         fits the current temperature is selected.
         '''
-        pass
+        # retrieve Cp gas data from database
+        exec_path = os.getcwd()
+        os.chdir("../database")
+        store = pd.HDFStore("database.h5")
+        Cpdf = store["/Cp/gases"]
+        os.chdir(exec_path)
+        store.close()
+        
+        Cps = pd.DataFrame()
+        for name in self.compounds:
+            Cp = Cpdf[Cpdf["Name"].str.match(name,case=False)]
+            if Cp.shape[0] == 0:
+                warnings.warn("No match found for component: %s" % name)
+            elif Cp.shape[0] > 1:
+                Cp = Cp[(self.T  - Cp["Tmin"] > 0) & (Cp["Tmax"] - self.T > 0)]
+                # if still more than one eq, choose one where temp is furthest
+                # from limits
+                if Cp.shape[0] > 1:
+                    dists = [min(self.T-Tmin, Tmax-self.T) 
+                                for i,Tmin,Tmax in Cp[["Tmin", "Tmax"]].itertuples()]
+                    ind = np.argmax(dists)[0]
+                    Cp = Cp.iloc[ind]
+            Cps = Cps.append(Cp.iloc[:,:-1]) # exclude "source" column                
+        return Cps
     
     def mix_rules(self):
         # get critical properties
@@ -122,4 +146,5 @@ class fluid(object):
     
     
 compounds = ["ethane","methane"]
-mixture = fluid(compounds, [0.5,0.5], 273, 10)
+#mixture = fluid(compounds, [0.5,0.5], 273, 10)
+a = fluid(["Hydrogen bromide"],[1],1500,1)
