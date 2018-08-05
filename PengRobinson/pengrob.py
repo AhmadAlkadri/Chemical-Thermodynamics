@@ -21,6 +21,7 @@ class fluid(object):
         self.T = T # K
         self.P = P # bar
         
+        # get property data and 
         self.data = self.search_db(self.compounds)
         self.params = self.mix_rules()
         self.v = self.pengrob_v()
@@ -42,11 +43,9 @@ class fluid(object):
         exec_path = os.getcwd()
         os.chdir("../database")
         store = pd.HDFStore("database.h5")
-        comps = [store["organics"],store["inorganics"]]
+        comps = store["all"]
         os.chdir(exec_path)
         store.close()
-        comps = pd.concat(comps)
-        comps.index = [i for i in range(0,len(comps))]
         
         df = pd.DataFrame()
         for name in names:
@@ -104,7 +103,7 @@ class fluid(object):
         if len(sols) == 1:
             return [sols[0]]
         elif len(sols) != 0:
-            print("Liquid-Vapour Region for component " + comp.name)
+            print("Liquid-Vapour Region Detected!")
             return [min(sols), max(sols)]
         else:
             warnings.warn("Warning! No solution found for specific volume.")
