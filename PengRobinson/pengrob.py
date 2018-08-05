@@ -21,16 +21,18 @@ class fluid(object):
         self.T = T # K
         self.P = P # bar
         
-        # get property data and 
+        # get property data and set state
         self.data = self.search_db(self.compounds)
-        self.params = self.mix_rules()
-        self.v = self.pengrob_v()
+        self.set_state(self.T,self.P)
     
     def set_state(self,T,P):
         self.T = T
         self.P = P
         self.params = self.mix_rules()
         self.v = self.pengrob_v()
+        
+        # calculate thermodynamic properties
+        self.Cp = self.get_Cp()
         
     @staticmethod
     def search_db(names):
@@ -58,11 +60,19 @@ class fluid(object):
         
         return df
     
+    def get_Cp(self):
+        '''
+        This function searches the database for Cp data for compounds in the
+        gaseous state. If more than one correlation is available, the one that
+        fits the current temperature is selected.
+        '''
+        pass
+    
     def mix_rules(self):
         # get critical properties
         crits = self.data[["Tc[K]","Pc[bar]","omega"]]
         
-        # a_i, b_i, and omega_i vectors
+        # aalpha_i and b_i vectors
         aalpha_i = []; b_i = [];
         for _,Tc,Pc,omega in crits.itertuples():
             a_i = 0.45724*(R**2)*(Tc**2)/Pc
