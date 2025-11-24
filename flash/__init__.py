@@ -10,6 +10,7 @@ from .system import (
     NPTEquilibriumSystem,
     SimpleFlashCalculator,
 )
+from .eos import EosResult, PengRobinsonEOS
 
 __all__ = [
     "DEFAULT_DATABASE_PATH",
@@ -20,4 +21,6 @@ __all__ = [
     "Mixture",
     "NPTEquilibriumSystem",
     "SimpleFlashCalculator",
+    "EosResult",
+    "PengRobinsonEOS",
 ]

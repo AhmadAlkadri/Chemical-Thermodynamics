@@ -163,6 +163,18 @@ class SimpleFlashCalculator(FlashCalculator):
         vapor_df = mixture.as_dataframe().copy()
         vapor_df["phase"] = "vapor"
 
+        if self.eos_model is not None:
+            eos_result = self.eos_model.compute_volumes(
+                mixture=mixture, temperature=temperature, pressure=pressure
+            )
+            if eos_result.z_factors:
+                vapor_z = max(eos_result.z_factors)
+                vapor_df["Z"] = vapor_z
+                vapor_df["Vm[m3/mol]"] = eos_result.preferred_phase_volume("vapor")
+                vapor_df["rho[kg/m3]"] = eos_result.densities_kg_per_m3[
+                    eos_result.z_factors.index(vapor_z)
+                ]
+
         model_details: Dict[str, str] = {}
         if self.eos_model:
             model_details["eos"] = self.eos_model.name
