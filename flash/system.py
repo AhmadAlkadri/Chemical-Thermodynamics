@@ -14,6 +14,10 @@ from typing import Dict, Iterable, List, Optional
 import pandas as pd
 
 
+# Default location for the packaged component database.
+DEFAULT_DATABASE_PATH = Path(__file__).resolve().parent.parent / "database" / "database.h5"
+
+
 @dataclass
 class Component:
     """Represents a single chemical component.
@@ -27,16 +31,19 @@ class Component:
     metadata: Dict[str, float] = field(default_factory=dict)
 
     @classmethod
-    def from_database(cls, name: str, database_path: Path) -> "Component":
+    def from_database(
+        cls, name: str, database_path: Path | None = None
+    ) -> "Component":
         """Load component metadata from the HDF database if available.
 
         The current implementation is intentionally lightweight and forgiving:
         missing data results in an empty metadata dictionary rather than an
         exception. Downstream code can make stricter assertions once the schema
-        stabilizes.
+        stabilizes. When no ``database_path`` is provided, the bundled
+        :data:`DEFAULT_DATABASE_PATH` is used.
         """
 
-        store_path = database_path.expanduser().resolve()
+        store_path = (database_path or DEFAULT_DATABASE_PATH).expanduser().resolve()
         if not store_path.exists():
             return cls(name=name)
 
@@ -65,9 +72,17 @@ class Mixture:
 
     @classmethod
     def from_names(
-        cls, names: Iterable[str], mole_fractions: Iterable[float], database_path: Path
+        cls,
+        names: Iterable[str],
+        mole_fractions: Iterable[float],
+        database_path: Path | None = None,
     ) -> "Mixture":
-        """Build a mixture by looking up each component in the database."""
+        """Build a mixture by looking up each component in the database.
+
+        If ``database_path`` is omitted, the function falls back to
+        :data:`DEFAULT_DATABASE_PATH`, allowing quickstart examples to avoid
+        hard-coding file locations.
+        """
 
         comps = [Component.from_database(name, database_path) for name in names]
         fractions = list(mole_fractions)
