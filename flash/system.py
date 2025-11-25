@@ -8,6 +8,7 @@ implementations can build upon.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from numbers import Number
 from pathlib import Path
 from typing import Dict, Iterable, List, Optional
 
@@ -133,6 +134,72 @@ class FlashResult:
     phases: Dict[str, pd.DataFrame] = field(default_factory=dict)
     model_details: Dict[str, str] = field(default_factory=dict)
 
+    def available_specific_properties(self) -> List[str]:
+        """List the specific properties computed for this flash result.
+
+        The list combines system-level properties (temperature and pressure)
+        with any per-phase columns that convey thermophysical quantities such as
+        compressibility, molar volume, density, or composition. Non-physical
+        identifiers like component names and phase labels are omitted.
+        """
+
+        properties = {"temperature", "pressure"}
+        for phase_df in self.phases.values():
+            properties.update(
+                col
+                for col in phase_df.columns
+                if col not in {"name", "phase"} and not phase_df[col].isna().all()
+            )
+        return sorted(properties)
+
+    def specific_properties(self) -> pd.DataFrame:
+        """Return the specific property values in a tidy table.
+
+        System-level properties (``temperature`` and ``pressure``) are included
+        alongside phase-level quantities. If a property varies by component
+        (e.g., composition ``z``), the per-component mapping is returned in the
+        ``value`` field to keep the output compact.
+        """
+
+        rows = [
+            {"phase": "system", "property": "temperature", "value": self.temperature},
+            {"phase": "system", "property": "pressure", "value": self.pressure},
+        ]
+
+        for phase, phase_df in self.phases.items():
+            for col in phase_df.columns:
+                if col in {"name", "phase"}:
+                    continue
+
+                series = phase_df[col].dropna()
+                if series.empty:
+                    continue
+
+                unique_values = series.unique()
+                if len(unique_values) == 1:
+                    value = unique_values[0]
+                    if isinstance(value, Number):
+                        value = float(value)
+                    rows.append({"phase": phase, "property": col, "value": value})
+                    continue
+
+                component_values = (
+                    phase_df[["name", col]]
+                    .dropna()
+                    .set_index("name")[col]
+                    .apply(lambda v: float(v) if isinstance(v, Number) else v)
+                    .to_dict()
+                )
+                rows.append(
+                    {
+                        "phase": phase,
+                        "property": f"{col} (by component)",
+                        "value": component_values,
+                    }
+                )
+
+        return pd.DataFrame(rows)
+
 
 class FlashCalculator:
     """Strategy interface for performing flash calculations."""
@@ -171,9 +238,11 @@ class SimpleFlashCalculator(FlashCalculator):
                 vapor_z = max(eos_result.z_factors)
                 vapor_df["Z"] = vapor_z
                 vapor_df["Vm[m3/mol]"] = eos_result.preferred_phase_volume("vapor")
-                vapor_df["rho[kg/m3]"] = eos_result.densities_kg_per_m3[
+                density = eos_result.densities_kg_per_m3[
                     eos_result.z_factors.index(vapor_z)
                 ]
+                vapor_df["rho[kg/m3]"] = density
+                vapor_df["v_specific[m3/kg]"] = float("nan") if density == 0 else 1.0 / density
 
         model_details: Dict[str, str] = {}
         if self.eos_model:
