@@ -158,12 +158,41 @@ class FlashResult:
         System-level properties (``temperature`` and ``pressure``) are included
         alongside phase-level quantities. If a property varies by component
         (e.g., composition ``z``), the per-component mapping is returned in the
-        ``value`` field to keep the output compact.
+        ``value`` field to keep the output compact. A ``units`` column is
+        included when units can be inferred from the column name (e.g.
+        ``Vm[m3/mol]``) or from a small set of known unitless quantities.
         """
 
+        def _split_units(prop_name: str) -> tuple[str, Optional[str]]:
+            if "[" in prop_name and prop_name.endswith("]"):
+                start = prop_name.rfind("[")
+                return prop_name[:start].strip(), prop_name[start + 1 : -1]
+            return prop_name, None
+
+        def _units_for(base_prop: str, parsed_unit: Optional[str]) -> Optional[str]:
+            if parsed_unit:
+                return parsed_unit
+            return {
+                "temperature": "K",
+                "pressure": "bar",
+                "z": "mole fraction",
+                "Z": "dimensionless",
+                "omega": "dimensionless",
+            }.get(base_prop)
+
         rows = [
-            {"phase": "system", "property": "temperature", "value": self.temperature},
-            {"phase": "system", "property": "pressure", "value": self.pressure},
+            {
+                "phase": "system",
+                "property": "temperature",
+                "units": _units_for("temperature", None),
+                "value": self.temperature,
+            },
+            {
+                "phase": "system",
+                "property": "pressure",
+                "units": _units_for("pressure", None),
+                "value": self.pressure,
+            },
         ]
 
         for phase, phase_df in self.phases.items():
@@ -171,6 +200,8 @@ class FlashResult:
                 if col in {"name", "phase"}:
                     continue
 
+                base_prop, parsed_unit = _split_units(col)
+                units = _units_for(base_prop, parsed_unit)
                 series = phase_df[col].dropna()
                 if series.empty:
                     continue
@@ -180,7 +211,9 @@ class FlashResult:
                     value = unique_values[0]
                     if isinstance(value, Number):
                         value = float(value)
-                    rows.append({"phase": phase, "property": col, "value": value})
+                    rows.append(
+                        {"phase": phase, "property": col, "units": units, "value": value}
+                    )
                     continue
 
                 component_values = (
@@ -194,6 +227,7 @@ class FlashResult:
                     {
                         "phase": phase,
                         "property": f"{col} (by component)",
+                        "units": units,
                         "value": component_values,
                     }
                 )
