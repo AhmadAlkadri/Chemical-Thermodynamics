@@ -23,6 +23,14 @@ When attached to a :class:`flash.system.SimpleFlashCalculator`, the EOS adds
 vapor-phase compressibility factor, molar volume, and density columns to the
 reported phase dataframe.
 
+## Enthalpy, entropy, and internal energy
+
+Each :class:`flash.system.Component` now provides ideal-gas enthalpy, entropy,
+and internal energy relative to the reference state 298.15 K and 1 bar. The
+phi–phi flash implementation combines those ideal contributions with
+Peng–Robinson residuals to report ``h[J/mol]``, ``s[J/mol/K]``, and ``u[J/mol]``
+for each phase.
+
 ## Antoine saturation pressure
 
 Component metadata includes Antoine coefficients in the form
@@ -50,4 +58,21 @@ from flash import Component
 methane = Component.from_database("methane")
 print(methane.heat_capacity(400.0))           # J/mol/K
 print(methane.heat_capacity(400.0, units="R"))
+```
+
+## VLE helpers
+
+With :class:`flash.eos.PengRobinsonEOS` attached to a
+:class:`flash.system.SimpleFlashCalculator`, ``flash`` performs a phi–phi flash
+and can trace pure-component P–T envelopes and binary T–x curves:
+
+```python
+from flash import Component, Mixture, PengRobinsonEOS, SimpleFlashCalculator
+
+calc = SimpleFlashCalculator(eos_model=PengRobinsonEOS())
+methanol = Component.from_database("methanol")
+pt_curve = calc.pure_PT_envelope(methanol, temperatures=[320, 340, 360])
+
+mixture = Mixture.from_names(["methanol", "water"], [0.5, 0.5])
+tx = calc.binary_Tx_diagram(mixture.components, pressure=1.0, x1_grid=[0.1, 0.5, 0.9])
 ```
