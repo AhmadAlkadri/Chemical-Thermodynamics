@@ -7,6 +7,7 @@ implementations can build upon.
 """
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from numbers import Number
 from pathlib import Path
@@ -54,14 +55,63 @@ class Component:
                 table = store["all"]
                 match = table[table["Name"].str.match(name, case=False)]
                 if not match.empty:
-                    # For now keep the entire row except for string identifiers.
                     row = match.iloc[0]
-                    metadata = {
-                        key: float(value)
-                        for key, value in row.items()
-                        if isinstance(value, (int, float))
-                    }
+                    metadata = {}
+                    for key, value in row.items():
+                        if isinstance(value, (int, float)):
+                            metadata[key] = float(value)
+                        elif (
+                            key == "Antoine Constants"
+                            and isinstance(value, (list, tuple))
+                            and len(value) == 5
+                        ):
+                            A, B, C, Tmin, Tmax = value
+                            metadata.update(
+                                {
+                                    "Antoine_A": float(A),
+                                    "Antoine_B": float(B),
+                                    "Antoine_C": float(C),
+                                    "Antoine_Tmin[K]": float(Tmin),
+                                    "Antoine_Tmax[K]": float(Tmax),
+                                }
+                            )
         return cls(name=name, metadata=metadata)
+
+    def saturation_pressure(self, temperature: float, units: str = "bar") -> float:
+        """Return vapor pressure from the stored Antoine parameters.
+
+        The database provides Antoine coefficients as :math:`\\ln P_{\\text{bar}} = A - B / (T + C)`,
+        valid over ``Antoine_Tmin[K]``–``Antoine_Tmax[K]``. Results are returned in
+        ``units`` (``"kPa"`` or ``"bar"``). A ``ValueError`` is raised when the required
+        coefficients are missing.
+        """
+
+        units_normalized = units.lower()
+        try:
+            A = self.metadata["Antoine_A"]
+            B = self.metadata["Antoine_B"]
+            C = self.metadata["Antoine_C"]
+        except KeyError as exc:
+            raise ValueError(
+                f"Antoine parameters unavailable for component '{self.name}'."
+            ) from exc
+
+        tmin = self.metadata.get("Antoine_Tmin[K]")
+        tmax = self.metadata.get("Antoine_Tmax[K]")
+        if tmin is not None and tmax is not None:
+            if not (tmin <= temperature <= tmax):
+                raise ValueError(
+                    f"Temperature {temperature} K outside Antoine valid range "
+                    f"{tmin}–{tmax} K for '{self.name}'."
+                )
+
+        pressure_bar = float(math.exp(A - B / (float(temperature) + C)))
+
+        if units_normalized == "kpa":
+            return pressure_bar * 100.0
+        if units_normalized == "bar":
+            return pressure_bar
+        raise ValueError(f"Unsupported pressure units '{units}'. Expected 'kPa' or 'bar'.")
 
 
 @dataclass

@@ -22,3 +22,17 @@ print(result.preferred_phase_volume("vapor"))
 When attached to a :class:`flash.system.SimpleFlashCalculator`, the EOS adds
 vapor-phase compressibility factor, molar volume, and density columns to the
 reported phase dataframe.
+
+## Antoine saturation pressure
+
+Component metadata includes Antoine coefficients in the form
+``ln(P_bar) = A - B / (T + C)`` with temperature in Kelvin. Each
+:class:`flash.system.Component` exposes ``saturation_pressure(T, units="bar")`` to
+evaluate vapor pressure in either bar or kPa:
+
+```python
+from flash import Component
+
+methanol = Component.from_database("methanol")
+print(methanol.saturation_pressure(338.0, units="bar"))
+```
