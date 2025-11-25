@@ -18,6 +18,7 @@ import pandas as pd
 
 # Default location for the packaged component database.
 DEFAULT_DATABASE_PATH = Path(__file__).resolve().parent.parent / "database" / "database.h5"
+R_J_PER_MOL_K = 8.314462618  # J·mol⁻¹·K⁻¹
 
 
 @dataclass
@@ -75,6 +76,22 @@ class Component:
                                     "Antoine_Tmax[K]": float(Tmax),
                                 }
                             )
+            if "/Cp/gases" in store:
+                cp_table = store["/Cp/gases"]
+                cp_match = cp_table[cp_table["Name"].str.match(name, case=False)]
+                if not cp_match.empty:
+                    cp_row = cp_match.iloc[0]
+                    metadata.update(
+                        {
+                            "CpA": float(cp_row["A"]),
+                            "CpB": float(cp_row["B*(10**3)"]) * 1e-3,
+                            "CpC": float(cp_row["C*(10**6)"]) * 1e-6,
+                            "CpD": float(cp_row["D*(10**(-5))"]) * 1e-5,
+                            "CpE": float(cp_row["E*(10**9)"]) * 1e-9,
+                            "Cp_Tmin[K]": float(cp_row["Tmin"]),
+                            "Cp_Tmax[K]": float(cp_row["Tmax"]),
+                        }
+                    )
         return cls(name=name, metadata=metadata)
 
     def saturation_pressure(self, temperature: float, units: str = "bar") -> float:
@@ -112,6 +129,52 @@ class Component:
         if units_normalized == "bar":
             return pressure_bar
         raise ValueError(f"Unsupported pressure units '{units}'. Expected 'kPa' or 'bar'.")
+
+    def heat_capacity(self, temperature: float, units: str = "J/mol/K") -> float:
+        """Return ideal-gas heat capacity using the tabulated correlation.
+
+        The correlation follows ``Cp/R = A + B*T + C*T^2 + D*T^-2 + E*T^3`` with
+        ``T`` in Kelvin. Coefficients are read from the ``/Cp/gases`` table and
+        automatically rescaled from the tabulated units (see ``database/Cp_gas.txt``).
+        Supported output units are ``J/mol/K`` (default), ``kJ/mol/K``, and ``R``.
+        Raises ``ValueError`` if coefficients are missing or the temperature is
+        outside the stated validity range.
+        """
+
+        units_normalized = units.lower()
+        try:
+            A = self.metadata["CpA"]
+            B = self.metadata["CpB"]
+            C = self.metadata["CpC"]
+            D = self.metadata["CpD"]
+            E = self.metadata["CpE"]
+        except KeyError as exc:
+            raise ValueError(
+                f"Heat capacity coefficients unavailable for component '{self.name}'."
+            ) from exc
+
+        tmin = self.metadata.get("Cp_Tmin[K]")
+        tmax = self.metadata.get("Cp_Tmax[K]")
+        if tmin is not None and tmax is not None:
+            if not (tmin <= temperature <= tmax):
+                raise ValueError(
+                    f"Temperature {temperature} K outside Cp correlation range "
+                    f"{tmin}–{tmax} K for '{self.name}'."
+                )
+
+        T = float(temperature)
+        cp_over_r = A + B * T + C * T**2 + D * T**-2 + E * T**3
+
+        if units_normalized in {"r"}:
+            return cp_over_r
+        if units_normalized in {"j/mol/k", "j"}:
+            return cp_over_r * R_J_PER_MOL_K
+        if units_normalized in {"kj/mol/k", "kj"}:
+            return cp_over_r * R_J_PER_MOL_K / 1000.0
+
+        raise ValueError(
+            f"Unsupported heat capacity units '{units}'. Expected 'J/mol/K', 'kJ/mol/K', or 'R'."
+        )
 
 
 @dataclass

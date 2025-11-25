@@ -36,3 +36,18 @@ from flash import Component
 methanol = Component.from_database("methanol")
 print(methanol.saturation_pressure(338.0, units="bar"))
 ```
+
+## Ideal-gas heat capacity
+
+Heat capacity coefficients from ``database/Cp_gas.txt`` follow
+``Cp/R = A + B*T + C*T^2 + D*T^-2 + E*T^3`` (T in Kelvin) with the tabulated
+``B``, ``C``, ``D``, and ``E`` values scaled by 1e-3, 1e-6, 1e-5, and 1e-9,
+respectively. Each :class:`flash.system.Component` can evaluate the correlation:
+
+```python
+from flash import Component
+
+methane = Component.from_database("methane")
+print(methane.heat_capacity(400.0))           # J/mol/K
+print(methane.heat_capacity(400.0, units="R"))
+```
