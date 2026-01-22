@@ -1,0 +1,41 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "chemthermo"
+version = "0.0.0"
+description = "Chemical engineering thermodynamics utilities."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { file = "LICENSE" }
+dependencies = ["numpy>=1.24"]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=7.4",
+  "ruff>=0.5",
+  "pyright>=1.1.350",
+]
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+exclude = [
+  "PengRobinson",
+  "VanderWaals",
+  "database",
+  "flash",
+  "notebooks",
+  "NPT_EquilibriumSystem.py",
+]
+
+[tool.ruff.lint]
+ignore = ["E501"]
+extend-select = ["I"]

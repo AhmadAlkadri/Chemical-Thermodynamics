@@ -1,4 +1,8 @@
 # Chemical-Thermodynamics
+Work in progress: this repository is being refactored into the `chemthermo`
+package (src layout, SI units). Legacy modules and notebooks remain for now and
+will be archived during the migration.
+
 Thermodynamic flash calculation solvers written in Python. Implementing different equations of state (in order of difficulty).
 
 ## Peng–Robinson equation of state helper

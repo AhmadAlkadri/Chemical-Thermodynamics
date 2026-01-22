@@ -1,3 +1,21 @@
 # Text documents
 *.docx
 *.tmp
+
+# Python cache and build artifacts
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.pyright/
+.mypy_cache/
+build/
+dist/
+
+# Virtual environments
+.venv/
+venv/
+
+# OS files
+.DS_Store
