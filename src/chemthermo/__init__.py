@@ -9,6 +9,8 @@ from .exceptions import (
     PropertyNotFoundError,
     ThermoError,
 )
+from .flash import FlashResult, FlashSettings, PhaseResult, flash_tp
+from .models import ActivityModel, EquationOfState
 from .units import (
     BAR_PER_PA,
     PA_PER_BAR,
@@ -34,6 +36,10 @@ __all__ = [
     "Composition",
     "CompositionBasis",
     "ConvergenceError",
+    "EquationOfState",
+    "FlashResult",
+    "FlashSettings",
+    "PhaseResult",
     "InputRangeError",
     "Mixture",
     "ModelError",
@@ -45,6 +51,8 @@ __all__ = [
     "STANDARD_P_PA",
     "STANDARD_T_K",
     "ThermoError",
+    "ActivityModel",
+    "flash_tp",
     "validate_fractions",
     "validate_pressure",
     "validate_temperature",
