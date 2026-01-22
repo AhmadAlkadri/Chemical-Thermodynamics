@@ -1,5 +1,6 @@
 """Chemical engineering thermodynamics package (work in progress)."""
 
+from .core import Component, Composition, CompositionBasis, Mixture
 from .exceptions import (
     CompositionError,
     ConvergenceError,
@@ -28,9 +29,13 @@ __all__ = [
     "__version__",
     "BAR_PER_PA",
     "COMPOSITION_SUM_TOL",
+    "Component",
     "CompositionError",
+    "Composition",
+    "CompositionBasis",
     "ConvergenceError",
     "InputRangeError",
+    "Mixture",
     "ModelError",
     "PA_PER_BAR",
     "PA_PER_KPA",
