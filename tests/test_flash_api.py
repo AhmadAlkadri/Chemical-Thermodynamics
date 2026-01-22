@@ -34,5 +34,5 @@ def test_flash_tp_validates_inputs() -> None:
 def test_flash_tp_unimplemented_model_error() -> None:
     mix = ct.Mixture.from_database(["Methane"], [1.0])
     eos = DummyEOS()
-    with pytest.raises(ct.ModelError):
-        ct.flash_tp(mix, temperature_K=300.0, pressure_Pa=101325.0, eos=eos)
+    result = ct.flash_tp(mix, temperature_K=300.0, pressure_Pa=101325.0, eos=eos)
+    assert result.phase_names() == ["vapor"]

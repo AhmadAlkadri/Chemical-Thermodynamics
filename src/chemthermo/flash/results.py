@@ -31,7 +31,7 @@ class FlashResult:
     pressure_Pa: float
     phases: Mapping[str, PhaseResult]
     vapor_fraction: float | None = None
-    diagnostics: Mapping[str, float | str] = field(default_factory=dict)
+    diagnostics: Mapping[str, float | str | int | bool] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         validate_temperature(self.temperature_K)
