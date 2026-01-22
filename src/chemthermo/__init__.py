@@ -10,7 +10,7 @@ from .exceptions import (
     ThermoError,
 )
 from .flash import FlashResult, FlashSettings, PhaseResult, flash_tp
-from .models import ActivityModel, EquationOfState
+from .models import ActivityModel, EquationOfState, PengRobinsonEOS
 from .units import (
     BAR_PER_PA,
     PA_PER_BAR,
@@ -47,6 +47,7 @@ __all__ = [
     "PA_PER_KPA",
     "PA_PER_MPA",
     "PropertyNotFoundError",
+    "PengRobinsonEOS",
     "R_J_PER_MOL_K",
     "STANDARD_P_PA",
     "STANDARD_T_K",
