@@ -1,0 +1,1399 @@
+{
+  "components": [
+    {
+      "antoine": {
+        "A": 9.1525,
+        "B": 2142.66,
+        "C": -34.3,
+        "Tmax_K": 290.0,
+        "Tmin_K": 215.0
+      },
+      "formula": "C4H6",
+      "name": "1,3-Butadiene",
+      "properties": {
+        "MW_kg_per_mol": 0.054090000000000006,
+        "Pc_Pa": 4327000.0,
+        "Tc_K": 425.0,
+        "omega": 0.195
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.2692,
+        "B": 2895.51,
+        "C": -53.97,
+        "Tmax_K": 400.0,
+        "Tmin_K": 265.0
+      },
+      "formula": "C7H14",
+      "name": "1-Heptene",
+      "properties": {
+        "MW_kg_per_mol": 0.09818600000000001,
+        "Pc_Pa": 2837000.0,
+        "Tc_K": 537.2,
+        "omega": 0.358
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.1887,
+        "B": 2654.81,
+        "C": -47.3,
+        "Tmax_K": 360.0,
+        "Tmin_K": 240.0
+      },
+      "formula": "C6H12",
+      "name": "1-Hexene",
+      "properties": {
+        "MW_kg_per_mol": 0.08415900000000001,
+        "Pc_Pa": 3171000.0,
+        "Tc_K": 504.0,
+        "omega": 0.285
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.3428,
+        "B": 3116.52,
+        "C": -60.39,
+        "Tmax_K": 420.0,
+        "Tmin_K": 288.0
+      },
+      "formula": "C8H16",
+      "name": "1-Octene",
+      "properties": {
+        "MW_kg_per_mol": 0.112213,
+        "Pc_Pa": 2624000.0,
+        "Tc_K": 566.6,
+        "omega": 0.386
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.1444,
+        "B": 2405.96,
+        "C": -39.63,
+        "Tmax_K": 325.0,
+        "Tmin_K": 220.0
+      },
+      "formula": "C5H10",
+      "name": "1-Pentene",
+      "properties": {
+        "MW_kg_per_mol": 0.070133,
+        "Pc_Pa": 4053000.0,
+        "Tc_K": 464.7,
+        "omega": 0.245
+      }
+    },
+    {
+      "antoine": {
+        "A": 10.9237,
+        "B": 3166.38,
+        "C": -80.15,
+        "Tmax_K": 400.0,
+        "Tmin_K": 285.0
+      },
+      "formula": "C3H8O",
+      "name": "1-Propanol",
+      "properties": {
+        "MW_kg_per_mol": 0.060094999999999996,
+        "Pc_Pa": 5168000.0,
+        "Tc_K": 536.7,
+        "omega": 0.624
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.6279,
+        "B": 2465.15,
+        "C": -37.15,
+        "Tmax_K": 320.0,
+        "Tmin_K": 210.0
+      },
+      "formula": "C2H4O",
+      "name": "Acetaldehyde",
+      "properties": {
+        "MW_kg_per_mol": 0.044052999999999995,
+        "Pc_Pa": 5573000.0,
+        "Tc_K": 461.0,
+        "omega": 0.303
+      }
+    },
+    {
+      "antoine": {
+        "A": 10.1878,
+        "B": 3405.57,
+        "C": -56.34,
+        "Tmax_K": 430.0,
+        "Tmin_K": 290.0
+      },
+      "formula": "C2H4O2",
+      "name": "Acetic acid",
+      "properties": {
+        "MW_kg_per_mol": 0.060052,
+        "Pc_Pa": 5786000.0,
+        "Tc_K": 594.4,
+        "omega": 0.454
+      }
+    },
+    {
+      "antoine": {
+        "A": 10.0311,
+        "B": 2940.46,
+        "C": -35.93,
+        "Tmax_K": 350.0,
+        "Tmin_K": 241.0
+      },
+      "formula": "C3H6O",
+      "name": "Acetone",
+      "properties": {
+        "MW_kg_per_mol": 0.058079,
+        "Pc_Pa": 4701000.0,
+        "Tc_K": 508.1,
+        "omega": 0.309
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.6672,
+        "B": 2945.47,
+        "C": -49.15,
+        "Tmax_K": 390.0,
+        "Tmin_K": 260.0
+      },
+      "formula": "C2H3N",
+      "name": "Acetonitrile",
+      "properties": {
+        "MW_kg_per_mol": 0.041052,
+        "Pc_Pa": 4833000.0,
+        "Tc_K": 548.0,
+        "omega": 0.321
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.7279,
+        "B": 1637.14,
+        "C": -19.77,
+        "Tmax_K": 202.0,
+        "Tmin_K": 194.0
+      },
+      "formula": "C2H4",
+      "name": "Acetylene",
+      "properties": {
+        "MW_kg_per_mol": 0.026038,
+        "Pc_Pa": 6140000.0,
+        "Tc_K": 308.3,
+        "omega": 0.184
+      }
+    },
+    {
+      "antoine": {
+        "A": 10.3279,
+        "B": 2132.5,
+        "C": -32.98,
+        "Tmax_K": 261.0,
+        "Tmin_K": 179.0
+      },
+      "formula": "NH3",
+      "name": "Ammonia",
+      "properties": {
+        "MW_kg_per_mol": 0.017030999999999998,
+        "Pc_Pa": 11277000.0,
+        "Tc_K": 405.6,
+        "omega": 0.25
+      }
+    },
+    {
+      "antoine": {
+        "A": 10.0546,
+        "B": 3857.52,
+        "C": -73.15,
+        "Tmax_K": 500.0,
+        "Tmin_K": 340.0
+      },
+      "formula": "C6H7N",
+      "name": "Aniline",
+      "properties": {
+        "MW_kg_per_mol": 0.093127,
+        "Pc_Pa": 5309000.0,
+        "Tc_K": 699.0,
+        "omega": 0.382
+      }
+    },
+    {
+      "antoine": {
+        "A": 8.6128,
+        "B": 700.51,
+        "C": -5.84,
+        "Tmax_K": 94.0,
+        "Tmin_K": 81.0
+      },
+      "formula": "Ar",
+      "name": "Argon",
+      "properties": {
+        "MW_kg_per_mol": 0.039948,
+        "Pc_Pa": 4874000.0,
+        "Tc_K": 150.8,
+        "omega": -0.004
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.2806,
+        "B": 2788.51,
+        "C": -52.36,
+        "Tmax_K": 377.0,
+        "Tmin_K": 280.0
+      },
+      "formula": "C6H6",
+      "name": "Benzene",
+      "properties": {
+        "MW_kg_per_mol": 0.078112,
+        "Pc_Pa": 4894000.0,
+        "Tc_K": 562.1,
+        "omega": 0.212
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.0985,
+        "B": 2242.71,
+        "C": -38.99,
+        "Tmax_K": 286.0,
+        "Tmin_K": 182.0
+      },
+      "formula": "BCl3",
+      "name": "Boron trichloride",
+      "properties": {
+        "MW_kg_per_mol": 0.117169,
+        "Pc_Pa": 3871000.0,
+        "Tc_K": 451.95,
+        "omega": 0.148
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.2239,
+        "B": 2582.32,
+        "C": -51.56,
+        "Tmax_K": 354.0,
+        "Tmin_K": 259.0
+      },
+      "formula": "Br2",
+      "name": "Bromine",
+      "properties": {
+        "MW_kg_per_mol": 0.159808,
+        "Pc_Pa": 10335000.0,
+        "Tc_K": 584.0,
+        "omega": 0.132
+      }
+    },
+    {
+      "antoine": {
+        "A": 15.9696,
+        "B": 3103.39,
+        "C": -0.16,
+        "Tmax_K": 204.0,
+        "Tmin_K": 154.0
+      },
+      "formula": "CO2",
+      "name": "Carbon dioxide",
+      "properties": {
+        "MW_kg_per_mol": 0.04401,
+        "Pc_Pa": 7376000.000000001,
+        "Tc_K": 304.2,
+        "omega": 0.225
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.3642,
+        "B": 2690.85,
+        "C": -31.62,
+        "Tmax_K": 342.0,
+        "Tmin_K": 228.0
+      },
+      "formula": "CS2",
+      "name": "Carbon disulfide",
+      "properties": {
+        "MW_kg_per_mol": 0.076143,
+        "Pc_Pa": 7903000.0,
+        "Tc_K": 552.0,
+        "omega": 0.115
+      }
+    },
+    {
+      "antoine": {
+        "A": 7.7484,
+        "B": 530.22,
+        "C": -13.15,
+        "Tmax_K": 108.0,
+        "Tmin_K": 63.0
+      },
+      "formula": "CO",
+      "name": "Carbon monoxide",
+      "properties": {
+        "MW_kg_per_mol": 0.02801,
+        "Pc_Pa": 3496000.0,
+        "Tc_K": 132.9,
+        "omega": 0.049
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.4341,
+        "B": 1244.55,
+        "C": -13.06,
+        "Tmax_K": 148.0,
+        "Tmin_K": 93.0
+      },
+      "formula": "CF4",
+      "name": "Carbon tetrafluoride",
+      "properties": {
+        "MW_kg_per_mol": 0.088004,
+        "Pc_Pa": 3739000.0,
+        "Tc_K": 227.6,
+        "omega": 0.191
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.3408,
+        "B": 1978.32,
+        "C": -27.01,
+        "Tmax_K": 264.0,
+        "Tmin_K": 172.0
+      },
+      "formula": "Cl2",
+      "name": "Chlorine",
+      "properties": {
+        "MW_kg_per_mol": 0.070905,
+        "Pc_Pa": 7701000.000000001,
+        "Tc_K": 417.0,
+        "omega": 0.073
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.353,
+        "B": 2696.79,
+        "C": -46.16,
+        "Tmax_K": 370.0,
+        "Tmin_K": 260.0
+      },
+      "formula": "CHCl3",
+      "name": "Chloroform",
+      "properties": {
+        "MW_kg_per_mol": 0.119377,
+        "Pc_Pa": 5472000.0,
+        "Tc_K": 536.4,
+        "omega": 0.216
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.1969,
+        "B": 2210.71,
+        "C": -36.15,
+        "Tmax_K": 305.0,
+        "Tmin_K": 200.0
+      },
+      "formula": "C4H8",
+      "name": "cis-2-Butene",
+      "properties": {
+        "MW_kg_per_mol": 0.056106,
+        "Pc_Pa": 4205000.0,
+        "Tc_K": 435.6,
+        "omega": 0.202
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.1325,
+        "B": 2766.63,
+        "C": -50.5,
+        "Tmax_K": 380.0,
+        "Tmin_K": 280.0
+      },
+      "formula": "C6H12",
+      "name": "Cyclohexane",
+      "properties": {
+        "MW_kg_per_mol": 0.08415900000000001,
+        "Pc_Pa": 4072999.9999999995,
+        "Tc_K": 553.4,
+        "omega": 0.213
+      }
+    },
+    {
+      "antoine": {
+        "A": 8.7074,
+        "B": 1377.84,
+        "C": -22.18,
+        "Tmax_K": 181.0,
+        "Tmin_K": 118.0
+      },
+      "formula": "B2H6",
+      "name": "Diborane",
+      "properties": {
+        "MW_kg_per_mol": 0.02767,
+        "Pc_Pa": 4050000.0,
+        "Tc_K": 289.8,
+        "omega": 0.138
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.0435,
+        "B": 1511.42,
+        "C": -17.16,
+        "Tmax_K": 199.0,
+        "Tmin_K": 130.0
+      },
+      "formula": "C2H6",
+      "name": "Ethane",
+      "properties": {
+        "MW_kg_per_mol": 0.030069,
+        "Pc_Pa": 4874000.0,
+        "Tc_K": 305.4,
+        "omega": 0.099
+      }
+    },
+    {
+      "antoine": {
+        "A": 12.2917,
+        "B": 3803.98,
+        "C": -41.68,
+        "Tmax_K": 369.0,
+        "Tmin_K": 270.0
+      },
+      "formula": "C2H6O",
+      "name": "Ethanol",
+      "properties": {
+        "MW_kg_per_mol": 0.046068,
+        "Pc_Pa": 6383000.0,
+        "Tc_K": 516.2,
+        "omega": 0.635
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.5314,
+        "B": 2790.5,
+        "C": -57.15,
+        "Tmax_K": 385.0,
+        "Tmin_K": 260.0
+      },
+      "formula": "C4H8O2",
+      "name": "Ethyl acetate",
+      "properties": {
+        "MW_kg_per_mol": 0.088105,
+        "Pc_Pa": 3829999.9999999995,
+        "Tc_K": 523.2,
+        "omega": 0.363
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.3993,
+        "B": 3279.47,
+        "C": -59.95,
+        "Tmax_K": 450.0,
+        "Tmin_K": 300.0
+      },
+      "formula": "C8H10",
+      "name": "Ethylbenzene",
+      "properties": {
+        "MW_kg_per_mol": 0.10616500000000001,
+        "Pc_Pa": 3607000.0,
+        "Tc_K": 617.1,
+        "omega": 0.301
+      }
+    },
+    {
+      "antoine": {
+        "A": 8.9166,
+        "B": 1347.01,
+        "C": -18.15,
+        "Tmax_K": 182.0,
+        "Tmin_K": 120.0
+      },
+      "formula": "C2H4",
+      "name": "Ethylene",
+      "properties": {
+        "MW_kg_per_mol": 0.028053,
+        "Pc_Pa": 5036000.0,
+        "Tc_K": 282.4,
+        "omega": 0.085
+      }
+    },
+    {
+      "antoine": {
+        "A": 10.1198,
+        "B": 2567.61,
+        "C": -29.01,
+        "Tmax_K": 310.0,
+        "Tmin_K": 300.0
+      },
+      "formula": "C2H4O",
+      "name": "Ethylene oxide",
+      "properties": {
+        "MW_kg_per_mol": 0.044052999999999995,
+        "Pc_Pa": 7194000.0,
+        "Tc_K": 469.0,
+        "omega": 0.2
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.0498,
+        "B": 714.1,
+        "C": -6.0,
+        "Tmax_K": 91.0,
+        "Tmin_K": 59.0
+      },
+      "formula": "F2",
+      "name": "Fluorine",
+      "properties": {
+        "MW_kg_per_mol": 0.037997,
+        "Pc_Pa": 5218000.0,
+        "Tc_K": 144.3,
+        "omega": 0.048
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.8573,
+        "B": 2204.13,
+        "C": -30.15,
+        "Tmax_K": 271.0,
+        "Tmin_K": 185.0
+      },
+      "formula": "CH2O",
+      "name": "Formaldehyde",
+      "properties": {
+        "MW_kg_per_mol": 0.030026,
+        "Pc_Pa": 6586000.0,
+        "Tc_K": 408.0,
+        "omega": 0.253
+      }
+    },
+    {
+      "antoine": {
+        "A": 5.6312,
+        "B": 33.7329,
+        "C": -1.79,
+        "Tmax_K": 4.3,
+        "Tmin_K": 3.7
+      },
+      "formula": "He",
+      "name": "Helium-4",
+      "properties": {
+        "MW_kg_per_mol": 0.0040030000000000005,
+        "Pc_Pa": 227000.0,
+        "Tc_K": 5.19,
+        "omega": -0.387
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.1646,
+        "B": 1559.11,
+        "C": -24.51,
+        "Tmax_K": 195.0,
+        "Tmin_K": 180.0
+      },
+      "formula": "C2F6",
+      "name": "Hexafluoroethane",
+      "properties": {
+        "MW_kg_per_mol": 0.138012,
+        "Pc_Pa": 3042000.0,
+        "Tc_K": 292.8,
+        "omega": 0.255
+      }
+    },
+    {
+      "antoine": {
+        "A": 7.0131,
+        "B": 164.9,
+        "C": -3.19,
+        "Tmax_K": 25.0,
+        "Tmin_K": 14.0
+      },
+      "formula": "H2",
+      "name": "Hydrogen",
+      "properties": {
+        "MW_kg_per_mol": 0.002016,
+        "Pc_Pa": 1297000.0,
+        "Tc_K": 33.2,
+        "omega": -0.22
+      }
+    },
+    {
+      "antoine": {
+        "A": 7.8485,
+        "B": 1242.53,
+        "C": -47.86,
+        "Tmax_K": 221.0,
+        "Tmin_K": 184.0
+      },
+      "formula": "HBr",
+      "name": "Hydrogen bromide",
+      "properties": {
+        "MW_kg_per_mol": 0.08091200000000001,
+        "Pc_Pa": 8552000.0,
+        "Tc_K": 363.2,
+        "omega": 0.063
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.8838,
+        "B": 1714.25,
+        "C": -14.45,
+        "Tmax_K": 200.0,
+        "Tmin_K": 137.0
+      },
+      "formula": "HCl",
+      "name": "Hydrogen chloride",
+      "properties": {
+        "MW_kg_per_mol": 0.036461,
+        "Pc_Pa": 8309000.0,
+        "Tc_K": 324.6,
+        "omega": 0.12
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.8936,
+        "B": 2585.8,
+        "C": -37.15,
+        "Tmax_K": 330.0,
+        "Tmin_K": 234.0
+      },
+      "formula": "HCN",
+      "name": "Hydrogen cyanide",
+      "properties": {
+        "MW_kg_per_mol": 0.027024999999999997,
+        "Pc_Pa": 5390000.0,
+        "Tc_K": 456.8,
+        "omega": 0.407
+      }
+    },
+    {
+      "antoine": {
+        "A": 11.0756,
+        "B": 3404.49,
+        "C": 15.06,
+        "Tmax_K": 313.0,
+        "Tmin_K": 206.0
+      },
+      "formula": "HF",
+      "name": "Hydrogen fluoride",
+      "properties": {
+        "MW_kg_per_mol": 0.020006,
+        "Pc_Pa": 6484999.999999999,
+        "Tc_K": 461.0,
+        "omega": 0.372
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.4838,
+        "B": 1768.69,
+        "C": -26.06,
+        "Tmax_K": 230.0,
+        "Tmin_K": 190.0
+      },
+      "formula": "H2S",
+      "name": "Hydrogen sulfide",
+      "properties": {
+        "MW_kg_per_mol": 0.034082,
+        "Pc_Pa": 8937000.0,
+        "Tc_K": 373.2,
+        "omega": 0.1
+      }
+    },
+    {
+      "antoine": {
+        "A": 8.9179,
+        "B": 2032.76,
+        "C": -33.15,
+        "Tmax_K": 280.0,
+        "Tmin_K": 187.0
+      },
+      "formula": "C4H10",
+      "name": "Isobutane",
+      "properties": {
+        "MW_kg_per_mol": 0.058122,
+        "Pc_Pa": 3647999.9999999995,
+        "Tc_K": 408.1,
+        "omega": 0.176
+      }
+    },
+    {
+      "antoine": {
+        "A": 8.6475,
+        "B": 958.75,
+        "C": -8.71,
+        "Tmax_K": 129.0,
+        "Tmin_K": 113.0
+      },
+      "formula": "Kr",
+      "name": "Krypton",
+      "properties": {
+        "MW_kg_per_mol": 0.0838,
+        "Pc_Pa": 5502000.0,
+        "Tc_K": 209.4,
+        "omega": -0.002
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.5188,
+        "B": 3366.99,
+        "C": -58.04,
+        "Tmax_K": 440.0,
+        "Tmin_K": 300.0
+      },
+      "formula": "C8H10",
+      "name": "m-Xylene",
+      "properties": {
+        "MW_kg_per_mol": 0.10616500000000001,
+        "Pc_Pa": 3546000.0,
+        "Tc_K": 617.0,
+        "omega": 0.331
+      }
+    },
+    {
+      "antoine": {
+        "A": 8.6041,
+        "B": 897.84,
+        "C": -7.16,
+        "Tmax_K": 120.0,
+        "Tmin_K": 93.0
+      },
+      "formula": "CH4",
+      "name": "Methane",
+      "properties": {
+        "MW_kg_per_mol": 0.016042,
+        "Pc_Pa": 4600000.0,
+        "Tc_K": 190.6,
+        "omega": 0.008
+      }
+    },
+    {
+      "antoine": {
+        "A": 11.9673,
+        "B": 3626.55,
+        "C": -34.29,
+        "Tmax_K": 364.0,
+        "Tmin_K": 257.0
+      },
+      "formula": "CH4O",
+      "name": "Methanol",
+      "properties": {
+        "MW_kg_per_mol": 0.032042,
+        "Pc_Pa": 8095999.999999999,
+        "Tc_K": 512.6,
+        "omega": 0.559
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.058,
+        "B": 2154.9,
+        "C": -34.42,
+        "Tmax_K": 290.0,
+        "Tmin_K": 195.0
+      },
+      "formula": "C4H10",
+      "name": "n-Butane",
+      "properties": {
+        "MW_kg_per_mol": 0.058122,
+        "Pc_Pa": 3790000.0,
+        "Tc_K": 425.2,
+        "omega": 0.193
+      }
+    },
+    {
+      "antoine": {
+        "A": 10.5958,
+        "B": 3137.02,
+        "C": -94.43,
+        "Tmax_K": 404.0,
+        "Tmin_K": 288.0
+      },
+      "formula": "C4H10O",
+      "name": "n-Butanol",
+      "properties": {
+        "MW_kg_per_mol": 0.074122,
+        "Pc_Pa": 4418000.0,
+        "Tc_K": 562.9,
+        "omega": 0.59
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.3912,
+        "B": 3456.8,
+        "C": -78.67,
+        "Tmax_K": 476.0,
+        "Tmin_K": 330.0
+      },
+      "formula": "C10H22",
+      "name": "n-Decane",
+      "properties": {
+        "MW_kg_per_mol": 0.14228200000000002,
+        "Pc_Pa": 2108000.0,
+        "Tc_K": 617.6,
+        "omega": 0.49
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.2535,
+        "B": 2911.32,
+        "C": -56.51,
+        "Tmax_K": 400.0,
+        "Tmin_K": 270.0
+      },
+      "formula": "C7H16",
+      "name": "n-Heptane",
+      "properties": {
+        "MW_kg_per_mol": 0.100202,
+        "Pc_Pa": 2736000.0,
+        "Tc_K": 540.2,
+        "omega": 0.351
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.2164,
+        "B": 2697.55,
+        "C": -48.78,
+        "Tmax_K": 370.0,
+        "Tmin_K": 245.0
+      },
+      "formula": "C6H14",
+      "name": "n-Hexane",
+      "properties": {
+        "MW_kg_per_mol": 0.086175,
+        "Pc_Pa": 2969000.0,
+        "Tc_K": 507.4,
+        "omega": 0.296
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.3469,
+        "B": 3291.45,
+        "C": -71.33,
+        "Tmax_K": 452.0,
+        "Tmin_K": 312.0
+      },
+      "formula": "C9H20",
+      "name": "n-Nonane",
+      "properties": {
+        "MW_kg_per_mol": 0.128255,
+        "Pc_Pa": 2310000.0,
+        "Tc_K": 594.6,
+        "omega": 0.444
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.3224,
+        "B": 3120.29,
+        "C": -63.63,
+        "Tmax_K": 425.0,
+        "Tmin_K": 292.0
+      },
+      "formula": "C8H18",
+      "name": "n-Octane",
+      "properties": {
+        "MW_kg_per_mol": 0.114229,
+        "Pc_Pa": 2482000.0,
+        "Tc_K": 568.8,
+        "omega": 0.394
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.2131,
+        "B": 2477.07,
+        "C": -39.94,
+        "Tmax_K": 330.0,
+        "Tmin_K": 220.0
+      },
+      "formula": "C5H12",
+      "name": "n-Pentane",
+      "properties": {
+        "MW_kg_per_mol": 0.072149,
+        "Pc_Pa": 3374000.0,
+        "Tc_K": 469.6,
+        "omega": 0.251
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.5224,
+        "B": 3992.01,
+        "C": -71.29,
+        "Tmax_K": 545.0,
+        "Tmin_K": 360.0
+      },
+      "formula": "C10H8",
+      "name": "Naphthalene",
+      "properties": {
+        "MW_kg_per_mol": 0.12817099999999998,
+        "Pc_Pa": 4053000.0,
+        "Tc_K": 748.4,
+        "omega": 0.302
+      }
+    },
+    {
+      "antoine": {
+        "A": 7.3897,
+        "B": 180.47,
+        "C": -2.61,
+        "Tmax_K": 29.0,
+        "Tmin_K": 24.0
+      },
+      "formula": "Ne",
+      "name": "Neon",
+      "properties": {
+        "MW_kg_per_mol": 0.02018,
+        "Pc_Pa": 2756000.0,
+        "Tc_K": 44.4,
+        "omega": 0.0
+      }
+    },
+    {
+      "antoine": {
+        "A": 13.5112,
+        "B": 1572.52,
+        "C": -4.88,
+        "Tmax_K": 140.0,
+        "Tmin_K": 95.0
+      },
+      "formula": "NO",
+      "name": "Nitric oxide",
+      "properties": {
+        "MW_kg_per_mol": 0.030006,
+        "Pc_Pa": 6484999.999999999,
+        "Tc_K": 180.0,
+        "omega": 0.607
+      }
+    },
+    {
+      "antoine": {
+        "A": 8.334,
+        "B": 588.72,
+        "C": -6.6,
+        "Tmax_K": 90.0,
+        "Tmin_K": 54.0
+      },
+      "formula": "N2",
+      "name": "Nitrogen",
+      "properties": {
+        "MW_kg_per_mol": 0.028013000000000003,
+        "Pc_Pa": 3384000.0000000005,
+        "Tc_K": 126.2,
+        "omega": 0.039
+      }
+    },
+    {
+      "antoine": {
+        "A": 13.9122,
+        "B": 4141.29,
+        "C": -3.65,
+        "Tmax_K": 320.0,
+        "Tmin_K": 230.0
+      },
+      "formula": "NO2",
+      "name": "Nitrogen dioxide",
+      "properties": {
+        "MW_kg_per_mol": 0.046006,
+        "Pc_Pa": 10133000.0,
+        "Tc_K": 431.4,
+        "omega": 0.86
+      }
+    },
+    {
+      "antoine": {
+        "A": 8.9905,
+        "B": 1155.69,
+        "C": -15.37,
+        "Tmax_K": 155.0,
+        "Tmin_K": 103.0
+      },
+      "formula": "NF3",
+      "name": "Nitrogen trifluoride",
+      "properties": {
+        "MW_kg_per_mol": 0.071002,
+        "Pc_Pa": 4529000.0,
+        "Tc_K": 234.0,
+        "omega": 0.132
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.5069,
+        "B": 1506.49,
+        "C": -25.99,
+        "Tmax_K": 200.0,
+        "Tmin_K": 144.0
+      },
+      "formula": "N2O",
+      "name": "Nitrous oxide",
+      "properties": {
+        "MW_kg_per_mol": 0.044013,
+        "Pc_Pa": 7245000.0,
+        "Tc_K": 309.6,
+        "omega": 0.16
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.4954,
+        "B": 3395.57,
+        "C": -59.46,
+        "Tmax_K": 445.0,
+        "Tmin_K": 305.0
+      },
+      "formula": "C8H10",
+      "name": "o-Xylene",
+      "properties": {
+        "MW_kg_per_mol": 0.10616500000000001,
+        "Pc_Pa": 3729000.0,
+        "Tc_K": 630.2,
+        "omega": 0.314
+      }
+    },
+    {
+      "antoine": {
+        "A": 8.7873,
+        "B": 734.55,
+        "C": -6.45,
+        "Tmax_K": 100.0,
+        "Tmin_K": 63.0
+      },
+      "formula": "O2",
+      "name": "Oxygen",
+      "properties": {
+        "MW_kg_per_mol": 0.031999,
+        "Pc_Pa": 5046000.0,
+        "Tc_K": 154.6,
+        "omega": 0.021
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.4761,
+        "B": 3346.65,
+        "C": -57.84,
+        "Tmax_K": 440.0,
+        "Tmin_K": 300.0
+      },
+      "formula": "C8H10",
+      "name": "p-Xylene",
+      "properties": {
+        "MW_kg_per_mol": 0.10616500000000001,
+        "Pc_Pa": 3515999.9999999995,
+        "Tc_K": 616.2,
+        "omega": 0.324
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.8077,
+        "B": 3490.89,
+        "C": -98.59,
+        "Tmax_K": 481.0,
+        "Tmin_K": 345.0
+      },
+      "formula": "C6H6O",
+      "name": "Phenol",
+      "properties": {
+        "MW_kg_per_mol": 0.094111,
+        "Pc_Pa": 6130000.0,
+        "Tc_K": 694.2,
+        "omega": 0.44
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.27,
+        "B": 1617.91,
+        "C": -11.07,
+        "Tmax_K": 186.0,
+        "Tmin_K": 144.0
+      },
+      "formula": "PH3",
+      "name": "Phosphene",
+      "properties": {
+        "MW_kg_per_mol": 0.033998,
+        "Pc_Pa": 6534999.999999999,
+        "Tc_K": 324.45,
+        "omega": 0.042
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.1058,
+        "B": 1872.46,
+        "C": -25.16,
+        "Tmax_K": 249.0,
+        "Tmin_K": 164.0
+      },
+      "formula": "C3H8",
+      "name": "Propane",
+      "properties": {
+        "MW_kg_per_mol": 0.044095999999999996,
+        "Pc_Pa": 4244000.0,
+        "Tc_K": 370.0,
+        "omega": 0.152
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.0825,
+        "B": 1807.53,
+        "C": -26.15,
+        "Tmax_K": 240.0,
+        "Tmin_K": 160.0
+      },
+      "formula": "C3H6",
+      "name": "Propylene",
+      "properties": {
+        "MW_kg_per_mol": 0.04208,
+        "Pc_Pa": 4620000.0,
+        "Tc_K": 365.0,
+        "omega": 0.148
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.7222,
+        "B": 1620.99,
+        "C": 5.35,
+        "Tmax_K": 162.0,
+        "Tmin_K": 94.0
+      },
+      "formula": "SiH4",
+      "name": "Silane",
+      "properties": {
+        "MW_kg_per_mol": 0.032117,
+        "Pc_Pa": 4843000.0,
+        "Tc_K": 269.69,
+        "omega": 0.089
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.1817,
+        "B": 2634.16,
+        "C": -43.15,
+        "Tmax_K": 364.0,
+        "Tmin_K": 238.0
+      },
+      "formula": "SiCl4",
+      "name": "Silicon tetrachloride",
+      "properties": {
+        "MW_kg_per_mol": 0.169896,
+        "Pc_Pa": 3749000.0,
+        "Tc_K": 507.0,
+        "omega": 0.264
+      }
+    },
+    {
+      "antoine": {
+        "A": 16.3709,
+        "B": 2810.45,
+        "C": -6.88,
+        "Tmax_K": 128.0,
+        "Tmin_K": 129.0
+      },
+      "formula": "SiF4",
+      "name": "Silicon tetrafluoride",
+      "properties": {
+        "MW_kg_per_mol": 0.10407899999999999,
+        "Pc_Pa": 3715000.0,
+        "Tc_K": 259.09,
+        "omega": 0.456
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.3991,
+        "B": 3328.57,
+        "C": -63.72,
+        "Tmax_K": 460.0,
+        "Tmin_K": 305.0
+      },
+      "formula": "C8H8",
+      "name": "Styrene",
+      "properties": {
+        "MW_kg_per_mol": 0.104149,
+        "Pc_Pa": 3992000.0,
+        "Tc_K": 647.0,
+        "omega": 0.257
+      }
+    },
+    {
+      "antoine": {
+        "A": 10.1478,
+        "B": 2302.35,
+        "C": -35.97,
+        "Tmax_K": 280.0,
+        "Tmin_K": 195.0
+      },
+      "formula": "SO2",
+      "name": "Sulfur dioxide",
+      "properties": {
+        "MW_kg_per_mol": 0.064065,
+        "Pc_Pa": 7883000.0,
+        "Tc_K": 430.8,
+        "omega": 0.251
+      }
+    },
+    {
+      "antoine": {
+        "A": 12.7583,
+        "B": 2524.78,
+        "C": -11.16,
+        "Tmax_K": 220.0,
+        "Tmin_K": 159.0
+      },
+      "formula": "SF6",
+      "name": "Sulfur hexafluoride",
+      "properties": {
+        "MW_kg_per_mol": 0.14605600000000002,
+        "Pc_Pa": 3759000.0000000005,
+        "Tc_K": 318.7,
+        "omega": 0.286
+      }
+    },
+    {
+      "antoine": {
+        "A": 14.2201,
+        "B": 3995.7,
+        "C": -36.66,
+        "Tmax_K": 332.0,
+        "Tmin_K": 290.0
+      },
+      "formula": "SO3",
+      "name": "Sulfur trioxide",
+      "properties": {
+        "MW_kg_per_mol": 0.080064,
+        "Pc_Pa": 8206999.999999999,
+        "Tc_K": 491.0,
+        "omega": 0.41
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.3935,
+        "B": 3096.52,
+        "C": -53.67,
+        "Tmax_K": 410.0,
+        "Tmin_K": 280.0
+      },
+      "formula": "C7H8",
+      "name": "Toluene",
+      "properties": {
+        "MW_kg_per_mol": 0.09213800000000001,
+        "Pc_Pa": 4114000.0,
+        "Tc_K": 591.7,
+        "omega": 0.257
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.1975,
+        "B": 2212.32,
+        "C": -33.15,
+        "Tmax_K": 300.0,
+        "Tmin_K": 200.0
+      },
+      "formula": "C4H8",
+      "name": "trans-2-Butene",
+      "properties": {
+        "MW_kg_per_mol": 0.056106,
+        "Pc_Pa": 4104000.0,
+        "Tc_K": 428.6,
+        "omega": 0.214
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.2314,
+        "B": 2401.61,
+        "C": -36.3,
+        "Tmax_K": 300.0,
+        "Tmin_K": 240.0
+      },
+      "formula": "CCl3F",
+      "name": "Trichlorofluoromethane",
+      "properties": {
+        "MW_kg_per_mol": 0.137367,
+        "Pc_Pa": 4408000.0,
+        "Tc_K": 471.2,
+        "omega": 0.188
+      }
+    },
+    {
+      "antoine": {
+        "A": 9.7079,
+        "B": 2694.02,
+        "C": -27.0,
+        "Tmax_K": 305.0,
+        "Tmin_K": 275.0
+      },
+      "formula": "SiCl3H",
+      "name": "Trichlorosilane",
+      "properties": {
+        "MW_kg_per_mol": 0.135452,
+        "Pc_Pa": 4170000.0000000005,
+        "Tc_K": 479.0,
+        "omega": 0.203
+      }
+    },
+    {
+      "antoine": {
+        "A": 10.4899,
+        "B": 2351.42,
+        "C": -64.7,
+        "Tmax_K": 290.0,
+        "Tmin_K": 202.0
+      },
+      "formula": "WF6",
+      "name": "Tungsten hexafluoride",
+      "properties": {
+        "MW_kg_per_mol": 0.29783,
+        "Pc_Pa": 4340000.0,
+        "Tc_K": 444.0,
+        "omega": 0.231
+      }
+    },
+    {
+      "antoine": {
+        "A": 11.6834,
+        "B": 3816.44,
+        "C": -46.13,
+        "Tmax_K": 441.0,
+        "Tmin_K": 284.0
+      },
+      "formula": "H2O",
+      "name": "Water",
+      "properties": {
+        "MW_kg_per_mol": 0.018015,
+        "Pc_Pa": 22048000.0,
+        "Tc_K": 647.3,
+        "omega": 0.344
+      }
+    }
+  ],
+  "schema_version": 1
+}
