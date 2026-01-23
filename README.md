@@ -6,13 +6,11 @@ will be archived during the migration.
 ## Quickstart / Current API usage
 
 Install from the repo (editable):
-
 ```bash
 pip install -e .
 ```
 
 SI units are used throughout (temperature in K, pressure in Pa).
-
 ```python
 from chemthermo import Component, Composition, Mixture, PengRobinsonEOS, flash_tp
 

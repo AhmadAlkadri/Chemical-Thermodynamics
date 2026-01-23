@@ -38,6 +38,7 @@ exclude = [
   "notebooks",
   "NPT_EquilibriumSystem.py",
 ]
+extend-exclude = ["archive"]
 
 [tool.ruff.lint]
 ignore = ["E501"]

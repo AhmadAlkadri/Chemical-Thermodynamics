@@ -7,7 +7,6 @@ import json
 from pathlib import Path
 from typing import Iterable
 
-
 PA_PER_BAR = 1e5
 G_PER_KG = 1000.0
 SCHEMA_VERSION = 1
