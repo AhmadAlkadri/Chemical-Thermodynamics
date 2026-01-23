@@ -3,6 +3,52 @@ Work in progress: this repository is being refactored into the `chemthermo`
 package (src layout, SI units). Legacy modules and notebooks remain for now and
 will be archived during the migration.
 
+## Quickstart / Current API usage
+
+Install from the repo (editable):
+
+```bash
+pip install -e .
+```
+
+SI units are used throughout (temperature in K, pressure in Pa).
+
+```python
+from chemthermo import Component, Composition, Mixture, PengRobinsonEOS, flash_tp
+
+component_names = ("Methane", "Ethane", "Propane")
+components = tuple(Component.from_database(name) for name in component_names)
+z = (0.50, 0.30, 0.20)  # Mole fractions.
+
+composition = Composition(fractions=z, basis="mole", normalize=False)
+mixture = Mixture(components=components, composition=composition)
+eos = PengRobinsonEOS()
+
+temperature_K = 240.0
+pressure_Pa = 3.0e6
+
+result = flash_tp(
+    mixture,
+    temperature_K=temperature_K,
+    pressure_Pa=pressure_Pa,
+    eos=eos,
+)
+print(result.vapor_fraction)
+print(result.phases["liquid"].composition.fractions)
+print(result.phases["vapor"].composition.fractions)
+```
+
+See `examples/flash_tp_peng_robinson_demo.py` for a runnable script that prints a
+table-style summary.
+
+## Project status
+
+- The new `src/chemthermo` scaffold is the active API and uses SI units.
+- Legacy code and notebooks are archived under `archive/`.
+- Migration is ongoing; interfaces may change.
+- Current core features: component databank, Peng–Robinson EOS, and TP flash.
+- Some README sections still reference archived APIs.
+
 Thermodynamic flash calculation solvers written in Python. Implementing different equations of state (in order of difficulty).
 
 ## Peng–Robinson equation of state helper
