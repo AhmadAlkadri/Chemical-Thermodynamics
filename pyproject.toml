@@ -31,14 +31,8 @@ where = ["src"]
 target-version = "py311"
 line-length = 100
 exclude = [
-  "PengRobinson",
-  "VanderWaals",
   "database",
-  "flash",
-  "notebooks",
-  "NPT_EquilibriumSystem.py",
 ]
-extend-exclude = ["archive"]
 
 [tool.ruff.lint]
 ignore = ["E501"]
