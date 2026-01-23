@@ -5,7 +5,7 @@ import chemthermo as ct
 
 def test_flash_tp_peng_robinson_example_smoke() -> None:
     component_names = ("Methane", "Ethane", "Propane")
-    components = [ct.Component.from_database(name) for name in component_names]
+    components = tuple(ct.Component.from_database(name) for name in component_names)
     z = (0.50, 0.30, 0.20)
 
     mixture = ct.Mixture(
