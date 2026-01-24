@@ -1,4 +1,4 @@
-"""TP flash solver using phi-phi approach."""
+"""TP flash solver using phi-phi or gamma-phi updates."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import numpy as np
 
 from ..core import Composition, Mixture
 from ..exceptions import CompositionError, ConvergenceError, ModelError
-from ..models import EquationOfState
+from ..models import ActivityModel, EquationOfState
 from ..validation import COMPOSITION_SUM_TOL, validate_pressure, validate_temperature
 from .results import FlashResult, PhaseResult
 from .settings import FlashSettings
@@ -21,15 +21,25 @@ def flash_tp(
     temperature_K: float,
     pressure_Pa: float,
     eos: EquationOfState | None,
+    activity_model: ActivityModel | None = None,
+    flash_mode: str = "phi-phi",
     settings: FlashSettings | None = None,
 ) -> FlashResult:
-    """Perform a TP flash calculation using a cubic EOS and phi-phi updates."""
+    """Perform a TP flash calculation using phi-phi or gamma-phi updates."""
 
     temperature = validate_temperature(temperature_K)
     pressure = validate_pressure(pressure_Pa)
 
     if eos is None:
         raise ModelError("An equation-of-state model is required for flash_tp.")
+
+    mode = flash_mode.strip().casefold()
+    if mode not in {"phi-phi", "gamma-phi"}:
+        raise ModelError(f"Unsupported flash_mode '{flash_mode}'.")
+    if mode == "gamma-phi" and activity_model is None:
+        raise ModelError("An activity model is required for gamma-phi flash.")
+    if mode != "gamma-phi" and activity_model is not None:
+        raise ModelError("activity_model is only used when flash_mode='gamma-phi'.")
 
     if mixture.basis != "mole":
         raise ModelError("flash_tp currently requires mole-fraction compositions.")
@@ -54,7 +64,17 @@ def flash_tp(
             pressure,
             phase_name="liquid",
             vapor_fraction=0.0,
-            diagnostics={"k_min": k_min, "k_max": k_max, "iterations": 0, "converged": True},
+            diagnostics={
+                "k_min": k_min,
+                "k_max": k_max,
+                "iterations": 0,
+                "converged": True,
+                "convergence_reason": "single_phase_k_bounds",
+                "max_delta_k": 0.0,
+                "phase_count": 1,
+                "phase_state": "liquid",
+                "flash_mode": mode,
+            },
         )
 
     if np.all(K >= 1.0):
@@ -64,7 +84,17 @@ def flash_tp(
             pressure,
             phase_name="vapor",
             vapor_fraction=1.0,
-            diagnostics={"k_min": k_min, "k_max": k_max, "iterations": 0, "converged": True},
+            diagnostics={
+                "k_min": k_min,
+                "k_max": k_max,
+                "iterations": 0,
+                "converged": True,
+                "convergence_reason": "single_phase_k_bounds",
+                "max_delta_k": 0.0,
+                "phase_count": 1,
+                "phase_state": "vapor",
+                "flash_mode": mode,
+            },
         )
 
     vapor_fraction, f0, f1 = _rachford_rice(z, K)
@@ -82,6 +112,11 @@ def flash_tp(
                 "k_max": k_max,
                 "iterations": 0,
                 "converged": True,
+                "convergence_reason": "rr_no_root",
+                "max_delta_k": 0.0,
+                "phase_count": 1,
+                "phase_state": phase_name,
+                "flash_mode": mode,
                 "rr_f0": float(f0),
                 "rr_f1": float(f1),
                 "rr_status": "no_root",
@@ -124,7 +159,22 @@ def flash_tp(
         if np.any(phi_v <= 0.0) or np.any(phi_l <= 0.0):
             raise ModelError("EOS returned non-positive fugacity coefficients.")
 
-        K_new = phi_l / phi_v
+        if mode == "gamma-phi":
+            assert activity_model is not None
+            gamma_l = _as_array(
+                activity_model.activity_coefficients(
+                    mixture=mixture,
+                    temperature_K=temperature,
+                    composition=x.tolist(),
+                )
+            )
+            if gamma_l.shape != K.shape:
+                raise ModelError("Activity model returned inconsistent coefficient shapes.")
+            if np.any(gamma_l <= 0.0):
+                raise ModelError("Activity model returned non-positive activity coefficients.")
+            K_new = gamma_l * phi_l / phi_v
+        else:
+            K_new = phi_l / phi_v
         max_delta = float(np.max(np.abs(K_new - K)))
         if max_delta < settings.tol:
             return _two_phase_result(
@@ -137,9 +187,13 @@ def flash_tp(
                 diagnostics={
                     "iterations": iteration,
                     "converged": True,
+                    "convergence_reason": "tolerance_met",
                     "max_delta_k": max_delta,
                     "k_min": float(np.min(K_new)),
                     "k_max": float(np.max(K_new)),
+                    "phase_count": 2,
+                    "phase_state": "two_phase",
+                    "flash_mode": mode,
                 },
             )
 

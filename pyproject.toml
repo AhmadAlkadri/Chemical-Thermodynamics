@@ -26,6 +26,7 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "chemthermo.data" = ["components.json"]
+"chemthermo.parameters" = ["data/activity/nrtl.json"]
 
 [tool.ruff]
 target-version = "py311"

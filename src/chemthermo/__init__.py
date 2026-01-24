@@ -10,7 +10,8 @@ from .exceptions import (
     ThermoError,
 )
 from .flash import FlashResult, FlashSettings, PhaseResult, flash_tp
-from .models import ActivityModel, EquationOfState, PengRobinsonEOS
+from .models import NRTL, ActivityModel, EquationOfState, PengRobinsonEOS
+from .parameters import ActivityParameters, NRTLParameters
 from .units import (
     BAR_PER_PA,
     PA_PER_BAR,
@@ -43,6 +44,9 @@ __all__ = [
     "InputRangeError",
     "Mixture",
     "ModelError",
+    "NRTL",
+    "NRTLParameters",
+    "ActivityParameters",
     "PA_PER_BAR",
     "PA_PER_KPA",
     "PA_PER_MPA",
