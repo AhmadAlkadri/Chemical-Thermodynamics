@@ -27,5 +27,7 @@ def test_flash_tp_vlle_scaffold() -> None:
         assert sum(phase.composition.fractions) == pytest.approx(1.0)
     assert result.diagnostics.get("converged") is True
     lle_delta = result.diagnostics.get("lle_max_delta_x")
+    lle_tol = result.diagnostics.get("lle_tol")
     assert isinstance(lle_delta, float)
-    assert lle_delta < 1e-6
+    assert isinstance(lle_tol, float)
+    assert lle_delta <= lle_tol

@@ -25,6 +25,7 @@ class _LleResult:
     iterations: int
     converged: bool
     max_delta_x: float
+    tol: float
     max_residual: float
     composition_residual: float
     termination_reason: str
@@ -365,6 +366,7 @@ def _flash_tp_vlle(
                 "lle_iterations": lle_result.iterations,
                 "lle_max_delta_x": lle_result.max_delta_x,
                 "lle_max_residual": lle_result.max_residual,
+                "lle_tol": lle_result.tol,
                 "flash_mode": "vlle",
             },
         )
@@ -393,6 +395,7 @@ def _flash_tp_vlle(
             "lle_max_delta_x": lle_result.max_delta_x,
             "lle_max_residual": lle_result.max_residual,
             "lle_composition_residual": lle_result.composition_residual,
+            "lle_tol": lle_result.tol,
             "termination_reason": lle_result.termination_reason,
             "converged": vle_result.diagnostics.get("converged", False)
             and lle_result.converged,
@@ -523,6 +526,7 @@ def _solve_lle(
             iterations=iterations,
             converged=False,
             max_delta_x=max_delta,
+            tol=lle_tol,
             max_residual=max_residual,
             composition_residual=float("inf"),
             termination_reason="lle_invalid_split",
@@ -544,6 +548,7 @@ def _solve_lle(
         iterations=iterations,
         converged=converged,
         max_delta_x=max_delta,
+        tol=lle_tol,
         max_residual=max_residual,
         composition_residual=composition_residual,
         termination_reason=termination_reason,
