@@ -70,7 +70,7 @@ def flash_tp(
 
     if mode == "vlle":
         if activity_model is None:
-            raise ModelError("An activity model is required for VLLE flash.")
+            raise ValueError("An activity model is required for VLLE flash.")
         return _flash_tp_vlle(
             mixture,
             temperature,
@@ -283,11 +283,15 @@ def _flash_tp_vlle(
     if z.size == 0:
         raise CompositionError("Mixture composition must be non-empty.")
 
-    gamma_max = _gamma_max(
-        activity_model=activity_model,
-        mixture=mixture,
-        temperature=temperature,
-        composition=z,
+    gamma_max = (
+        _gamma_max(
+            activity_model=activity_model,
+            mixture=mixture,
+            temperature_K=temperature,
+            composition=z,
+        )
+        if activity_model is not None
+        else None
     )
 
     try:
@@ -600,12 +604,12 @@ def _gamma_max(
     *,
     activity_model: ActivityModel,
     mixture: Mixture,
-    temperature: float,
+    temperature_K: float,
     composition: np.ndarray,
 ) -> float | None:
     gamma = activity_model.activity_coefficients(
         mixture=mixture,
-        temperature_K=temperature,
+        temperature_K=temperature_K,
         composition=composition.tolist(),
     )
     return float(max(gamma)) if gamma else None
