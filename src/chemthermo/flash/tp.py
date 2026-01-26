@@ -210,8 +210,7 @@ def flash_tp(
             raise ConvergenceError("Rachford-Rice failed to bracket a vapor fraction.")
 
     raise ConvergenceError(
-        "flash_tp did not converge within the iteration limit; "
-        f"max_delta_k={max_delta:.3e}."
+        f"flash_tp did not converge within the iteration limit; max_delta_k={max_delta:.3e}."
     )
 
 
