@@ -29,8 +29,8 @@ def _format_diagnostics(diag: Mapping[str, float | int | str | bool]) -> str:
         "converged",
         "termination_reason",
         "lle_max_delta_x",
-        "lle_max_residual",
         "lle_composition_residual",
+        "lle_tol",
     ]
     lines = ["Diagnostics:"]
     for key in keys:

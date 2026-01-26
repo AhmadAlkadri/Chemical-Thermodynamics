@@ -26,7 +26,6 @@ class _LleResult:
     converged: bool
     max_delta_x: float
     tol: float
-    max_residual: float
     composition_residual: float
     termination_reason: str
     separation: float
@@ -312,7 +311,6 @@ def _flash_tp_vlle(
             vle_result.diagnostics,
             {
                 "phase_regime": "single-phase",
-                "vlle_status": "fallback",
                 "termination_reason": "vlle_no_liquid",
                 "flash_mode": "vlle",
             },
@@ -332,7 +330,6 @@ def _flash_tp_vlle(
             vle_result.diagnostics,
             {
                 "phase_regime": "single-phase",
-                "vlle_status": "fallback",
                 "termination_reason": "vlle_no_liquid",
                 "flash_mode": "vlle",
             },
@@ -365,11 +362,9 @@ def _flash_tp_vlle(
             vle_result.diagnostics,
             {
                 "phase_regime": "VLE",
-                "vlle_status": "fallback",
                 "termination_reason": "vlle_lle_failed",
                 "lle_iterations": lle_result.iterations,
                 "lle_max_delta_x": lle_result.max_delta_x,
-                "lle_max_residual": lle_result.max_residual,
                 "lle_tol": lle_result.tol,
                 "flash_mode": "vlle",
             },
@@ -397,7 +392,6 @@ def _flash_tp_vlle(
             "vle_iterations": vle_result.diagnostics.get("iterations", 0),
             "lle_iterations": lle_result.iterations,
             "lle_max_delta_x": lle_result.max_delta_x,
-            "lle_max_residual": lle_result.max_residual,
             "lle_composition_residual": lle_result.composition_residual,
             "lle_tol": lle_result.tol,
             "termination_reason": lle_result.termination_reason,
@@ -413,7 +407,6 @@ def _flash_tp_vlle(
             diagnostics,
             {
                 "phase_regime": "single-phase",
-                "vlle_status": "fallback",
                 "termination_reason": "vlle_no_vapor",
             },
         )
@@ -454,7 +447,6 @@ def _solve_lle(
     anchor_x1 = x1.copy()
     anchor_x2 = x2.copy()
     max_delta = float("inf")
-    max_residual = float("inf")
     iterations = 0
     damping = 0.5 if settings.damping is None else settings.damping
     anchor_weight = 0.1
@@ -512,9 +504,6 @@ def _solve_lle(
         x1 = new_x1
         x2 = new_x2
 
-        fugacity_residual = np.abs(x1 * gamma1 * phi1 - x2 * gamma2 * phi2)
-        max_residual = float(np.max(fugacity_residual))
-
         if max_delta < lle_tol:
             break
 
@@ -531,7 +520,6 @@ def _solve_lle(
             converged=False,
             max_delta_x=max_delta,
             tol=lle_tol,
-            max_residual=max_residual,
             composition_residual=float("inf"),
             termination_reason="lle_invalid_split",
             separation=separation,
@@ -553,7 +541,6 @@ def _solve_lle(
         converged=converged,
         max_delta_x=max_delta,
         tol=lle_tol,
-        max_residual=max_residual,
         composition_residual=composition_residual,
         termination_reason=termination_reason,
         separation=separation,
