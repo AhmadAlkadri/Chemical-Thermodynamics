@@ -8,6 +8,13 @@
       "tau_21": 0.1,
       "alpha_12": 0.3,
       "alpha_21": 0.3
+    },
+    {
+      "components": ["Benzene", "Water"],
+      "tau_12": 3.0,
+      "tau_21": 2.0,
+      "alpha_12": 0.3,
+      "alpha_21": 0.3
     }
   ]
 }
