@@ -20,6 +20,9 @@ pip install notebook
 
 - `notebooks/01_tp_flash_peng_robinson.ipynb`
 - `notebooks/02_tp_flash_nrtl.ipynb`
+- `notebooks/validation/README.md`
+- `notebooks/validation/01_flash_pr_vs_thermo.ipynb`
+- `notebooks/validation/02_flash_nrtl_vs_thermo.ipynb`
 
 Run with:
 
