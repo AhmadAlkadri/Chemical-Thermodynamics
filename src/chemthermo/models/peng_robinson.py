@@ -23,7 +23,11 @@ R_J_PER_MOL_K = 8.314462618
 
 @dataclass(frozen=True)
 class PengRobinsonEOS(EquationOfState):
-    """Peng-Robinson EOS with simple quadratic mixing and optional kij scalar."""
+    """Peng-Robinson EOS in SI units with simple quadratic mixing.
+
+    Supports "vapor" and "liquid" phase labels and returns fugacity
+    coefficients (dimensionless).
+    """
 
     kij: float = 0.0
     name: str = "Peng-Robinson"
@@ -39,16 +43,20 @@ class PengRobinsonEOS(EquationOfState):
     ) -> Sequence[float]:
         """Return fugacity coefficients for a phase composition.
 
-        Parameters
-        ----------
-        mixture:
-            Mixture providing component properties in SI units.
-        temperature_K, pressure_Pa:
-            State conditions in K and Pa.
-        composition:
-            Phase mole fractions (must sum to 1 within tolerance).
-        phase:
-            "vapor" selects the largest real root; "liquid" selects the smallest.
+        Args:
+            mixture: Mixture providing component properties in SI units.
+            temperature_K: Temperature in K.
+            pressure_Pa: Pressure in Pa.
+            composition: Mole fractions, sum to 1 within COMPOSITION_SUM_TOL.
+            phase: "vapor" selects the largest real root; "liquid" the smallest.
+
+        Returns:
+            Fugacity coefficients (dimensionless), one per component.
+
+        Raises:
+            CompositionError: If composition length mismatches or is invalid.
+            ModelError: If EOS parameters or roots are invalid.
+            ValueError: If phase is not "vapor" or "liquid".
         """
 
         temperature = validate_temperature(temperature_K)

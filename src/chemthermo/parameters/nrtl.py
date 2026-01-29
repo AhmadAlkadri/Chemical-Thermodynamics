@@ -20,7 +20,16 @@ _SCHEMA_VERSION = 1
 
 @dataclass(frozen=True)
 class NRTLParameters:
-    """Binary NRTL parameters keyed by ordered component pairs."""
+    """Binary NRTL parameters keyed by ordered component pairs.
+
+    Payload schema (nrtl.json) requires:
+        schema_version: 1
+        model: "NRTL"
+        pairs: list of objects with components, tau_12, tau_21, alpha_12, alpha_21
+
+    Component names are normalized for lookup. Missing pairs raise ModelError
+    when building arrays for a mixture.
+    """
 
     tau: Mapping[tuple[str, str], float]
     alpha: Mapping[tuple[str, str], float]

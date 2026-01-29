@@ -20,7 +20,12 @@ def _default_parameters() -> NRTLParameters:
 
 @dataclass(frozen=True)
 class NRTL(ActivityModel):
-    """Non-random two-liquid activity coefficient model (dimensionless)."""
+    """Non-random two-liquid (NRTL) activity coefficient model.
+
+    Parameters are supplied by NRTLParameters and must cover all ordered
+    component pairs in the mixture. Returns positive, finite activity
+    coefficients for valid inputs.
+    """
 
     parameters: NRTLParameters = field(default_factory=_default_parameters)
     name: str = "NRTL"
@@ -32,6 +37,20 @@ class NRTL(ActivityModel):
         temperature_K: float,
         composition: Sequence[float],
     ) -> Sequence[float]:
+        """Return activity coefficients for a liquid composition.
+
+        Args:
+            mixture: Mixture providing component identities.
+            temperature_K: Temperature in K.
+            composition: Mole fractions, sum to 1 within COMPOSITION_SUM_TOL.
+
+        Returns:
+            Activity coefficients (dimensionless), one per component.
+
+        Raises:
+            CompositionError: If composition length mismatches or is invalid.
+            ModelError: If parameters are missing or results are non-physical.
+        """
         validate_temperature(temperature_K)
 
         if len(composition) != len(mixture.components):

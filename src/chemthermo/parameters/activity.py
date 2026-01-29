@@ -10,7 +10,10 @@ from .nrtl import NRTLParameters
 
 @dataclass(frozen=True)
 class ActivityParameters:
-    """Factory for activity-model parameter stores."""
+    """Factory for activity-model parameter stores.
+
+    Use load() with a model name (e.g., "NRTL") to obtain a parameter store.
+    """
 
     @staticmethod
     def load(model: str) -> NRTLParameters:
