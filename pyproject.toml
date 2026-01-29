@@ -13,6 +13,7 @@ dependencies = ["numpy>=1.24"]
 
 [project.optional-dependencies]
 dev = [
+  "nbstripout>=0.7.1",
   "pytest>=7.4",
   "ruff==0.14.13",
   "pyright>=1.1.350",

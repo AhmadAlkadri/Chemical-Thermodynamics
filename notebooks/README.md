@@ -16,6 +16,22 @@ pip install -e ".[validation]"
 pip install notebook
 ```
 
+## Notebook output stripping
+
+This repo uses `nbstripout` as a git filter to strip notebook outputs on commit
+while keeping outputs visible locally.
+
+Install the tooling (once):
+
+```bash
+pip install -e ".[dev]"
+python -m nbstripout --install --attributes .gitattributes
+```
+
+Notes:
+- Running a notebook will add outputs and `git status` will show the file as modified.
+- Committing will automatically strip outputs, keeping the repository clean.
+
 ## Contents
 
 - `notebooks/01_tp_flash_peng_robinson.ipynb`
