@@ -17,6 +17,9 @@ dev = [
   "ruff==0.14.13",
   "pyright>=1.1.350",
 ]
+validation = [
+  "thermo>=0.6.0",
+]
 
 [tool.setuptools]
 package-dir = { "" = "src" }

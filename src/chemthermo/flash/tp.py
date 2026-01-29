@@ -306,8 +306,7 @@ def _flash_tp_vle(
             raise ConvergenceError("Rachford-Rice failed to bracket a vapor fraction.")
 
     raise ConvergenceError(
-        "flash_tp did not converge within the iteration limit; "
-        f"max_delta_k={max_delta:.3e}."
+        f"flash_tp did not converge within the iteration limit; max_delta_k={max_delta:.3e}."
     )
 
 
@@ -438,8 +437,7 @@ def _flash_tp_vlle(
             "lle_composition_residual": lle_result.composition_residual,
             "lle_tol": lle_result.tol,
             "termination_reason": lle_result.termination_reason,
-            "converged": vle_result.diagnostics.get("converged", False)
-            and lle_result.converged,
+            "converged": vle_result.diagnostics.get("converged", False) and lle_result.converged,
         },
     )
     diagnostics.update(gamma_diag)
@@ -788,6 +786,7 @@ def _wilson_k(mixture: Mixture, temperature: float, pressure: float) -> np.ndarr
 
 def _rachford_rice(z: np.ndarray, K: np.ndarray) -> tuple[float | None, float, float]:
     """Solve the Rachford-Rice equation; returns (vapor_fraction, f0, f1)."""
+
     def f(v: float) -> float:
         denom = 1.0 + v * (K - 1.0)
         if np.any(denom <= 0.0):

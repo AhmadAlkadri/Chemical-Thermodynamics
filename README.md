@@ -37,3 +37,16 @@ print(result.phases["vapor"].composition.fractions)
 
 See `examples/flash_tp_peng_robinson_demo.py` for a runnable script that prints a
 table-style summary.
+
+## Examples and notebooks
+
+- Scripted demos: `examples/README.md`
+- Jupyter notebooks: `notebooks/README.md`
+
+## Optional validation dependencies
+
+Install the reference library used by validation tests:
+
+```bash
+pip install -e ".[validation]"
+```
