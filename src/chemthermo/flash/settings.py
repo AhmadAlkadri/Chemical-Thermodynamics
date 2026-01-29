@@ -9,7 +9,16 @@ from ..exceptions import InputRangeError
 
 @dataclass(frozen=True)
 class FlashSettings:
-    """Solver settings for flash calculations."""
+    """Solver settings for flash calculations.
+
+    Attributes:
+        max_iter: Maximum number of iterations.
+        tol: Convergence tolerance on K-value updates (dimensionless).
+        damping: Optional damping factor for K updates in (0, 1].
+
+    Notes:
+        The solver is deterministic for fixed inputs, models, and settings.
+    """
 
     max_iter: int = 100
     tol: float = 1e-8

@@ -12,7 +12,11 @@ from .composition import Composition, CompositionBasis
 
 @dataclass(frozen=True)
 class Mixture:
-    """A mixture of components with an associated composition."""
+    """A mixture of components with an associated composition.
+
+    The number of components must match the composition length, and the
+    composition must already satisfy its own validation contract.
+    """
 
     components: tuple[Component, ...]
     composition: Composition

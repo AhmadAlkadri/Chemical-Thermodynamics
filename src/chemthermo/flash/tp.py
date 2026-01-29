@@ -1,4 +1,10 @@
-"""TP flash solver using phi-phi, gamma-phi, or VLLE scaffolding."""
+"""TP flash calculations (T,P) for VLE/VLLE in SI units.
+
+Supports phi-phi, gamma-phi, and a staged VLLE scaffold. The solver uses
+Wilson K-value initialization, Rachford-Rice vapor fraction updates, and
+fixed-point K updates. Given the same inputs and settings, results are
+deterministic.
+"""
 
 from __future__ import annotations
 
@@ -41,7 +47,42 @@ def flash_tp(
     flash_mode: str = "phi-phi",
     settings: FlashSettings | None = None,
 ) -> FlashResult:
-    """Perform a TP flash calculation using phi-phi, gamma-phi, or VLLE scaffolding."""
+    """Perform a TP flash calculation using phi-phi, gamma-phi, or VLLE scaffolding.
+
+    Args:
+        mixture: Mixture with mole-fraction composition.
+        temperature_K: Temperature in K.
+        pressure_Pa: Pressure in Pa.
+        eos: Equation-of-state model used for fugacity coefficients.
+        activity_model: Activity model (required for gamma-phi and VLLE).
+        flash_mode: Case-insensitive mode: "phi-phi", "gamma-phi", or "vlle".
+        settings: Iteration controls (tolerance, damping, max iterations).
+
+    Returns:
+        FlashResult with phase compositions and fractions. Phase names follow:
+        VLE -> "liquid"/"vapor", single-phase -> "liquid" or "vapor",
+        VLLE -> "vapor"/"liquid1"/"liquid2".
+
+    Diagnostics:
+        Diagnostics keys are implementation details. Current stable keys include:
+        - VLE: iterations, converged, termination_reason, max_delta_k, k_min,
+          k_max, phase_count, phase_state, phase_regime, flash_mode.
+        - VLE single-phase fallbacks may also include rr_f0, rr_f1, rr_status.
+        - VLLE: phase_regime, phase_state, phase_count, flash_mode, vle_iterations,
+          lle_iterations, lle_max_delta_x, lle_composition_residual, lle_tol,
+          termination_reason, converged, and optional vlle_gamma_max.
+
+    Raises:
+        InputRangeError: If temperature or pressure is non-physical.
+        ModelError: If required models are missing or return invalid values.
+        CompositionError: If the mixture composition is invalid.
+        ConvergenceError: If iteration fails to converge.
+        ValueError: If VLLE is requested without an activity model.
+
+    Notes:
+        Single-phase fallbacks are returned (not raised) when K-bounds or
+        Rachford-Rice root checks indicate only one phase is possible.
+    """
 
     temperature = validate_temperature(temperature_K)
     pressure = validate_pressure(pressure_Pa)

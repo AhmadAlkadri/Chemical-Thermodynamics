@@ -13,7 +13,18 @@ CompositionBasis = Literal["mole", "mass"]
 
 @dataclass(frozen=True)
 class Composition:
-    """Component fractions on a mole or mass basis."""
+    """Component fractions on a mole or mass basis.
+
+    Args:
+        fractions: Mole or mass fractions.
+        basis: "mole" or "mass".
+        normalize: If True, normalize to sum to 1. If False, require the
+            sum to be 1 within tol.
+        tol: Absolute tolerance for the sum-to-one check.
+
+    Notes:
+        Fractions are stored as an immutable tuple after validation.
+    """
 
     fractions: Sequence[float]
     basis: CompositionBasis = "mole"

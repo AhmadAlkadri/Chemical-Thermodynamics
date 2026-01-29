@@ -12,7 +12,14 @@ from ..validation import COMPOSITION_SUM_TOL, validate_pressure, validate_temper
 
 @dataclass(frozen=True)
 class PhaseResult:
-    """Per-phase composition and properties."""
+    """Per-phase composition and properties.
+
+    Attributes:
+        name: Phase name (non-empty).
+        composition: Phase composition as a Composition object (fractions sum
+            to 1 within COMPOSITION_SUM_TOL).
+        properties: Optional scalar properties for the phase (user-defined).
+    """
 
     name: str
     composition: Composition
@@ -25,7 +32,29 @@ class PhaseResult:
 
 @dataclass(frozen=True)
 class FlashResult:
-    """Outcome of a flash calculation."""
+    """Outcome of a flash calculation.
+
+    Attributes:
+        temperature_K: Temperature in K.
+        pressure_Pa: Pressure in Pa.
+        phases: Mapping from phase name to PhaseResult.
+        vapor_fraction: Vapor fraction (0-1), if applicable.
+        phase_fractions: Mapping from phase name to phase fraction.
+        diagnostics: Diagnostic metadata from the solver.
+
+    Invariants:
+        - temperature_K > 0 and pressure_Pa > 0.
+        - phases is non-empty, and mapping keys match phase.name.
+        - phase_fractions values are in [0, 1] and sum to 1 within
+          COMPOSITION_SUM_TOL.
+        - If vapor_fraction is provided and phase_fractions includes "vapor",
+          the two agree within COMPOSITION_SUM_TOL.
+
+    Phase naming conventions:
+        - VLE: "liquid", "vapor"
+        - Single-phase: "liquid" or "vapor"
+        - VLLE scaffold: "vapor", "liquid1", "liquid2"
+    """
 
     temperature_K: float
     pressure_Pa: float

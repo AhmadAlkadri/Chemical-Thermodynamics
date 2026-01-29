@@ -11,7 +11,19 @@ from ..exceptions import PropertyNotFoundError
 
 @dataclass(frozen=True)
 class Component:
-    """Chemical component metadata in SI units."""
+    """Chemical component metadata in SI units.
+
+    Attributes:
+        name: Component common name.
+        formula: Chemical formula string.
+        properties: Mapping of property name to value (SI units).
+        antoine: Optional Antoine coefficients mapping.
+
+    Notes:
+        Use Component.from_database to load a record from the built-in
+        databank. Missing properties raise PropertyNotFoundError via
+        require_property().
+    """
 
     name: str
     formula: str
