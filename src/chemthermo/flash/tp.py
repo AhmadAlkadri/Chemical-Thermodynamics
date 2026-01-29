@@ -133,6 +133,7 @@ def _flash_tp_vle(
     mode: str,
     settings: FlashSettings,
 ) -> FlashResult:
+    """Internal TP VLE solver (phi-phi or gamma-phi) with K-value iteration."""
     if mixture.basis != "mole":
         raise ModelError("flash_tp currently requires mole-fraction compositions.")
 
@@ -319,6 +320,7 @@ def _flash_tp_vlle(
     activity_model: ActivityModel,
     settings: FlashSettings,
 ) -> FlashResult:
+    """Stage gamma-phi VLE, then split the liquid into two LLE phases."""
     z = np.array(mixture.fractions, dtype=float)
     if z.size == 0:
         raise CompositionError("Mixture composition must be non-empty.")
@@ -484,6 +486,7 @@ def _solve_lle(
     activity_model: ActivityModel,
     settings: FlashSettings,
 ) -> _LleResult:
+    """Fixed-point LLE split for a liquid feed composition."""
     x1, x2 = _initialize_liquid_split(z_liq)
     anchor_x1 = x1.copy()
     anchor_x2 = x2.copy()
@@ -770,6 +773,7 @@ def _three_phase_result(
 
 
 def _wilson_k(mixture: Mixture, temperature: float, pressure: float) -> np.ndarray:
+    """Wilson K-value estimate for each component (dimensionless)."""
     values = []
     for component in mixture.components:
         tc = component.tc_k
@@ -783,6 +787,7 @@ def _wilson_k(mixture: Mixture, temperature: float, pressure: float) -> np.ndarr
 
 
 def _rachford_rice(z: np.ndarray, K: np.ndarray) -> tuple[float | None, float, float]:
+    """Solve the Rachford-Rice equation; returns (vapor_fraction, f0, f1)."""
     def f(v: float) -> float:
         denom = 1.0 + v * (K - 1.0)
         if np.any(denom <= 0.0):
@@ -814,6 +819,7 @@ def _rachford_rice(z: np.ndarray, K: np.ndarray) -> tuple[float | None, float, f
 
 
 def _normalize(values: np.ndarray) -> np.ndarray:
+    """Clip to positive values and normalize to sum to 1."""
     values = np.clip(values, 1e-12, None)
     total = float(np.sum(values))
     if total <= 0.0:

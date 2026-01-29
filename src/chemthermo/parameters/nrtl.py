@@ -128,6 +128,7 @@ def _insert_pair(
     value_ba: float,
     label: str,
 ) -> None:
+    """Insert ordered pair parameters into a symmetric lookup store."""
     key_ab = (name_a, name_b)
     key_ba = (name_b, name_a)
     if key_ab in store or key_ba in store:
@@ -138,6 +139,7 @@ def _insert_pair(
 
 @lru_cache(maxsize=1)
 def _load_payload() -> dict[str, object]:
+    """Load the raw NRTL parameter payload from package resources."""
     data_path = resources.files("chemthermo.parameters")
     for segment in _NRTL_RESOURCE:
         data_path = data_path / segment
