@@ -1,3 +1,5 @@
+from typing import Any
+
 import numpy as np
 import pytest
 
@@ -13,14 +15,17 @@ PRMIX = thermo.PRMIX
 NRTL_gammas = thermo.nrtl.NRTL_gammas
 
 
-def _get_vf(state: object) -> float | None:
+def _get_vf(state: Any) -> float | None:
     vf = getattr(state, "VF", None)
     if vf is None:
         return None
-    return vf() if callable(vf) else vf
+    vf_value = vf() if callable(vf) else vf
+    if isinstance(vf_value, (int, float)):
+        return float(vf_value)
+    return None
 
 
-def _pr_flasher(ids: list[str]) -> FlashVL:
+def _pr_flasher(ids: list[str]) -> Any:
     constants, properties = ChemicalConstantsPackage.from_IDs(ids)
     kijs = [[0.0 for _ in ids] for _ in ids]
     eos_kwargs = {
