@@ -53,7 +53,6 @@ class FlashResult:
     Phase naming conventions:
         - VLE: "liquid", "vapor"
         - Single-phase: "liquid" or "vapor"
-        - VLLE scaffold: "vapor", "liquid1", "liquid2"
     """
 
     temperature_K: float

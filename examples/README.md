@@ -14,8 +14,6 @@ Run examples from the repo root with `python`.
   - Existing TP flash demo (Peng-Robinson EOS).
 - `examples/flash_tp_gamma_phi_demo.py`
   - Existing TP flash demo (gamma-phi, NRTL + Peng-Robinson).
-- `examples/flash_tp_vlle_demo.py`
-  - Existing VLLE scaffold demo.
 
 ## Expected output format
 

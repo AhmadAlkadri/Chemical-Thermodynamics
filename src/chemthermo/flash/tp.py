@@ -1,16 +1,14 @@
-"""TP flash calculations (T,P) for VLE/VLLE in SI units.
+"""TP flash calculations (T,P) for VLE in SI units.
 
-Supports phi-phi, gamma-phi, and a staged VLLE scaffold. The solver uses
-Wilson K-value initialization, Rachford-Rice vapor fraction updates, and
-fixed-point K updates. Given the same inputs and settings, results are
-deterministic.
+Supports phi-phi and gamma-phi. The solver uses Wilson K-value initialization,
+Rachford-Rice vapor fraction updates, and fixed-point K updates. Given the
+same inputs and settings, results are deterministic.
 """
 
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
-from typing import Mapping, Sequence
+from typing import Sequence
 
 import numpy as np
 
@@ -20,21 +18,6 @@ from ..models import ActivityModel, EquationOfState
 from ..validation import COMPOSITION_SUM_TOL, validate_pressure, validate_temperature
 from .results import FlashResult, PhaseResult
 from .settings import FlashSettings
-
-
-@dataclass(frozen=True)
-class _LleResult:
-    x1: np.ndarray
-    x2: np.ndarray
-    beta_l1: float
-    beta_l2: float
-    iterations: int
-    converged: bool
-    max_delta_x: float
-    tol: float
-    composition_residual: float
-    termination_reason: str
-    separation: float
 
 
 def flash_tp(
@@ -47,37 +30,31 @@ def flash_tp(
     flash_mode: str = "phi-phi",
     settings: FlashSettings | None = None,
 ) -> FlashResult:
-    """Perform a TP flash calculation using phi-phi, gamma-phi, or VLLE scaffolding.
+    """Perform a TP flash calculation using phi-phi or gamma-phi.
 
     Args:
         mixture: Mixture with mole-fraction composition.
         temperature_K: Temperature in K.
         pressure_Pa: Pressure in Pa.
         eos: Equation-of-state model used for fugacity coefficients.
-        activity_model: Activity model (required for gamma-phi and VLLE).
-        flash_mode: Case-insensitive mode: "phi-phi", "gamma-phi", or "vlle".
+        activity_model: Activity model (required for gamma-phi).
+        flash_mode: Case-insensitive mode: "phi-phi" or "gamma-phi".
         settings: Iteration controls (tolerance, damping, max iterations).
 
     Returns:
         FlashResult with phase compositions and fractions. Phase names follow:
-        VLE -> "liquid"/"vapor", single-phase -> "liquid" or "vapor",
-        VLLE -> "vapor"/"liquid1"/"liquid2".
+        VLE -> "liquid"/"vapor", single-phase -> "liquid" or "vapor".
 
     Diagnostics:
         Diagnostics keys are implementation details. Current stable keys include:
         - VLE: iterations, converged, termination_reason, max_delta_k, k_min,
           k_max, phase_count, phase_state, phase_regime, flash_mode.
         - VLE single-phase fallbacks may also include rr_f0, rr_f1, rr_status.
-        - VLLE: phase_regime, phase_state, phase_count, flash_mode, vle_iterations,
-          lle_iterations, lle_max_delta_x, lle_composition_residual, lle_tol,
-          termination_reason, converged, and optional vlle_gamma_max.
-
     Raises:
         InputRangeError: If temperature or pressure is non-physical.
         ModelError: If required models are missing or return invalid values.
         CompositionError: If the mixture composition is invalid.
         ConvergenceError: If iteration fails to converge.
-        ValueError: If VLLE is requested without an activity model.
 
     Notes:
         Single-phase fallbacks are returned (not raised) when K-bounds or
@@ -109,15 +86,9 @@ def flash_tp(
         )
 
     if mode == "vlle":
-        if activity_model is None:
-            raise ValueError("An activity model is required for VLLE flash.")
-        return _flash_tp_vlle(
-            mixture,
-            temperature,
-            pressure,
-            eos=eos,
-            activity_model=activity_model,
-            settings=settings,
+        raise ModelError(
+            "VLLE support is provided by the optional chemthermo_vlle plugin. "
+            "Install chemthermo_vlle to enable VLLE support."
         )
 
     raise ModelError(f"Unsupported flash_mode '{flash_mode}'.")
@@ -310,349 +281,6 @@ def _flash_tp_vle(
     )
 
 
-def _flash_tp_vlle(
-    mixture: Mixture,
-    temperature: float,
-    pressure: float,
-    *,
-    eos: EquationOfState,
-    activity_model: ActivityModel,
-    settings: FlashSettings,
-) -> FlashResult:
-    """Stage gamma-phi VLE, then split the liquid into two LLE phases."""
-    z = np.array(mixture.fractions, dtype=float)
-    if z.size == 0:
-        raise CompositionError("Mixture composition must be non-empty.")
-
-    gamma_max = (
-        _gamma_max(
-            activity_model=activity_model,
-            mixture=mixture,
-            temperature_K=temperature,
-            composition=z,
-        )
-        if activity_model is not None
-        else None
-    )
-
-    try:
-        vle_result = _flash_tp_vle(
-            mixture,
-            temperature,
-            pressure,
-            eos=eos,
-            activity_model=activity_model,
-            mode="gamma-phi",
-            settings=settings,
-        )
-    except ConvergenceError as exc:
-        raise ConvergenceError("VLLE staging failed during VLE solve.") from exc
-
-    if "liquid" not in vle_result.phases:
-        diagnostics = _merge_diagnostics(
-            vle_result.diagnostics,
-            {
-                "phase_regime": "single-phase",
-                "termination_reason": "vlle_no_liquid",
-                "flash_mode": "vlle",
-            },
-        )
-        return FlashResult(
-            temperature_K=vle_result.temperature_K,
-            pressure_Pa=vle_result.pressure_Pa,
-            phases=vle_result.phases,
-            vapor_fraction=vle_result.vapor_fraction,
-            phase_fractions=vle_result.phase_fractions,
-            diagnostics=diagnostics,
-        )
-
-    beta_v = float(vle_result.vapor_fraction or 0.0)
-    if beta_v >= 1.0 - COMPOSITION_SUM_TOL:
-        diagnostics = _merge_diagnostics(
-            vle_result.diagnostics,
-            {
-                "phase_regime": "single-phase",
-                "termination_reason": "vlle_no_liquid",
-                "flash_mode": "vlle",
-            },
-        )
-        return FlashResult(
-            temperature_K=vle_result.temperature_K,
-            pressure_Pa=vle_result.pressure_Pa,
-            phases=vle_result.phases,
-            vapor_fraction=vle_result.vapor_fraction,
-            phase_fractions=vle_result.phase_fractions,
-            diagnostics=diagnostics,
-        )
-
-    liquid_phase = vle_result.phases["liquid"]
-    z_liq = np.array(liquid_phase.composition.fractions, dtype=float)
-
-    lle_result = _solve_lle(
-        mixture,
-        temperature,
-        pressure,
-        z_liq,
-        eos=eos,
-        activity_model=activity_model,
-        settings=settings,
-    )
-
-    gamma_diag = {"vlle_gamma_max": gamma_max} if gamma_max is not None else {}
-    if not lle_result.converged or lle_result.separation < 1e-3:
-        diagnostics = _merge_diagnostics(
-            vle_result.diagnostics,
-            {
-                "phase_regime": "VLE",
-                "termination_reason": "vlle_lle_failed",
-                "lle_iterations": lle_result.iterations,
-                "lle_max_delta_x": lle_result.max_delta_x,
-                "lle_tol": lle_result.tol,
-                "flash_mode": "vlle",
-            },
-        )
-        diagnostics.update(gamma_diag)
-        return FlashResult(
-            temperature_K=vle_result.temperature_K,
-            pressure_Pa=vle_result.pressure_Pa,
-            phases=vle_result.phases,
-            vapor_fraction=vle_result.vapor_fraction,
-            phase_fractions=vle_result.phase_fractions,
-            diagnostics=diagnostics,
-        )
-
-    beta_l1_total = (1.0 - beta_v) * lle_result.beta_l1
-    beta_l2_total = (1.0 - beta_v) * lle_result.beta_l2
-
-    diagnostics = _merge_diagnostics(
-        vle_result.diagnostics,
-        {
-            "phase_regime": "VLLE",
-            "phase_count": 3,
-            "phase_state": "three_phase",
-            "flash_mode": "vlle",
-            "vle_iterations": vle_result.diagnostics.get("iterations", 0),
-            "lle_iterations": lle_result.iterations,
-            "lle_max_delta_x": lle_result.max_delta_x,
-            "lle_composition_residual": lle_result.composition_residual,
-            "lle_tol": lle_result.tol,
-            "termination_reason": lle_result.termination_reason,
-            "converged": vle_result.diagnostics.get("converged", False) and lle_result.converged,
-        },
-    )
-    diagnostics.update(gamma_diag)
-
-    vapor = vle_result.phases.get("vapor")
-    if vapor is None:
-        diagnostics = _merge_diagnostics(
-            diagnostics,
-            {
-                "phase_regime": "single-phase",
-                "termination_reason": "vlle_no_vapor",
-            },
-        )
-        return FlashResult(
-            temperature_K=vle_result.temperature_K,
-            pressure_Pa=vle_result.pressure_Pa,
-            phases=vle_result.phases,
-            vapor_fraction=vle_result.vapor_fraction,
-            phase_fractions=vle_result.phase_fractions,
-            diagnostics=diagnostics,
-        )
-
-    return _three_phase_result(
-        mixture,
-        temperature,
-        pressure,
-        lle_result.x1,
-        lle_result.x2,
-        np.array(vapor.composition.fractions, dtype=float),
-        beta_v,
-        beta_l1_total,
-        beta_l2_total,
-        diagnostics=diagnostics,
-    )
-
-
-def _solve_lle(
-    mixture: Mixture,
-    temperature: float,
-    pressure: float,
-    z_liq: np.ndarray,
-    *,
-    eos: EquationOfState,
-    activity_model: ActivityModel,
-    settings: FlashSettings,
-) -> _LleResult:
-    """Fixed-point LLE split for a liquid feed composition."""
-    x1, x2 = _initialize_liquid_split(z_liq)
-    anchor_x1 = x1.copy()
-    anchor_x2 = x2.copy()
-    max_delta = float("inf")
-    iterations = 0
-    damping = 0.5 if settings.damping is None else settings.damping
-    anchor_weight = 0.1
-    lle_tol = max(settings.tol * 10.0, 1e-6)
-    for iteration in range(1, settings.max_iter + 1):
-        iterations = iteration
-        gamma1 = _as_array(
-            activity_model.activity_coefficients(
-                mixture=mixture,
-                temperature_K=temperature,
-                composition=x1.tolist(),
-            )
-        )
-        gamma2 = _as_array(
-            activity_model.activity_coefficients(
-                mixture=mixture,
-                temperature_K=temperature,
-                composition=x2.tolist(),
-            )
-        )
-        phi1 = _as_array(
-            eos.fugacity_coefficients(
-                mixture=mixture,
-                temperature_K=temperature,
-                pressure_Pa=pressure,
-                composition=x1.tolist(),
-                phase="liquid",
-            )
-        )
-        phi2 = _as_array(
-            eos.fugacity_coefficients(
-                mixture=mixture,
-                temperature_K=temperature,
-                pressure_Pa=pressure,
-                composition=x2.tolist(),
-                phase="liquid",
-            )
-        )
-
-        if np.any(gamma1 <= 0.0) or np.any(gamma2 <= 0.0):
-            raise ModelError("Activity model returned non-positive activity coefficients.")
-        if np.any(phi1 <= 0.0) or np.any(phi2 <= 0.0):
-            raise ModelError("EOS returned non-positive fugacity coefficients.")
-
-        ratio = gamma1 * phi1 / (gamma2 * phi2)
-        x2_target = _normalize(x1 * ratio)
-        x1_target = _normalize(x2 / ratio)
-
-        new_x1 = _normalize((1.0 - damping) * x1 + damping * x1_target)
-        new_x2 = _normalize((1.0 - damping) * x2 + damping * x2_target)
-        new_x1 = _normalize((1.0 - anchor_weight) * new_x1 + anchor_weight * anchor_x1)
-        new_x2 = _normalize((1.0 - anchor_weight) * new_x2 + anchor_weight * anchor_x2)
-
-        max_delta = float(max(np.max(np.abs(new_x1 - x1)), np.max(np.abs(new_x2 - x2))))
-        x1 = new_x1
-        x2 = new_x2
-
-        if max_delta < lle_tol:
-            break
-
-    beta_l1 = _compute_beta_l1(z_liq, x1, x2)
-    separation = float(np.max(np.abs(x1 - x2)))
-
-    if beta_l1 is None:
-        return _LleResult(
-            x1=x1,
-            x2=x2,
-            beta_l1=0.5,
-            beta_l2=0.5,
-            iterations=iterations,
-            converged=False,
-            max_delta_x=max_delta,
-            tol=lle_tol,
-            composition_residual=float("inf"),
-            termination_reason="lle_invalid_split",
-            separation=separation,
-        )
-
-    beta_l2 = 1.0 - beta_l1
-    z_recon = beta_l1 * x1 + beta_l2 * x2
-    composition_residual = float(np.max(np.abs(z_recon - z_liq)))
-
-    converged = max_delta < lle_tol
-    termination_reason = "lle_converged" if converged else "lle_max_iter"
-
-    return _LleResult(
-        x1=x1,
-        x2=x2,
-        beta_l1=beta_l1,
-        beta_l2=beta_l2,
-        iterations=iterations,
-        converged=converged,
-        max_delta_x=max_delta,
-        tol=lle_tol,
-        composition_residual=composition_residual,
-        termination_reason=termination_reason,
-        separation=separation,
-    )
-
-
-def _initialize_liquid_split(z: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-    count = z.size
-    if count == 1:
-        return z.copy(), z.copy()
-
-    z = _normalize(z)
-    delta = 0.15
-    if count == 2:
-        x1 = np.array([min(1.0 - 1e-6, max(1e-6, z[0] + delta)), 0.0], dtype=float)
-        x1[1] = 1.0 - x1[0]
-        x2 = np.array([max(1e-6, min(1.0 - 1e-6, z[0] - delta)), 0.0], dtype=float)
-        x2[1] = 1.0 - x2[0]
-        return x1, x2
-
-    idx = int(np.argmax(z))
-    x1 = z.copy()
-    x2 = z.copy()
-    x1[idx] = min(1.0 - 1e-6, z[idx] + delta)
-    x2[idx] = max(1e-6, z[idx] - delta)
-    x1 = _normalize(x1)
-    x2 = _normalize(x2)
-    return x1, x2
-
-
-def _compute_beta_l1(z: np.ndarray, x1: np.ndarray, x2: np.ndarray) -> float | None:
-    values = []
-    for zi, x1i, x2i in zip(z, x1, x2):
-        denom = x1i - x2i
-        if abs(denom) > 1e-8:
-            values.append((zi - x2i) / denom)
-
-    if not values:
-        return None
-
-    beta = float(np.mean(values))
-    if not (0.0 <= beta <= 1.0):
-        return None
-    return beta
-
-
-def _gamma_max(
-    *,
-    activity_model: ActivityModel,
-    mixture: Mixture,
-    temperature_K: float,
-    composition: np.ndarray,
-) -> float | None:
-    gamma = activity_model.activity_coefficients(
-        mixture=mixture,
-        temperature_K=temperature_K,
-        composition=composition.tolist(),
-    )
-    return float(max(gamma)) if gamma else None
-
-
-def _merge_diagnostics(
-    base: Mapping[str, float | str | int | bool],
-    extra: Mapping[str, float | str | int | bool],
-) -> dict[str, float | str | int | bool]:
-    merged = dict(base)
-    merged.update(extra)
-    return merged
-
-
 def _single_phase_result(
     mixture: Mixture,
     temperature_K: float,
@@ -710,61 +338,6 @@ def _two_phase_result(
         pressure_Pa=pressure_Pa,
         phases={"liquid": liquid, "vapor": vapor},
         vapor_fraction=float(vapor_fraction),
-        phase_fractions=phase_fractions,
-        diagnostics=diagnostics,
-    )
-
-
-def _three_phase_result(
-    mixture: Mixture,
-    temperature_K: float,
-    pressure_Pa: float,
-    x1: np.ndarray,
-    x2: np.ndarray,
-    y: np.ndarray,
-    beta_v: float,
-    beta_l1: float,
-    beta_l2: float,
-    *,
-    diagnostics: dict[str, float | int | str | bool],
-) -> FlashResult:
-    liquid1 = PhaseResult(
-        name="liquid1",
-        composition=Composition(
-            fractions=tuple(x1.tolist()),
-            basis=mixture.basis,
-            normalize=False,
-            tol=COMPOSITION_SUM_TOL,
-        ),
-    )
-    liquid2 = PhaseResult(
-        name="liquid2",
-        composition=Composition(
-            fractions=tuple(x2.tolist()),
-            basis=mixture.basis,
-            normalize=False,
-            tol=COMPOSITION_SUM_TOL,
-        ),
-    )
-    vapor = PhaseResult(
-        name="vapor",
-        composition=Composition(
-            fractions=tuple(y.tolist()),
-            basis=mixture.basis,
-            normalize=False,
-            tol=COMPOSITION_SUM_TOL,
-        ),
-    )
-    phase_fractions = {
-        "vapor": float(beta_v),
-        "liquid1": float(beta_l1),
-        "liquid2": float(beta_l2),
-    }
-    return FlashResult(
-        temperature_K=temperature_K,
-        pressure_Pa=pressure_Pa,
-        phases={"vapor": vapor, "liquid1": liquid1, "liquid2": liquid2},
-        vapor_fraction=float(beta_v),
         phase_fractions=phase_fractions,
         diagnostics=diagnostics,
     )

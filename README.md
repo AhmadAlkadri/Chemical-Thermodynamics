@@ -43,6 +43,29 @@ table-style summary.
 - Scripted demos: `examples/README.md`
 - Jupyter notebooks: `notebooks/README.md`
 
+## VLLE support
+
+The public `chemthermo` repository defines a minimal VLLE API boundary only.
+The working VLLE implementation lives in an optional private plugin package,
+`chemthermo_vlle`.
+
+Example usage:
+
+```python
+from chemthermo.vlle import get_vlle_engine
+
+engine = get_vlle_engine()
+result = engine.solve(
+    temperature_K=300.0,
+    pressure_Pa=101325.0,
+    z=[0.5, 0.5],
+)
+print([phase.name for phase in result.phases])
+```
+
+If the plugin is not installed, `get_vlle_engine()` raises an error instructing
+you to install `chemthermo_vlle`.
+
 ## Optional validation dependencies
 
 Install the reference library used by validation tests:
