@@ -38,6 +38,26 @@ print(result.phases["vapor"].composition.fractions)
 See `examples/flash_tp_peng_robinson_demo.py` for a runnable script that prints a
 table-style summary.
 
+## EOS extension points (PC-SAFT scaffold)
+
+The public repo defines a minimal residual-Helmholtz EOS protocol and registry
+hooks in `chemthermo.eos`:
+
+```python
+from chemthermo.eos import EOSProtocol, get_eos, list_eos
+
+print(list_eos())  # ["pcsaft"]
+eos = get_eos("pcsaft", components=["Methane"])
+```
+
+`EOSProtocol` requires:
+- `num_components()`
+- `residual_helmholtz(temperature_K, volume_m3, composition)`
+
+The PC-SAFT implementation is a placeholder. Parameter access is exposed via
+`get_pcsaft_parameters()` and raises `PCSAFTParameterError` until a parameter
+dataset is provided.
+
 ## Examples and notebooks
 
 - Scripted demos: `examples/README.md`

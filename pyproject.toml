@@ -37,6 +37,7 @@ target-version = "py311"
 line-length = 100
 exclude = [
   "database",
+  "notebooks",
 ]
 
 [tool.ruff.lint]
