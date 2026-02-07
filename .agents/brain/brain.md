@@ -17,6 +17,10 @@ How to use this document
 - **Golden Path Rule**: Every Thin Vertical Slice must ship with at least one golden path (example/test) that executes successfully from a clean environment.
 - Keep claims factual; add evidence tags or links for load-bearing statements.
 
+**Skills**
+- Local skill catalog: `.agents/skills/README.md`
+- Preferred repo workflow skill: `.agents/skills/chemthermo-change-loop/SKILL.md`
+
 ## 0) Repo at a glance
 - Purpose: chemical engineering thermodynamics utilities packaged as `chemthermo`, SI units throughout. (source: README.md)
 - Primary language/toolchain: Python 3.11+, setuptools build via `pyproject.toml`. (source: pyproject.toml)
