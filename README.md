@@ -78,10 +78,11 @@ pip install -e ".[validation]"
 
 ## Project brain
 
-This repository maintains lightweight architectural context and decision history in `AGENT/`:
+This repository maintains lightweight architectural context and decision history in `.agents/`:
 
-- `brain.md` — current architecture, invariants, and contributor/agent contract
-- `adr/` — Architecture Decision Records (why key design choices were made)
-- `steering-brief.md` — short summaries of recent changes and next steps
+- `.agents/brain/brain.md` - current architecture, invariants, and contributor/agent contract
+- `.agents/brain/adr/` - Architecture Decision Records (why key design choices were made)
+- `.agents/brain/steering-brief.md` - short summaries of recent changes and next steps
 
-Contributors and AI agents should read `AGENT/brain.md` before making structural or API changes.
+Contributors and AI agents should read `.agents/brain/brain.md` before making structural or API changes.
+Internal agent workflow and vendored skills: see `.agents/`.

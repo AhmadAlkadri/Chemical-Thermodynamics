@@ -6,7 +6,7 @@ How to use this document
 - Keep updates short; link to existing docs instead of duplicating.
 
 **Agent Contract**
-- Read first: `AGENT/brain.md`, `AGENT/steering-brief.md`, relevant ADRs in `AGENT/adr/`.
+- Read first: `.agents/brain/brain.md`, `.agents/brain/steering-brief.md`, relevant ADRs in `.agents/brain/adr/`.
 - Do-not-touch list (initial): public API boundaries (ADR-0001), CI contract (`.github/workflows/ci.yml`), compatibility rules (public API + schema versions), numerics invariants (SI units, composition tolerance, flash determinism).
 - Definition of done: tests updated/passing, docs updated, Golden Path runnable, no TODOs in critical path.
 - Stop if >3 plausible root causes: write an experiment/instrumentation plan first.
@@ -30,7 +30,7 @@ How to use this document
 - Non-goal: **PC-SAFT is explicitly out of scope**. The `pcsaft` module is a non-functional artifact and will not be implemented.
 
 ## 2) Public API surface (current)
-Definition of public API follows ADR-0001 (source of truth rules in `AGENT/adr/0001-public-api-truth-source.md`).
+Definition of public API follows ADR-0001 (source of truth rules in `.agents/brain/adr/0001-public-api-truth-source.md`).
 
 Stable (public) entry points
 - `chemthermo` top-level exports in `__all__` (core types, flash API, models, parameters, exceptions, units, validation helpers). (source: src/chemthermo/__init__.py)
@@ -100,10 +100,10 @@ Top 10 cheapest checks
 - Optional validation tests compare against the `thermo` library and are skipped if not installed. (source: tests/validation/test_flash_vs_thermo.py, pyproject.toml)
 
 ## 8) Decisions log (index)
-- ADR folder: `AGENT/adr/`
+- ADR folder: `.agents/brain/adr/`
 - Accepted ADRs:
-  - `AGENT/adr/0001-public-api-truth-source.md`
-  - `AGENT/adr/0002-thin-vertical-slices.md` (Adopted 2026-02-06)
+  - `.agents/brain/adr/0001-public-api-truth-source.md`
+  - `.agents/brain/adr/0002-thin-vertical-slices.md` (Adopted 2026-02-06)
 - ADR rules: one decision per ADR; keep under 1 page; include status and supersedes fields.
 
 ## 9) Roadmap: next 3 increments (vertical slices)
