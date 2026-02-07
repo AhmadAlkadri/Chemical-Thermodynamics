@@ -13,6 +13,8 @@ How to use this document
 - If uncertain after 2 iterations, produce a minimal repro and document findings.
 - Complexity receipts rule: any new abstraction must state why, bug prevented, cost, and what breaks if omitted.
 - ADR rule: any public API or architectural change requires a new ADR (or update + supersede).
+- **Thin Vertical Slice Rule** (ADR-0002): Every exposed capability must be end-to-end usable. No scaffolded/partial features.
+- **Golden Path Rule**: Every Thin Vertical Slice must ship with at least one golden path (example/test) that executes successfully from a clean environment.
 - Keep claims factual; add evidence tags or links for load-bearing statements.
 
 ## 0) Repo at a glance
@@ -101,12 +103,19 @@ Top 10 cheapest checks
 - ADR folder: `AGENT/adr/`
 - Accepted ADRs:
   - `AGENT/adr/0001-public-api-truth-source.md`
+  - `AGENT/adr/0002-thin-vertical-slices.md` (Adopted 2026-02-06)
 - ADR rules: one decision per ADR; keep under 1 page; include status and supersedes fields.
 
 ## 9) Roadmap: next 3 increments (vertical slices)
-- Refresh the component databank from `database/organics.txt` and `database/inorganics.txt` using `tools/build_database.py`, then run `tests/test_data_loading.py`. (source: tools/build_database.py, database/organics.txt, database/inorganics.txt, tests/test_data_loading.py)
-- Add an optional CI job that installs `.[validation]` and runs `tests/validation` to cover `thermo` comparisons. (source: pyproject.toml, tests/validation/test_flash_vs_thermo.py, .github/workflows/ci.yml)
-- Promote the gamma-phi example in `README.md` by pointing to `examples/flash_tp_gamma_phi_demo.py` and keep it in sync with tests. (source: examples/flash_tp_gamma_phi_demo.py, tests/test_examples_smoke.py)
+- **Slice 1: Component Database Expansion (End-to-End)**
+  - Capability: Users can access a broad, realistic set of components at runtime.
+  - Requirements: Regenerate `components.json` from `organics.txt`, add representative tests, add Golden Path example.
+- **Slice 2: CLI TP Flash Tool**
+  - Capability: Users can run a TP flash from the command line without writing Python.
+  - Requirements: Minimal CLI entrypoint, integration test, Golden Path (README/script).
+- **Slice 3: Minimal External Validation Slice**
+  - Capability: Users can trust numerical correctness for at least one EOS + mixture combination.
+  - Requirements: Deterministic validation against external reference, CI or documented optional run, Golden Path validation example.
 
 ## 10) Open questions / risks
 
