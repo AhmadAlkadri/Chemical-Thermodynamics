@@ -38,25 +38,24 @@ print(result.phases["vapor"].composition.fractions)
 See `examples/flash_tp_peng_robinson_demo.py` for a runnable script that prints a
 table-style summary.
 
-## EOS extension points (PC-SAFT scaffold)
+## EOS extension points
 
 The public repo defines a minimal residual-Helmholtz EOS protocol and registry
 hooks in `chemthermo.eos`:
 
 ```python
-from chemthermo.eos import EOSProtocol, get_eos, list_eos
+from chemthermo.eos import EOSProtocol, list_eos
 
-print(list_eos())  # ["pcsaft"]
-eos = get_eos("pcsaft", components=["Methane"])
+print(list_eos())
 ```
 
 `EOSProtocol` requires:
 - `num_components()`
 - `residual_helmholtz(temperature_K, volume_m3, composition)`
 
-The PC-SAFT implementation is a placeholder. Parameter access is exposed via
-`get_pcsaft_parameters()` and raises `PCSAFTParameterError` until a parameter
-dataset is provided.
+> [!WARNING]
+> **PC-SAFT is explicitly unsupported.**
+> While some placeholder code for PC-SAFT exists in the codebase (`chemthermo.eos.pcsaft`), it is **non-functional and out of scope** for this repository. It will not be developed further.
 
 ## Examples and notebooks
 
@@ -65,26 +64,9 @@ dataset is provided.
 
 ## VLLE support
 
-The public `chemthermo` repository defines a minimal VLLE API boundary only.
-The working VLLE implementation lives in an optional private plugin package,
-`chemthermo_vlle`.
-
-Example usage:
-
-```python
-from chemthermo.vlle import get_vlle_engine
-
-engine = get_vlle_engine()
-result = engine.solve(
-    temperature_K=300.0,
-    pressure_Pa=101325.0,
-    z=[0.5, 0.5],
-)
-print([phase.name for phase in result.phases])
-```
-
-If the plugin is not installed, `get_vlle_engine()` raises an error instructing
-you to install `chemthermo_vlle`.
+> [!WARNING]
+> **VLLE is explicitly out of scope.**
+> This repository focuses on VLE (Vapor-Liquid Equilibrium) only. Any symbols or hooks related to VLLE (`chemthermo.vlle`) are legacy boundaries and are not supported.
 
 ## Optional validation dependencies
 

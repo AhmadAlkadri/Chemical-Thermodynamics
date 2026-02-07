@@ -24,8 +24,8 @@ How to use this document
 
 ## 1) Purpose and non-goals
 - Purpose: provide core thermodynamics utilities (components, mixtures, EOS/activities, TP flash) in SI units. (source: README.md, src/chemthermo/flash/tp.py, src/chemthermo/models/base.py)
-- Non-goal: VLLE solver implementation is not in this public repo; only a plugin boundary exists. (source: README.md, ROADMAP.md, src/chemthermo/vlle/loader.py)
-- Non-goal: PC-SAFT physics and parameters are not implemented in the open-source build. (source: src/chemthermo/eos/pcsaft.py, src/chemthermo/parameters/pcsaft.py)
+- Non-goal: **VLLE is explicitly out of scope**. This repository focuses on VLE only. 
+- Non-goal: **PC-SAFT is explicitly out of scope**. The `pcsaft` module is a non-functional artifact and will not be implemented.
 
 ## 2) Public API surface (current)
 Definition of public API follows ADR-0001 (source of truth rules in `AGENT/adr/0001-public-api-truth-source.md`).
@@ -35,8 +35,9 @@ Stable (public) entry points
 - EOS registry module (`chemthermo.eos`: `EOSProtocol`, `PCSAFTEOS`, `get_eos`, `list_eos`, `register_eos`). (source: src/chemthermo/eos/__init__.py)
 - VLLE plugin boundary (`chemthermo.vlle`: `get_vlle_engine`, `VLLEEngine`, `VLLEResult`, and related types/errors). (source: src/chemthermo/vlle/__init__.py, README.md)
 
-Experimental / placeholder
-- PC-SAFT placeholder exports (`PCSAFTEOS`, `get_pcsaft_parameters`, `PCSAFTParameterRegistry`) raise missing-parameter or not-implemented errors in the open-source build. (source: src/chemthermo/eos/pcsaft.py, src/chemthermo/parameters/pcsaft.py, tests/test_pcsaft_sanity.py)
+Unsupported / Out of Scope
+- `chemthermo.vlle`: Legacy boundary. Do not use.
+- `chemthermo.eos.pcsaft`: Non-functional placeholder. Do not use.
 
 CLI entry points
 - No CLI scripts are defined in `pyproject.toml` (no `[project.scripts]` section). (source: pyproject.toml)
@@ -45,16 +46,14 @@ CLI entry points
 Text-only diagram
 ```
 components.json -> data loaders -> Component/Composition/Mixture -> models (PR/NRTL) -> flash_tp -> FlashResult
-                                   \-> EOS registry (PC-SAFT placeholder)
-chemthermo.vlle.get_vlle_engine -> optional external plugin (chemthermo_vlle)
+
 ```
 
 Key modules and flow
 - Component databank lives in `src/chemthermo/data/components.json`, loaded via `chemthermo.data` helpers. (source: src/chemthermo/data/__init__.py, src/chemthermo/data/components.json)
 - Core domain objects: `Component`, `Composition`, `Mixture`. (source: src/chemthermo/core/component.py, src/chemthermo/core/composition.py, src/chemthermo/core/mixture.py)
 - Flash solver (`flash_tp`) orchestrates models and returns `FlashResult`. (source: src/chemthermo/flash/tp.py, src/chemthermo/flash/results.py)
-- EOS registry provides named EOS factories (currently registers `pcsaft`). (source: src/chemthermo/eos/registry.py, src/chemthermo/eos/pcsaft.py)
-- VLLE boundary is glue code that loads an optional plugin package. (source: src/chemthermo/vlle/loader.py)
+- EOS registry provides named EOS factories. (source: src/chemthermo/eos/registry.py)
 - Deeper usage docs: `README.md`, `examples/README.md`. (source: README.md, examples/README.md)
 
 Key entry points (top paths)
@@ -72,14 +71,14 @@ Key entry points (top paths)
 - Validation helpers raise `InputRangeError` for invalid temperatures/pressures; `CompositionError` for invalid fractions. (source: src/chemthermo/validation.py, src/chemthermo/exceptions.py)
 - Model misuse or invalid model outputs raise `ModelError`; flash non-convergence raises `ConvergenceError`. (source: src/chemthermo/exceptions.py, src/chemthermo/flash/tp.py)
 - Missing component properties raise `PropertyNotFoundError`. (source: src/chemthermo/core/component.py, src/chemthermo/exceptions.py)
-- VLLE plugin boundary raises `VLLEPluginNotInstalledError` or `VLLEPluginError` when unavailable/misconfigured. (source: src/chemthermo/vlle/errors.py, src/chemthermo/vlle/loader.py)
+
 
 ## 6) Configuration & defaults
 - Flash defaults: `FlashSettings(max_iter=100, tol=1e-8, damping=None)`. (source: src/chemthermo/flash/settings.py)
 - Composition sum tolerance: `COMPOSITION_SUM_TOL = 1e-8`. (source: src/chemthermo/validation.py)
 - Unit constants: `R_J_PER_MOL_K`, `STANDARD_T_K`, `STANDARD_P_PA`, pressure conversions. (source: src/chemthermo/units.py)
 - NRTL parameters load from packaged JSON (`src/chemthermo/parameters/data/activity/nrtl.json`). (source: src/chemthermo/parameters/nrtl.py, src/chemthermo/parameters/data/activity/nrtl.json)
-- PC-SAFT parameters default to empty registry and raise until populated. (source: src/chemthermo/parameters/pcsaft.py)
+
 - No environment-variable configuration is documented in README or `pyproject.toml`. (source: README.md, pyproject.toml)
 
 Top 10 cheapest checks
@@ -110,6 +109,4 @@ Top 10 cheapest checks
 - Promote the gamma-phi example in `README.md` by pointing to `examples/flash_tp_gamma_phi_demo.py` and keep it in sync with tests. (source: examples/flash_tp_gamma_phi_demo.py, tests/test_examples_smoke.py)
 
 ## 10) Open questions / risks
-- Is the `chemthermo.vlle` boundary considered stable public API or experimental? Verify by confirming maintainer intent and whether it should be listed as stable in README. (quick check: `rg -n "vlle" README.md src/chemthermo`)
-- Should CI cover the optional validation suite (`thermo`)? If yes, add a CI job with `.[validation]` to avoid silent regression drift. (quick check: run `python -m pytest tests/validation -q` after installing `.[validation]`)
-- PC-SAFT is exported but placeholder; decide whether to mark as experimental in docs or hide from public API. (quick check: review `src/chemthermo/eos/pcsaft.py` and `tests/test_pcsaft_sanity.py`)
+
