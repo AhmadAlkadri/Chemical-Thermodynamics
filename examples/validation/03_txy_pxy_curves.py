@@ -179,7 +179,9 @@ def main():
             # T_bubble at P, zs
             # thermo doesn't expose strict BubbleT easily via FlashVL without iteration or using
             # specific methods. But flasher.flash(P=P, VF=0, zs=zs) works.
-            bub_res = flasher.flash(P=P, VF=0.0, zs=zs)
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=RuntimeWarning, module="chemicals")
+                bub_res = flasher.flash(P=P, VF=0.0, zs=zs)
             ref_T_bub = bub_res.T
         except Exception:
             ref_T_bub = None
@@ -190,7 +192,9 @@ def main():
         # --- Dew Point (y=z) ---
         # Thermo
         try:
-            dew_res = flasher.flash(P=P, VF=1.0, zs=zs)
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=RuntimeWarning, module="chemicals")
+                dew_res = flasher.flash(P=P, VF=1.0, zs=zs)
             ref_T_dew = dew_res.T
         except Exception:
             ref_T_dew = None
