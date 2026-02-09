@@ -8,7 +8,7 @@ How to use this document
 **Agent Contract**
 - Read first: `.agents/brain/brain.md`, `.agents/brain/steering-brief.md`, relevant ADRs in `.agents/brain/adr/`.
 - Do-not-touch list (initial): public API boundaries (ADR-0001), CI contract (`.github/workflows/ci.yml`), compatibility rules (public API + schema versions), numerics invariants (SI units, composition tolerance, flash determinism).
-- Definition of done: tests updated/passing, docs updated, Golden Path runnable, no TODOs in critical path.
+- Definition of done: code formatted (`ruff format src tests`), quality gates pass (`ruff format --check src tests`, `ruff check src tests`, `pyright`, `pytest -q`), docs updated, Golden Path runnable, no TODOs in critical path.
 - Stop if >3 plausible root causes: write an experiment/instrumentation plan first.
 - If uncertain after 2 iterations, produce a minimal repro and document findings.
 - Complexity receipts rule: any new abstraction must state why, bug prevented, cost, and what breaks if omitted.
@@ -96,6 +96,7 @@ Top 10 cheapest checks
 - `python -m pytest tests/test_pr_eos.py -q` (Peng-Robinson EOS). (source: tests/test_pr_eos.py)
 - `python -m pytest tests/test_data_loading.py -q` (component databank). (source: tests/test_data_loading.py)
 - `python -m pytest tests/test_examples_smoke.py -q` (example usage). (source: tests/test_examples_smoke.py)
+- `ruff format src tests` (apply standard formatting before quality gates).
 - `ruff format --check src tests` (format gate in CI). (source: .github/workflows/ci.yml)
 - `ruff check src tests` and `pyright` (lint/type gate in CI). (source: .github/workflows/ci.yml)
 
@@ -122,4 +123,3 @@ Top 10 cheapest checks
   - Requirements: Deterministic validation against external reference, CI or documented optional run, Golden Path validation example.
 
 ## 10) Open questions / risks
-

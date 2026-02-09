@@ -36,9 +36,7 @@ class PCSAFTParameterRegistry:
         missing = [name for name in canonical if name not in self.parameters]
         if missing:
             missing_list = ", ".join(missing)
-            raise PCSAFTParameterError(
-                f"Missing PC-SAFT parameters for: {missing_list}."
-            )
+            raise PCSAFTParameterError(f"Missing PC-SAFT parameters for: {missing_list}.")
 
         return {name: self.parameters[name] for name in canonical}
 

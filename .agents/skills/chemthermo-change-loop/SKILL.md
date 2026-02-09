@@ -1,6 +1,6 @@
 ---
 name: chemthermo-change-loop
-description: Use when implementing or reviewing changes in this Chemical-Thermodynamics repository. Apply the repo contract by reading .agents/brain/brain.md first, preserving SI-unit and public-API invariants, shipping thin vertical slices with a runnable golden path, running CI-equivalent checks (ruff format/check, pyright, pytest), and updating ADR/brain docs when architecture or public API changes.
+description: Use when implementing or reviewing changes in this Chemical-Thermodynamics repository. Apply the repo contract by reading .agents/brain/brain.md first, preserving SI-unit and public-API invariants, shipping thin vertical slices with a runnable golden path, running CI-equivalent quality gates (ruff format, ruff format --check, ruff check, pyright, pytest), and updating ADR/brain docs when architecture or public API changes.
 ---
 
 # Chemthermo Change Loop
@@ -30,11 +30,12 @@ description: Use when implementing or reviewing changes in this Chemical-Thermod
 
 4. Validate in escalating order.
 - Run focused tests for touched modules first.
-- Run CI-equivalent checks before finalizing:
+- Run quality gates (must pass) before finalizing:
+  - `ruff format src tests`
   - `ruff format --check src tests`
   - `ruff check src tests`
   - `pyright`
-  - `pytest`
+  - `pytest -q`
 - Run a golden path script for behavior sanity:
   - `python examples/flash_tp_peng_robinson_demo.py`
 - If validation extras are installed, run optional reference checks under `tests/validation/`.
@@ -59,4 +60,3 @@ description: Use when implementing or reviewing changes in this Chemical-Thermod
 - Do not loosen CI or invariant checks unless explicitly requested.
 - Keep commits small and logically grouped.
 - Keep the working tree clean at handoff.
-
