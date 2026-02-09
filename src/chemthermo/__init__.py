@@ -8,7 +8,7 @@ from .core.mixture import Mixture
 from .data import list_component_names
 from .exceptions import PropertyNotFoundError, ThermoError as ChemThermoError
 from .flash import flash_tp
-from .models import get_valid_models
+from .models import NRTL, PengRobinsonEOS
 
 __version__ = "0.0.0"
 
@@ -19,7 +19,8 @@ __all__ = [
 
     "PropertyNotFoundError",
     "flash_tp",
-    "get_valid_models",
+    "NRTL",
+    "PengRobinsonEOS",
     "list_component_names",
     "cite",
 ]
