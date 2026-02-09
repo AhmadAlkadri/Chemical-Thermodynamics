@@ -8,28 +8,28 @@
       "MW": {
         "value": 0.054090000000000006,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 425.0,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 4327000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.195,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -40,7 +40,7 @@
         "Tmin_K": 215.0,
         "Tmax_K": 290.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -50,28 +50,28 @@
       "MW": {
         "value": 0.09818600000000001,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 537.2,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 2837000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.358,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -82,7 +82,7 @@
         "Tmin_K": 265.0,
         "Tmax_K": 400.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -92,28 +92,28 @@
       "MW": {
         "value": 0.08415900000000001,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 504.0,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 3171000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.285,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -124,7 +124,7 @@
         "Tmin_K": 240.0,
         "Tmax_K": 360.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -134,28 +134,28 @@
       "MW": {
         "value": 0.112213,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 566.6,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 2624000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.386,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -166,7 +166,7 @@
         "Tmin_K": 288.0,
         "Tmax_K": 420.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -176,28 +176,28 @@
       "MW": {
         "value": 0.070133,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 464.7,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 4053000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.245,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -208,7 +208,7 @@
         "Tmin_K": 220.0,
         "Tmax_K": 325.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -218,28 +218,28 @@
       "MW": {
         "value": 0.060094999999999996,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 536.7,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 5168000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.624,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -250,7 +250,7 @@
         "Tmin_K": 285.0,
         "Tmax_K": 400.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -260,28 +260,28 @@
       "MW": {
         "value": 0.044052999999999995,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 461.0,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 5573000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.303,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -292,7 +292,7 @@
         "Tmin_K": 210.0,
         "Tmax_K": 320.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -302,28 +302,28 @@
       "MW": {
         "value": 0.060052,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 594.4,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 5786000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.454,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -334,7 +334,7 @@
         "Tmin_K": 290.0,
         "Tmax_K": 430.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -344,28 +344,28 @@
       "MW": {
         "value": 0.058079,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 508.1,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 4701000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.309,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -376,7 +376,7 @@
         "Tmin_K": 241.0,
         "Tmax_K": 350.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -386,28 +386,28 @@
       "MW": {
         "value": 0.041052,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 548.0,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 4833000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.321,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -418,7 +418,7 @@
         "Tmin_K": 260.0,
         "Tmax_K": 390.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -428,28 +428,28 @@
       "MW": {
         "value": 0.026038,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 308.3,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 6140000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.184,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -460,7 +460,7 @@
         "Tmin_K": 194.0,
         "Tmax_K": 202.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -470,28 +470,28 @@
       "MW": {
         "value": 0.017030999999999998,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 405.6,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 11277000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.25,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -502,7 +502,7 @@
         "Tmin_K": 179.0,
         "Tmax_K": 261.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -512,28 +512,28 @@
       "MW": {
         "value": 0.093127,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 699.0,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 5309000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.382,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -544,7 +544,7 @@
         "Tmin_K": 340.0,
         "Tmax_K": 500.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -554,28 +554,28 @@
       "MW": {
         "value": 0.039948,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 150.8,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 4874000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": -0.004,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -586,7 +586,7 @@
         "Tmin_K": 81.0,
         "Tmax_K": 94.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -596,28 +596,28 @@
       "MW": {
         "value": 0.078112,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 562.1,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 4894000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.212,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -628,7 +628,7 @@
         "Tmin_K": 280.0,
         "Tmax_K": 377.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -638,28 +638,28 @@
       "MW": {
         "value": 0.117169,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 451.95,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 3871000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.148,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -670,7 +670,7 @@
         "Tmin_K": 182.0,
         "Tmax_K": 286.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -680,28 +680,28 @@
       "MW": {
         "value": 0.159808,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 584.0,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 10335000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.132,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -712,7 +712,7 @@
         "Tmin_K": 259.0,
         "Tmax_K": 354.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -722,28 +722,28 @@
       "MW": {
         "value": 0.04401,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 304.2,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 7376000.000000001,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.225,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -754,7 +754,7 @@
         "Tmin_K": 154.0,
         "Tmax_K": 204.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -764,28 +764,28 @@
       "MW": {
         "value": 0.076143,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 552.0,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 7903000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.115,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -796,7 +796,7 @@
         "Tmin_K": 228.0,
         "Tmax_K": 342.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -806,28 +806,28 @@
       "MW": {
         "value": 0.02801,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 132.9,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 3496000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.049,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -838,7 +838,7 @@
         "Tmin_K": 63.0,
         "Tmax_K": 108.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -848,28 +848,28 @@
       "MW": {
         "value": 0.088004,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 227.6,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 3739000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.191,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -880,7 +880,7 @@
         "Tmin_K": 93.0,
         "Tmax_K": 148.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -890,28 +890,28 @@
       "MW": {
         "value": 0.070905,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 417.0,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 7701000.000000001,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.073,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -922,7 +922,7 @@
         "Tmin_K": 172.0,
         "Tmax_K": 264.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -932,28 +932,28 @@
       "MW": {
         "value": 0.119377,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 536.4,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 5472000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.216,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -964,7 +964,7 @@
         "Tmin_K": 260.0,
         "Tmax_K": 370.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -974,28 +974,28 @@
       "MW": {
         "value": 0.056106,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 435.6,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 4205000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.202,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -1006,7 +1006,7 @@
         "Tmin_K": 200.0,
         "Tmax_K": 305.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -1016,28 +1016,28 @@
       "MW": {
         "value": 0.08415900000000001,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 553.4,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 4072999.9999999995,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.213,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -1048,7 +1048,7 @@
         "Tmin_K": 280.0,
         "Tmax_K": 380.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -1058,28 +1058,28 @@
       "MW": {
         "value": 0.02767,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 289.8,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 4050000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.138,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -1090,7 +1090,7 @@
         "Tmin_K": 118.0,
         "Tmax_K": 181.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -1100,28 +1100,28 @@
       "MW": {
         "value": 0.030069,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 305.4,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 4874000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.099,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -1132,7 +1132,7 @@
         "Tmin_K": 130.0,
         "Tmax_K": 199.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -1142,28 +1142,28 @@
       "MW": {
         "value": 0.046068,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 516.2,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 6383000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.635,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -1174,7 +1174,7 @@
         "Tmin_K": 270.0,
         "Tmax_K": 369.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -1184,28 +1184,28 @@
       "MW": {
         "value": 0.088105,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 523.2,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 3829999.9999999995,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.363,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -1216,7 +1216,7 @@
         "Tmin_K": 260.0,
         "Tmax_K": 385.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -1226,28 +1226,28 @@
       "MW": {
         "value": 0.10616500000000001,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 617.1,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 3607000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.301,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -1258,7 +1258,7 @@
         "Tmin_K": 300.0,
         "Tmax_K": 450.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -1268,28 +1268,28 @@
       "MW": {
         "value": 0.028053,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 282.4,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 5036000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.085,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -1300,7 +1300,7 @@
         "Tmin_K": 120.0,
         "Tmax_K": 182.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -1310,28 +1310,28 @@
       "MW": {
         "value": 0.044052999999999995,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 469.0,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 7194000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.2,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -1342,7 +1342,7 @@
         "Tmin_K": 300.0,
         "Tmax_K": 310.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -1352,28 +1352,28 @@
       "MW": {
         "value": 0.037997,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 144.3,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 5218000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.048,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -1384,7 +1384,7 @@
         "Tmin_K": 59.0,
         "Tmax_K": 91.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -1394,28 +1394,28 @@
       "MW": {
         "value": 0.030026,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 408.0,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 6586000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.253,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -1426,7 +1426,7 @@
         "Tmin_K": 185.0,
         "Tmax_K": 271.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -1436,28 +1436,28 @@
       "MW": {
         "value": 0.0040030000000000005,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 5.19,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 227000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": -0.387,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -1468,7 +1468,7 @@
         "Tmin_K": 3.7,
         "Tmax_K": 4.3,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -1478,28 +1478,28 @@
       "MW": {
         "value": 0.138012,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 292.8,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 3042000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.255,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -1510,7 +1510,7 @@
         "Tmin_K": 180.0,
         "Tmax_K": 195.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -1520,28 +1520,28 @@
       "MW": {
         "value": 0.002016,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 33.2,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 1297000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": -0.22,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -1552,7 +1552,7 @@
         "Tmin_K": 14.0,
         "Tmax_K": 25.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -1562,28 +1562,28 @@
       "MW": {
         "value": 0.08091200000000001,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 363.2,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 8552000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.063,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -1594,7 +1594,7 @@
         "Tmin_K": 184.0,
         "Tmax_K": 221.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -1604,28 +1604,28 @@
       "MW": {
         "value": 0.036461,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 324.6,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 8309000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.12,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -1636,7 +1636,7 @@
         "Tmin_K": 137.0,
         "Tmax_K": 200.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -1646,28 +1646,28 @@
       "MW": {
         "value": 0.027024999999999997,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 456.8,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 5390000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.407,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -1678,7 +1678,7 @@
         "Tmin_K": 234.0,
         "Tmax_K": 330.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -1688,28 +1688,28 @@
       "MW": {
         "value": 0.020006,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 461.0,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 6484999.999999999,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.372,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -1720,7 +1720,7 @@
         "Tmin_K": 206.0,
         "Tmax_K": 313.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -1730,28 +1730,28 @@
       "MW": {
         "value": 0.034082,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 373.2,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 8937000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.1,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -1762,7 +1762,7 @@
         "Tmin_K": 190.0,
         "Tmax_K": 230.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -1772,28 +1772,28 @@
       "MW": {
         "value": 0.058122,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 408.1,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 3647999.9999999995,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.176,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -1804,7 +1804,7 @@
         "Tmin_K": 187.0,
         "Tmax_K": 280.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -1814,28 +1814,28 @@
       "MW": {
         "value": 0.0838,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 209.4,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 5502000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": -0.002,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -1846,7 +1846,7 @@
         "Tmin_K": 113.0,
         "Tmax_K": 129.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -1856,28 +1856,28 @@
       "MW": {
         "value": 0.10616500000000001,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 617.0,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 3546000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.331,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -1888,7 +1888,7 @@
         "Tmin_K": 300.0,
         "Tmax_K": 440.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -1898,28 +1898,28 @@
       "MW": {
         "value": 0.016042,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 190.6,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 4600000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.008,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -1930,7 +1930,7 @@
         "Tmin_K": 93.0,
         "Tmax_K": 120.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -1940,28 +1940,28 @@
       "MW": {
         "value": 0.032042,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 512.6,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 8095999.999999999,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.559,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -1972,7 +1972,7 @@
         "Tmin_K": 257.0,
         "Tmax_K": 364.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -1982,28 +1982,28 @@
       "MW": {
         "value": 0.058122,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 425.2,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 3790000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.193,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -2014,7 +2014,7 @@
         "Tmin_K": 195.0,
         "Tmax_K": 290.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -2024,28 +2024,28 @@
       "MW": {
         "value": 0.074122,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 562.9,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 4418000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.59,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -2056,7 +2056,7 @@
         "Tmin_K": 288.0,
         "Tmax_K": 404.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -2066,28 +2066,28 @@
       "MW": {
         "value": 0.14228200000000002,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 617.6,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 2108000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.49,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -2098,7 +2098,7 @@
         "Tmin_K": 330.0,
         "Tmax_K": 476.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -2108,28 +2108,28 @@
       "MW": {
         "value": 0.100202,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 540.2,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 2736000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.351,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -2140,7 +2140,7 @@
         "Tmin_K": 270.0,
         "Tmax_K": 400.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -2150,28 +2150,28 @@
       "MW": {
         "value": 0.086175,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 507.4,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 2969000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.296,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -2182,7 +2182,7 @@
         "Tmin_K": 245.0,
         "Tmax_K": 370.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -2192,28 +2192,28 @@
       "MW": {
         "value": 0.128255,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 594.6,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 2310000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.444,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -2224,7 +2224,7 @@
         "Tmin_K": 312.0,
         "Tmax_K": 452.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -2234,28 +2234,28 @@
       "MW": {
         "value": 0.114229,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 568.8,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 2482000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.394,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -2266,7 +2266,7 @@
         "Tmin_K": 292.0,
         "Tmax_K": 425.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -2276,28 +2276,28 @@
       "MW": {
         "value": 0.072149,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 469.6,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 3374000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.251,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -2308,7 +2308,7 @@
         "Tmin_K": 220.0,
         "Tmax_K": 330.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -2318,28 +2318,28 @@
       "MW": {
         "value": 0.12817099999999998,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 748.4,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 4053000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.302,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -2350,7 +2350,7 @@
         "Tmin_K": 360.0,
         "Tmax_K": 545.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -2360,28 +2360,28 @@
       "MW": {
         "value": 0.02018,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 44.4,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 2756000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.0,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -2392,7 +2392,7 @@
         "Tmin_K": 24.0,
         "Tmax_K": 29.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -2402,28 +2402,28 @@
       "MW": {
         "value": 0.030006,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 180.0,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 6484999.999999999,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.607,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -2434,7 +2434,7 @@
         "Tmin_K": 95.0,
         "Tmax_K": 140.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -2444,28 +2444,28 @@
       "MW": {
         "value": 0.028013000000000003,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 126.2,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 3384000.0000000005,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.039,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -2476,7 +2476,7 @@
         "Tmin_K": 54.0,
         "Tmax_K": 90.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -2486,28 +2486,28 @@
       "MW": {
         "value": 0.046006,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 431.4,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 10133000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.86,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -2518,7 +2518,7 @@
         "Tmin_K": 230.0,
         "Tmax_K": 320.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -2528,28 +2528,28 @@
       "MW": {
         "value": 0.071002,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 234.0,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 4529000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.132,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -2560,7 +2560,7 @@
         "Tmin_K": 103.0,
         "Tmax_K": 155.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -2570,28 +2570,28 @@
       "MW": {
         "value": 0.044013,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 309.6,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 7245000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.16,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -2602,7 +2602,7 @@
         "Tmin_K": 144.0,
         "Tmax_K": 200.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -2612,28 +2612,28 @@
       "MW": {
         "value": 0.10616500000000001,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 630.2,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 3729000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.314,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -2644,7 +2644,7 @@
         "Tmin_K": 305.0,
         "Tmax_K": 445.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -2654,28 +2654,28 @@
       "MW": {
         "value": 0.031999,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 154.6,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 5046000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.021,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -2686,7 +2686,7 @@
         "Tmin_K": 63.0,
         "Tmax_K": 100.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -2696,28 +2696,28 @@
       "MW": {
         "value": 0.10616500000000001,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 616.2,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 3515999.9999999995,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.324,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -2728,7 +2728,7 @@
         "Tmin_K": 300.0,
         "Tmax_K": 440.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -2738,28 +2738,28 @@
       "MW": {
         "value": 0.094111,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 694.2,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 6130000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.44,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -2770,7 +2770,7 @@
         "Tmin_K": 345.0,
         "Tmax_K": 481.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -2780,28 +2780,28 @@
       "MW": {
         "value": 0.033998,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 324.45,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 6534999.999999999,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.042,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -2812,7 +2812,7 @@
         "Tmin_K": 144.0,
         "Tmax_K": 186.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -2822,28 +2822,28 @@
       "MW": {
         "value": 0.044095999999999996,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 370.0,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 4244000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.152,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -2854,7 +2854,7 @@
         "Tmin_K": 164.0,
         "Tmax_K": 249.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -2864,28 +2864,28 @@
       "MW": {
         "value": 0.04208,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 365.0,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 4620000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.148,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -2896,7 +2896,7 @@
         "Tmin_K": 160.0,
         "Tmax_K": 240.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -2906,28 +2906,28 @@
       "MW": {
         "value": 0.032117,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 269.69,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 4843000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.089,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -2938,7 +2938,7 @@
         "Tmin_K": 94.0,
         "Tmax_K": 162.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -2948,28 +2948,28 @@
       "MW": {
         "value": 0.169896,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 507.0,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 3749000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.264,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -2980,7 +2980,7 @@
         "Tmin_K": 238.0,
         "Tmax_K": 364.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -2990,28 +2990,28 @@
       "MW": {
         "value": 0.10407899999999999,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 259.09,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 3715000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.456,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -3022,7 +3022,7 @@
         "Tmin_K": 129.0,
         "Tmax_K": 128.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -3032,28 +3032,28 @@
       "MW": {
         "value": 0.104149,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 647.0,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 3992000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.257,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -3064,7 +3064,7 @@
         "Tmin_K": 305.0,
         "Tmax_K": 460.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -3074,28 +3074,28 @@
       "MW": {
         "value": 0.064065,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 430.8,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 7883000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.251,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -3106,7 +3106,7 @@
         "Tmin_K": 195.0,
         "Tmax_K": 280.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -3116,28 +3116,28 @@
       "MW": {
         "value": 0.14605600000000002,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 318.7,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 3759000.0000000005,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.286,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -3148,7 +3148,7 @@
         "Tmin_K": 159.0,
         "Tmax_K": 220.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -3158,28 +3158,28 @@
       "MW": {
         "value": 0.080064,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 491.0,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 8206999.999999999,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.41,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -3190,7 +3190,7 @@
         "Tmin_K": 290.0,
         "Tmax_K": 332.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -3200,28 +3200,28 @@
       "MW": {
         "value": 0.09213800000000001,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 591.7,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 4114000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.257,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -3232,7 +3232,7 @@
         "Tmin_K": 280.0,
         "Tmax_K": 410.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -3242,28 +3242,28 @@
       "MW": {
         "value": 0.056106,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 428.6,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 4104000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.214,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -3274,7 +3274,7 @@
         "Tmin_K": 200.0,
         "Tmax_K": 300.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -3284,28 +3284,28 @@
       "MW": {
         "value": 0.137367,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 471.2,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 4408000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.188,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -3316,7 +3316,7 @@
         "Tmin_K": 240.0,
         "Tmax_K": 300.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -3326,28 +3326,28 @@
       "MW": {
         "value": 0.135452,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 479.0,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 4170000.0000000005,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.203,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -3358,7 +3358,7 @@
         "Tmin_K": 275.0,
         "Tmax_K": 305.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -3368,28 +3368,28 @@
       "MW": {
         "value": 0.29783,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 444.0,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 4340000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.231,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -3400,7 +3400,7 @@
         "Tmin_K": 202.0,
         "Tmax_K": 290.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     },
     {
@@ -3410,28 +3410,28 @@
       "MW": {
         "value": 0.018015,
         "units": "kg/mol",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Tc": {
         "value": 647.3,
         "units": "K",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "Pc": {
         "value": 22048000.0,
         "units": "Pa",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
       "omega": {
         "value": 0.344,
         "units": "-",
-        "source_key": "legacy_db",
+        "source_key": "koretsky2012engineering",
         "uncertainty": null,
         "method": null
       },
@@ -3442,7 +3442,7 @@
         "Tmin_K": 284.0,
         "Tmax_K": 441.0,
         "units": "bar",
-        "source_key": "legacy_db"
+        "source_key": "koretsky2012engineering"
       }
     }
   ]
