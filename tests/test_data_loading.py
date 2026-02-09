@@ -16,10 +16,10 @@ def test_get_component_record_is_case_insensitive() -> None:
 
 def test_component_units_are_si() -> None:
     record = get_component_record("Methane")
-    props = record["properties"]
-    assert props["Tc_K"] == pytest.approx(190.6)
-    assert props["Pc_Pa"] == pytest.approx(4.6e6, rel=1e-4)
-    assert props["MW_kg_per_mol"] == pytest.approx(0.016042, rel=1e-6)
+    # New schema: properties are at top level as Parameter objects (dicts)
+    assert record["Tc"]["value"] == pytest.approx(190.6)
+    assert record["Pc"]["value"] == pytest.approx(4.6e6, rel=1e-4)
+    assert record["MW"]["value"] == pytest.approx(0.016042, rel=1e-6)
 
 
 def test_missing_component_raises() -> None:
