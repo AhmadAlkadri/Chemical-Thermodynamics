@@ -1,8 +1,46 @@
 # Component database
 
-The `flash` module looks for a consolidated HDF5 store at `database/database.h5` by default. The `DEFAULT_DATABASE_PATH` constant exported by `flash` points to this location so that client code and notebooks do not need to hard-code paths.
+The `flash` module looks for the component database at `chemthermo/data/components.json` by default.
 
-The `database.h5` file is generated from the tab-delimited text sources in this directory (for example `organics.txt` and `inorganics.txt`). The `sort_database.py` helper can be used to rebuild the HDF5 store from those raw tables.
+## Usage
 
-For the runtime package data, use `tools/build_database.py` to produce
-`src/chemthermo/data/components.json` in SI units (K, Pa, kg/mol).
+### Using the Database
+
+```python
+from chemthermo import Component, cite
+
+# Load a component
+methane = Component.from_database("Methane")
+print(f"Tc: {methane.tc_k} K")
+
+# Get a citation
+print(cite("Methane", "Tc"))
+```
+
+### Adding New Components
+
+To add a new component to the database interactively:
+
+```bash
+python tools/add_component.py
+```
+
+This script will prompt you for properties and automatically update `database/components.json`.
+
+### Rebuilding the Package Data
+
+If you modify `database/components.json` manually or via the tool, you must assume the package uses this source directly (in development mode) or reinstall the package to see changes if installed in site-packages.
+
+The `database.h5` and `sort_database.py` files are **deprecated** and should not be used.
+
+### Schema
+
+The database uses a JSON schema defined in `src/chemthermo/schemas.py`. Each component has:
+- `name`, `formula`, `CAS`
+- `MW`, `Tc`, `Pc`, `omega` (as Parameter objects with value, units, source_key)
+- `antoine` (optional)
+
+## Legacy Data
+
+The original data from `organics.txt` and `inorganics.txt` has been migrated to `components.json`.
+
