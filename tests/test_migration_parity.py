@@ -23,7 +23,7 @@ def test_component_loading():
     # Should resolve to something, not "Unknown citation" if we did it right
     # But wait, migrate_legacy_db uses "legacy_db" key.
     # And references.bib has "legacy_db".
-    assert "Legacy Chemical Thermodynamics Database" in cit
+    assert "Koretsky" in cit
 
 def test_legacy_parity_spot_check():
     """Spot check values against known legacy values."""
