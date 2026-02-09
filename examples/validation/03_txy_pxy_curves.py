@@ -19,6 +19,7 @@ Metrics:
 
 import sys
 import csv
+import warnings
 from pathlib import Path
 
 import numpy as np
@@ -78,7 +79,9 @@ def solve_bubble_point(mixture, P, x, eos, T_guess=150.0, tol=1e-5):
                 T_mid = 0.5 * (T_min + T_max)
                 res = None
                 try:
-                    res = ct.flash_tp(mixture, temperature_K=T_mid, pressure_Pa=P, eos=eos)
+                    with warnings.catch_warnings():
+                        warnings.filterwarnings("ignore", category=RuntimeWarning, module="chemicals")
+                        res = ct.flash_tp(mixture, temperature_K=T_mid, pressure_Pa=P, eos=eos)
                     vf = res.vapor_fraction
                 except ct.exceptions.ConvergenceError:
                     vf = None
@@ -115,7 +118,9 @@ def solve_dew_point(mixture, P, y, eos, T_guess=150.0):
         T_mid = 0.5 * (T_min + T_max)
         res = None
         try:
-            res = ct.flash_tp(mixture, temperature_K=T_mid, pressure_Pa=P, eos=eos)
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", category=RuntimeWarning, module="chemicals")
+                res = ct.flash_tp(mixture, temperature_K=T_mid, pressure_Pa=P, eos=eos)
             vf = res.vapor_fraction
         except ct.exceptions.ConvergenceError:
             vf = None
