@@ -118,47 +118,40 @@ def main():
         else:
             print(f"{T:<10.1f} {'Psat':<10} {'FAIL':<15} {'FAIL':<15} {'-':<15}")
 
-        # --- 2. Z factor ---
-        # We'll evaluate Z at Psat (saturation) for both liquid and vapor
-        if ref_Psat and calc_Psat:
-            P_check = ref_Psat # Use ref P to compare Z purely on formulation, or calc P?
-            # Let's use the calculated Psat for each to be self-consistent, 
-            # OR use a fixed P to compare Z implementation in isolation. 
-            # Slice plan says "Fixed pressure(s)" or Psat. 
-            # Let's use P = ref_Psat for both to isolate Z calculation diffs from Psat diffs.
-            
-            # Liquid Z
-            ref_Zl = liquid.Z(T, P_check)
-            try:
-                calc_Zl = eos.compressibility_factor(
-                    mixture=mixture, temperature_K=T, pressure_Pa=P_check, 
-                    composition=[1.0], phase="liquid"
-                )
-                err_l = abs(calc_Zl - ref_Zl) / abs(ref_Zl)
-                results.append({
-                    "T": T, "Property": "Z_liq", 
-                    "Thermo": ref_Zl, "ChemThermo": calc_Zl, "RelError": err_l
-                })
-            except Exception:
-                err_l = float('inf')
+            # Z factor
+            # Use the Z from the flash result directly
+            if ref_Psat and calc_Psat and ref_flash:
+                P_check = ref_Psat 
+                
+                # Liquid Z
+                try:
+                    ref_Zl = ref_flash.liquid0.Z
+                    calc_Zl = eos.compressibility_factor(
+                        mixture=mixture, temperature_K=T, pressure_Pa=P_check, 
+                        composition=[1.0], phase="liquid"
+                    )
+                    err_l = abs(calc_Zl - ref_Zl) / abs(ref_Zl)
+                    results.append({
+                        "T": T, "Property": "Z_liq", 
+                        "Thermo": ref_Zl, "ChemThermo": calc_Zl, "RelError": err_l
+                    })
+                except Exception:
+                    pass
 
-            # Vapor Z
-            ref_Zv = gas.Z(T, P_check)
-            try:
-                calc_Zv = eos.compressibility_factor(
-                    mixture=mixture, temperature_K=T, pressure_Pa=P_check, 
-                    composition=[1.0], phase="vapor"
-                )
-                err_v = abs(calc_Zv - ref_Zv) / abs(ref_Zv)
-                results.append({
-                    "T": T, "Property": "Z_vap", 
-                    "Thermo": ref_Zv, "ChemThermo": calc_Zv, "RelError": err_v
-                })
-            except Exception:
-                err_v = float('inf')
-            
-            # Print only invalid or large errors to avoid spam, or just Psat is enough for live log
-            # We'll add to summary.
+                # Vapor Z
+                try:
+                    ref_Zv = ref_flash.gas.Z
+                    calc_Zv = eos.compressibility_factor(
+                        mixture=mixture, temperature_K=T, pressure_Pa=P_check, 
+                        composition=[1.0], phase="vapor"
+                    )
+                    err_v = abs(calc_Zv - ref_Zv) / abs(ref_Zv)
+                    results.append({
+                        "T": T, "Property": "Z_vap", 
+                        "Thermo": ref_Zv, "ChemThermo": calc_Zv, "RelError": err_v
+                    })
+                except Exception:
+                    pass
 
     # Save artifact
     out_file = Path(__file__).parent / "01_pure_props_grid.csv"

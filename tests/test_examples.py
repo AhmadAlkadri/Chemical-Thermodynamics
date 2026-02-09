@@ -11,7 +11,7 @@ EXAMPLES_DIR = Path(__file__).resolve().parents[1] / "examples"
 def get_example_scripts():
     """Return a list of all .py files in the examples directory."""
     return [
-        p for p in EXAMPLES_DIR.glob("*.py")
+        p for p in EXAMPLES_DIR.rglob("*.py")
         if p.name != "__init__.py" and p.name != "README.md"
     ]
 

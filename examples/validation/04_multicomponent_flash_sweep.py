@@ -80,6 +80,8 @@ def main():
             ref_x, ref_y = None, None
 
         # Chemthermo
+        # Chemthermo
+        ct_x, ct_y = None, None
         try:
             mix = ct.Mixture.from_database(comps, zs)
             ct_res = ct.flash_tp(mix, temperature_K=T, pressure_Pa=P, eos=eos)
@@ -90,7 +92,6 @@ def main():
                 if 0 < ct_vf < 1: ct_phases = 2
                 else: ct_phases = 1
             
-            ct_x, ct_y = None, None
             if ct_phases == 2:
                 ct_x = np.array(ct_res.phases["liquid"].composition.fractions)
                 ct_y = np.array(ct_res.phases["vapor"].composition.fractions)

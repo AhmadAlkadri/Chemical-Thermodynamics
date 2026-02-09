@@ -76,14 +76,18 @@ def solve_bubble_point(mixture, P, x, eos, T_guess=150.0, tol=1e-5):
             T_min, T_max = 100.0, 300.0
             for _ in range(20):
                 T_mid = 0.5 * (T_min + T_max)
-                res = ct.flash_tp(mixture, temperature_K=T_mid, pressure_Pa=P, eos=eos)
-                vf = res.vapor_fraction
-                
+                res = None
+                try:
+                    res = ct.flash_tp(mixture, temperature_K=T_mid, pressure_Pa=P, eos=eos)
+                    vf = res.vapor_fraction
+                except ct.exceptions.ConvergenceError:
+                    vf = None
+
                 # If single phase liquid (vf=0 or None/liquid), we are too cold. T_mid is too low.
-                if vf == 0.0 or (vf is None and "liquid" in res.phases):
+                if vf == 0.0 or (vf is None and res and "liquid" in getattr(res, "phases", {})):
                     T_min = T_mid
                 # If single phase vapor (vf=1 or None/vapor), we are too hot.
-                elif vf == 1.0 or (vf is None and "vapor" in res.phases):
+                elif vf == 1.0 or (vf is None and res and "vapor" in getattr(res, "phases", {})):
                     T_max = T_mid
                 # If 2-phase, check VF.
                 elif vf is not None:
@@ -92,6 +96,8 @@ def solve_bubble_point(mixture, P, x, eos, T_guess=150.0, tol=1e-5):
                         T_max = T_mid # Too hot, too much vapor
                     else:
                         return T_mid # Close enough to bubble point
+                else:
+                    return None
             
             return 0.5*(T_min + T_max)
 
@@ -107,14 +113,18 @@ def solve_dew_point(mixture, P, y, eos, T_guess=150.0):
     T_min, T_max = 100.0, 300.0
     for _ in range(20):
         T_mid = 0.5 * (T_min + T_max)
-        res = ct.flash_tp(mixture, temperature_K=T_mid, pressure_Pa=P, eos=eos)
-        vf = res.vapor_fraction
-        
+        res = None
+        try:
+            res = ct.flash_tp(mixture, temperature_K=T_mid, pressure_Pa=P, eos=eos)
+            vf = res.vapor_fraction
+        except ct.exceptions.ConvergenceError:
+            vf = None
+
         # If single phase liquid, too cold.
-        if vf == 0.0 or (vf is None and "liquid" in res.phases):
+        if vf == 0.0 or (vf is None and res and "liquid" in getattr(res, "phases", {})):
             T_min = T_mid
         # If single phase vapor, too hot.
-        elif vf == 1.0 or (vf is None and "vapor" in res.phases):
+        elif vf == 1.0 or (vf is None and res and "vapor" in getattr(res, "phases", {})):
             T_max = T_mid
         # If 2-phase
         elif vf is not None:
@@ -123,6 +133,8 @@ def solve_dew_point(mixture, P, y, eos, T_guess=150.0):
                 T_min = T_mid # Too cold, too much liquid
             else:
                 return T_mid # Close enough
+        else:
+            return None
     
     return 0.5*(T_min + T_max)
 
