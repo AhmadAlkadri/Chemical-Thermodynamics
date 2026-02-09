@@ -8,7 +8,7 @@ from importlib import resources
 from typing import Any
 
 from ..exceptions import PropertyNotFoundError
-from .schema import ANTOINE_KEYS, COMPONENT_KEYS, PROPERTY_KEYS, SCHEMA_VERSION, TOP_LEVEL_KEYS
+from .schema import ANTOINE_KEYS, COMPONENT_KEYS, PARAMETER_KEYS, SCHEMA_VERSION, TOP_LEVEL_KEYS
 
 
 def normalize_name(name: str) -> str:
@@ -36,23 +36,31 @@ def load_component_database() -> dict[str, dict[str, Any]]:
 
     components = payload["components"]
     mapping: dict[str, dict[str, Any]] = {}
+    
+    # We validate against COMPONENT_KEYS which now includes MW, Tc, etc.
+    # And we check that those keys are objects with PARAMETER_KEYS.
+    # We do NOT use Pydantic here to avoid runtime overhead on import if possible,
+    # or just keep it simple validation.
+    
     for record in components:
         for key in COMPONENT_KEYS:
             if key not in record:
                 raise ValueError(f"Component record missing '{key}'.")
 
-        properties = record["properties"]
-        for key in PROPERTY_KEYS:
-            if key not in properties:
-                raise ValueError(f"Component '{record.get('name')}' missing property '{key}'.")
+        # Check parameter objects
+        for param_name in ("MW", "Tc", "Pc", "omega"):
+            param = record[param_name]
+            for key in PARAMETER_KEYS:  # value, units, source_key
+                 if key not in param:
+                      raise ValueError(f"Component '{record.get('name')}' property '{param_name}' missing '{key}'.")
 
-        if "antoine" in record:
+        if "antoine" in record and record["antoine"] is not None:
             for key in ANTOINE_KEYS:
                 if key not in record["antoine"]:
                     raise ValueError(
                         f"Component '{record.get('name')}' missing Antoine key '{key}'."
                     )
-
+        
         canonical = normalize_name(str(record["name"]))
         if canonical in mapping:
             raise ValueError(f"Duplicate component name after normalization: {record['name']!r}")
