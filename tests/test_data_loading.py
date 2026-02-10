@@ -35,17 +35,22 @@ def test_list_component_names_includes_methane() -> None:
     assert "Methane" in names
 
 
-def test_runtime_loader_does_not_depend_on_legacy_database_copy(tmp_path: Path) -> None:
-    legacy_copy = Path("database/components.json")
-    if not legacy_copy.exists():
-        pytest.skip("Legacy authoring copy is absent.")
+def test_runtime_loader_does_not_depend_on_non_runtime_mirror_copy(tmp_path: Path) -> None:
+    mirror_path = Path("database/components.mirror.json")
+    created_mirror = False
+    if not mirror_path.exists():
+        mirror_path.write_text('{"schema_version": 1, "components": []}', encoding="utf-8")
+        created_mirror = True
 
-    backup = tmp_path / "components_legacy_backup.json"
-    shutil.move(str(legacy_copy), backup)
+    backup = tmp_path / "components_mirror_backup.json"
+    shutil.move(str(mirror_path), backup)
     try:
         load_component_database.cache_clear()
         record = get_component_record("Methane")
         assert record["name"] == "Methane"
     finally:
-        shutil.move(str(backup), legacy_copy)
+        if created_mirror:
+            backup.unlink(missing_ok=True)
+        else:
+            shutil.move(str(backup), mirror_path)
         load_component_database.cache_clear()

@@ -4,58 +4,79 @@
 
 VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capability class is categorically out of scope; implementation maturity may vary by module and release.
 
-The canonical runtime component database is:
+## Canonical runtime database path
+
+The canonical packaged runtime component database is:
 
 - `src/chemthermo/data/components.json`
 
-Runtime loading uses packaged resources (`chemthermo.data/components.json`) and
-does not depend on `database/components.json`.
+Runtime loading uses packaged resources (`chemthermo.data/components.json`) and does not depend on any file under `database/`.
 
-## Usage
+## Raw source files
 
-### Using the Database
+Canonical raw tables for regeneration are:
+
+- `database/organics.txt`
+- `database/inorganics.txt`
+
+## Rebuild and check workflow
+
+Regenerate canonical payload:
+
+```bash
+python tools/build_database.py
+```
+
+Verify deterministic sync against canonical runtime path:
+
+```bash
+python tools/build_database.py --check
+```
+
+Optionally write a non-runtime mirror (generated artifact):
+
+```bash
+python tools/build_database.py --write-mirror
+```
+
+Optional mirror path:
+
+- `database/components.mirror.json`
+
+`database/components.mirror.json` is generated-only, git-ignored, and never loaded at runtime.
+
+## Using the runtime database
 
 ```python
 from chemthermo import Component, cite
 
-# Load a component
 methane = Component.from_database("Methane")
-print(f"Tc: {methane.tc_k} K")
-
-# Get a citation
+print(methane.tc_k)
 print(cite("Methane", "Tc"))
 ```
 
-### Adding New Components
-
-To add a new component to the database interactively:
+## Adding components interactively
 
 ```bash
 python tools/add_component.py
 ```
 
-This script will prompt you for properties and automatically update `database/components.json`.
-This script now updates the canonical runtime file:
+This tool updates:
 
 - `src/chemthermo/data/components.json`
 
-### Rebuilding the Package Data
+If you changed packaged data, reinstall before non-editable smoke tests so site-packages reflects the update.
 
-If you modify `src/chemthermo/data/components.json`, reinstall the package if
-needed to refresh site-packages in non-editable installs.
+## Schema
 
-`database/components.json` is a deprecated legacy artifact and is not the
-runtime source of truth.
+The database schema is defined by `src/chemthermo/schemas.py` and loaded by `src/chemthermo/data/__init__.py`.
 
-The `database.h5` and `sort_database.py` files are **deprecated** and should not be used.
+Each component record includes:
 
-### Schema
-
-The database uses a JSON schema defined in `src/chemthermo/schemas.py`. Each component has:
 - `name`, `formula`, `CAS`
-- `MW`, `Tc`, `Pc`, `omega` (as Parameter objects with value, units, source_key)
+- `MW`, `Tc`, `Pc`, `omega` (parameter objects)
 - `antoine` (optional)
 
-## Legacy Data
+## Legacy / deprecated artifacts
 
-The original data from `organics.txt` and `inorganics.txt` has been migrated to `components.json`.
+`database/components.json` and `database.h5` are deprecated legacy artifacts and are not runtime sources of truth.

@@ -22,3 +22,6 @@ venv/
 
 # Generated example outputs
 examples/**/*.csv
+
+# Generated non-runtime database mirror
+database/components.mirror.json
