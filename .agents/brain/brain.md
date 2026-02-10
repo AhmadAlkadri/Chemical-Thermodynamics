@@ -8,7 +8,7 @@ How to use this document
 **Agent Contract**
 - Read first: `.agents/brain/brain.md`, `.agents/brain/steering-brief.md`, relevant ADRs in `.agents/brain/adr/`.
 - Do-not-touch list (initial): public API boundaries (ADR-0001), CI contract (`.github/workflows/ci.yml`), compatibility rules (public API + schema versions), numerics invariants (SI units, composition tolerance, flash determinism).
-- Definition of done: code formatted (`ruff format src tests`), quality gates pass (`ruff format --check src tests`, `ruff check src tests`, `pyright`, `pytest -q`), docs updated, Golden Path runnable, no TODOs in critical path.
+- Definition of done: run canonical bootstrap, CI gates, and golden path from `.agents/dev-contract.md`; update docs; keep no TODOs in critical path.
 - Stop if >3 plausible root causes: write an experiment/instrumentation plan first.
 - If uncertain after 2 iterations, produce a minimal repro and document findings.
 - Complexity receipts rule: any new abstraction must state why, bug prevented, cost, and what breaks if omitted.
@@ -26,7 +26,7 @@ How to use this document
 - Primary language/toolchain: Python 3.11+, setuptools build via `pyproject.toml`. (source: pyproject.toml)
 - Primary entry points: `chemthermo` top-level API, `chemthermo.eos` registry, `chemthermo.vlle` plugin boundary. (source: src/chemthermo/__init__.py, src/chemthermo/eos/__init__.py, src/chemthermo/vlle/__init__.py)
 - Tests: `pytest` (plus lint/type checks in CI). (source: .github/workflows/ci.yml)
-- Golden Path (one command): `python -m pip install -e ".[dev]" && python examples/basic/flash_tp_peng_robinson_demo.py`. (source: README.md, examples/basic/flash_tp_peng_robinson_demo.py)
+- Golden Path command is maintained in `.agents/dev-contract.md`. (source: .agents/dev-contract.md)
 
 ## 1) Purpose and non-goals
 - Purpose: provide core thermodynamics utilities (components, mixtures, EOS/activities, TP flash) in SI units. (source: README.md, src/chemthermo/flash/tp.py, src/chemthermo/models/base.py)
@@ -87,18 +87,9 @@ Key entry points (top paths)
 
 - No environment-variable configuration is documented in README or `pyproject.toml`. (source: README.md, pyproject.toml)
 
-Top 10 cheapest checks
-- Confirm Python >= 3.11 (`pyproject.toml` requires it). (source: pyproject.toml)
-- `python -m pip install -e ".[dev]"` installs CI-parity tooling (`pytest`, `ruff`, `pyright`) and runtime deps. (source: pyproject.toml, .github/workflows/ci.yml)
-- `python -m pytest tests/test_import.py -q` (quick import sanity). (source: tests/test_import.py)
-- `python -m pytest tests/test_validation.py -q` (validation helpers). (source: tests/test_validation.py)
-- `python -m pytest tests/test_flash_tp.py -q` (flash solver basics). (source: tests/test_flash_tp.py)
-- `python -m pytest tests/test_pr_eos.py -q` (Peng-Robinson EOS). (source: tests/test_pr_eos.py)
-- `python -m pytest tests/test_data_loading.py -q` (component databank). (source: tests/test_data_loading.py)
-- `python -m pytest tests/test_examples.py -q` (example usage). (source: tests/test_examples.py)
-- `ruff format src tests` (apply standard formatting before quality gates).
-- `ruff format --check src tests` (format gate in CI). (source: .github/workflows/ci.yml)
-- `ruff check src tests` and `pyright` (lint/type gate in CI). (source: .github/workflows/ci.yml)
+Cheap checks
+- Canonical cheap checks are maintained in `.agents/dev-contract.md` to avoid command drift.
+- Use the cheap-check subset first for fast feedback, then run full CI gates from `.agents/dev-contract.md`.
 
 ## 7) Testing & CI contract
 - CI runs: ruff format check, ruff lint, pyright, pytest on Python 3.11. (source: .github/workflows/ci.yml)
