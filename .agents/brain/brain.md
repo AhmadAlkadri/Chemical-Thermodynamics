@@ -13,7 +13,7 @@ How to use this document
 - If uncertain after 2 iterations, produce a minimal repro and document findings.
 - Complexity receipts rule: any new abstraction must state why, bug prevented, cost, and what breaks if omitted.
 - ADR rule: any public API or architectural change requires a new ADR (or update + supersede).
-- **Thin Vertical Slice Rule** (ADR-0002): Every exposed capability must be end-to-end usable. No scaffolded/partial features.
+- **Thin Vertical Slice Rule**: Every exposed capability must be end-to-end usable. No scaffolded/partial features.
 - **Golden Path Rule**: Every Thin Vertical Slice must ship with at least one golden path (example/test) that executes successfully from a clean environment.
 - Keep claims factual; add evidence tags or links for load-bearing statements.
 
@@ -28,10 +28,9 @@ How to use this document
 - Tests: `pytest` (plus lint/type checks in CI). (source: .github/workflows/ci.yml)
 - Golden Path command is maintained in `.agents/dev-contract.md`. (source: .agents/dev-contract.md)
 
-## 1) Purpose and non-goals
+## 1) Purpose and scope policy
 - Purpose: provide core thermodynamics utilities (components, mixtures, EOS/activities, TP flash) in SI units. (source: README.md, src/chemthermo/flash/tp.py, src/chemthermo/models/base.py)
-- Non-goal: **VLLE is explicitly out of scope**. This repository focuses on VLE only. 
-- Non-goal: **PC-SAFT is explicitly out of scope**. The `pcsaft` module is a non-functional artifact and will not be implemented.
+- Scope policy: VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capability class is categorically out of scope; implementation maturity may vary by module and release.
 
 ## 2) Public API surface (current)
 Definition of public API follows ADR-0001 (source of truth rules in `.agents/brain/adr/0001-public-api-truth-source.md`).
@@ -41,9 +40,9 @@ Stable (public) entry points
 - EOS registry module (`chemthermo.eos`: `EOSProtocol`, `PCSAFTEOS`, `get_eos`, `list_eos`, `register_eos`). (source: src/chemthermo/eos/__init__.py)
 - VLLE plugin boundary (`chemthermo.vlle`: `get_vlle_engine`, `VLLEEngine`, `VLLEResult`, and related types/errors). (source: src/chemthermo/vlle/__init__.py, README.md)
 
-Unsupported / Out of Scope
-- `chemthermo.vlle`: Legacy boundary. Do not use.
-- `chemthermo.eos.pcsaft`: Non-functional placeholder. Do not use.
+Implementation status notes
+- `chemthermo.vlle`: Public plugin boundary for optional VLLE engines.
+- `chemthermo.eos.pcsaft`: Public EOS registry entry and interface with implementation details evolving over time.
 
 CLI entry points
 - No CLI scripts are defined in `pyproject.toml` (no `[project.scripts]` section). (source: pyproject.toml)
@@ -99,7 +98,6 @@ Cheap checks
 - ADR folder: `.agents/brain/adr/`
 - Accepted ADRs:
   - `.agents/brain/adr/0001-public-api-truth-source.md`
-  - `.agents/brain/adr/0002-thin-vertical-slices.md` (Adopted 2026-02-06)
 - ADR rules: one decision per ADR; keep under 1 page; include status and supersedes fields.
 
 ## 9) Roadmap: next 3 increments (vertical slices)

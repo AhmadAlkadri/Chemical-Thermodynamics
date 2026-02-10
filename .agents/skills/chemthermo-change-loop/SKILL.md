@@ -16,7 +16,7 @@ description: Use when implementing or reviewing changes in this Chemical-Thermod
 1. Establish scope and constraints.
 - Read `README.md` and `.agents/brain/brain.md` before structural edits.
 - If the change is architectural or API-facing, read relevant ADRs in `.agents/brain/adr/`.
-- Confirm non-goals remain intact: VLLE and PC-SAFT are out of scope.
+- Confirm scope policy remains consistent across docs: VLLE and PC-SAFT are in scope, and no thermodynamic capability class is categorically out of scope.
 
 2. Classify the change.
 - Treat edits touching `src/chemthermo/__init__.py`, `src/chemthermo/eos/__init__.py`, or `src/chemthermo/vlle/__init__.py` as public API-sensitive.

@@ -88,20 +88,14 @@ print(list_eos())
 - `num_components()`
 - `residual_helmholtz(temperature_K, volume_m3, composition)`
 
-> [!WARNING]
-> **PC-SAFT is explicitly unsupported.**
-> While some placeholder code for PC-SAFT exists in the codebase (`chemthermo.eos.pcsaft`), it is **non-functional and out of scope** for this repository. It will not be developed further.
+## Scope Policy
+
+VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capability class is categorically out of scope; implementation maturity may vary by module and release.
 
 ## Examples and notebooks
 
 - Scripted demos: `examples/README.md`
 - Jupyter notebooks: `notebooks/README.md`
-
-## VLLE support
-
-> [!WARNING]
-> **VLLE is explicitly out of scope.**
-> This repository focuses on VLE (Vapor-Liquid Equilibrium) only. Any symbols or hooks related to VLLE (`chemthermo.vlle`) are legacy boundaries and are not supported.
 
 ## Optional validation dependencies
 
