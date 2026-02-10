@@ -182,3 +182,75 @@ def test_vle_raises_convergence_error_when_tolerance_not_met(binary_components, 
                 "inner_tol": 1e-14,
             },
         )
+
+
+def test_vle_boundary_grid_invariants_pr_binary(binary_components, eos):
+    tol = 1e-7
+    pressures = [1.0e5, 5.0e5, 1.0e6, 2.0e6]
+    fractions = [0.2, 0.5, 0.8]
+
+    successes = 0
+
+    for pressure in pressures:
+        for frac in fractions:
+            x = (frac, 1.0 - frac)
+            bubble_mix = ct.Mixture(
+                components=binary_components, composition=ct.Composition(fractions=x)
+            )
+            try:
+                temperature, y = bubble_temperature(
+                    bubble_mix,
+                    pressure_Pa=pressure,
+                    eos=eos,
+                    settings={"tol": tol, "max_iter": 100},
+                )
+            except ct.ConvergenceError:
+                pass
+            else:
+                successes += 1
+                y_arr = np.array(y, dtype=float)
+                assert np.all(y_arr >= 0.0)
+                assert abs(float(np.sum(y_arr)) - 1.0) < 1e-8
+
+                K = _k_values(
+                    bubble_mix,
+                    eos,
+                    temperature,
+                    pressure,
+                    liquid_composition=x,
+                    vapor_composition=tuple(y),
+                )
+                residual = float(np.dot(K, np.array(x, dtype=float)) - 1.0)
+                assert abs(residual) < tol
+
+            y = (frac, 1.0 - frac)
+            dew_mix = ct.Mixture(
+                components=binary_components, composition=ct.Composition(fractions=y)
+            )
+            try:
+                temperature, x_soln = dew_temperature(
+                    dew_mix,
+                    pressure_Pa=pressure,
+                    eos=eos,
+                    settings={"tol": tol, "max_iter": 100},
+                )
+            except ct.ConvergenceError:
+                pass
+            else:
+                successes += 1
+                x_arr = np.array(x_soln, dtype=float)
+                assert np.all(x_arr >= 0.0)
+                assert abs(float(np.sum(x_arr)) - 1.0) < 1e-8
+
+                K = _k_values(
+                    dew_mix,
+                    eos,
+                    temperature,
+                    pressure,
+                    liquid_composition=tuple(x_soln),
+                    vapor_composition=y,
+                )
+                residual = float(np.sum(np.array(y, dtype=float) / K) - 1.0)
+                assert abs(residual) < tol
+
+    assert successes > 0
