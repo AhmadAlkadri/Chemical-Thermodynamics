@@ -37,26 +37,23 @@ def test_database_model():
 
 def test_load_template_db():
     """Test loading the template components.json."""
-    db_path = Path("database/components.json")
+    db_path = Path("src/chemthermo/data/components.json")
     assert db_path.exists()
 
-    with open(db_path) as f:
+    with db_path.open(encoding="utf-8") as f:
         data = json.load(f)
 
-    # process components list
+    # Process components list.
     db = Database(**data)
     assert db.schema_version == 1
 
 
 def test_database_source_of_truth_sync_check():
-    """Runtime and authoring component databases must stay byte-equivalent."""
+    """Canonical packaged components database exists and is schema-valid."""
     runtime_path = Path("src/chemthermo/data/components.json")
-    authoring_path = Path("database/components.json")
-
     assert runtime_path.exists()
-    assert authoring_path.exists()
 
     runtime_payload = json.loads(runtime_path.read_text(encoding="utf-8"))
-    authoring_payload = json.loads(authoring_path.read_text(encoding="utf-8"))
-
-    assert runtime_payload == authoring_payload
+    db = Database(**runtime_payload)
+    assert db.schema_version == 1
+    assert len(db.components) > 0

@@ -116,5 +116,5 @@ def migrate_database(data_dir: Path, output_file: Path):
 
 if __name__ == "__main__":
     db_dir = Path(__file__).resolve().parents[1] / "database"
-    out_file = Path(__file__).resolve().parents[1] / "database" / "components.json"
+    out_file = Path(__file__).resolve().parents[1] / "src" / "chemthermo" / "data" / "components.json"
     migrate_database(db_dir, out_file)

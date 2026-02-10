@@ -1,6 +1,11 @@
 # Component database
 
-The `flash` module looks for the component database at `chemthermo/data/components.json` by default.
+The canonical runtime component database is:
+
+- `src/chemthermo/data/components.json`
+
+Runtime loading uses packaged resources (`chemthermo.data/components.json`) and
+does not depend on `database/components.json`.
 
 ## Usage
 
@@ -26,10 +31,17 @@ python tools/add_component.py
 ```
 
 This script will prompt you for properties and automatically update `database/components.json`.
+This script now updates the canonical runtime file:
+
+- `src/chemthermo/data/components.json`
 
 ### Rebuilding the Package Data
 
-If you modify `database/components.json` manually or via the tool, you must assume the package uses this source directly (in development mode) or reinstall the package to see changes if installed in site-packages.
+If you modify `src/chemthermo/data/components.json`, reinstall the package if
+needed to refresh site-packages in non-editable installs.
+
+`database/components.json` is a deprecated legacy artifact and is not the
+runtime source of truth.
 
 The `database.h5` and `sort_database.py` files are **deprecated** and should not be used.
 
@@ -43,4 +55,3 @@ The database uses a JSON schema defined in `src/chemthermo/schemas.py`. Each com
 ## Legacy Data
 
 The original data from `organics.txt` and `inorganics.txt` has been migrated to `components.json`.
-

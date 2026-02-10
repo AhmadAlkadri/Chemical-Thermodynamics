@@ -1,3 +1,6 @@
+import shutil
+from pathlib import Path
+
 import pytest
 
 from chemthermo.data import get_component_record, list_component_names, load_component_database
@@ -30,3 +33,19 @@ def test_missing_component_raises() -> None:
 def test_list_component_names_includes_methane() -> None:
     names = list_component_names()
     assert "Methane" in names
+
+
+def test_runtime_loader_does_not_depend_on_legacy_database_copy(tmp_path: Path) -> None:
+    legacy_copy = Path("database/components.json")
+    if not legacy_copy.exists():
+        pytest.skip("Legacy authoring copy is absent.")
+
+    backup = tmp_path / "components_legacy_backup.json"
+    shutil.move(str(legacy_copy), backup)
+    try:
+        load_component_database.cache_clear()
+        record = get_component_record("Methane")
+        assert record["name"] == "Methane"
+    finally:
+        shutil.move(str(backup), legacy_copy)
+        load_component_database.cache_clear()
