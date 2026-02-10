@@ -22,6 +22,10 @@ jobs:
           python -m venv .venv
           .venv/bin/python -m pip install --upgrade pip
           .venv/bin/pip install -e ".[dev]"
+          .venv/bin/pip install git+https://github.com/AhmadAlkadri/agentslint.git@v0.3.0
+
+      - name: Aglint
+        run: .venv/bin/aglint check --repo .
 
       - name: Editable install smoke
         run: |
@@ -41,3 +45,31 @@ jobs:
 
       - name: Non-editable install smoke
         run: .venv/bin/python tools/smoke_install.py --package .
+
+      - name: Commit cadence trailers
+        run: |
+          slice_lines="$(git log -n 200 --format=%B | grep -E '^Slice:' || true)"
+          if [ -z "$slice_lines" ]; then
+            echo "No Slice trailers found in recent commits (no-slice run)."
+            exit 0
+          fi
+
+          invalid_lines="$(printf '%s\n' "$slice_lines" | grep -Ev '^Slice: [a-z0-9][a-z0-9_-]*$' || true)"
+          if [ -n "$invalid_lines" ]; then
+            echo "Missing Slice trailer on slice-closing commits."
+            echo "Use trailer format: Slice: <slug>"
+            echo "$invalid_lines"
+            exit 1
+          fi
+
+          counts="$(printf '%s\n' "$slice_lines" | awk -F': ' '{print $2}' | sort | uniq -c)"
+          echo "$counts"
+          printf '%s\n' "$counts" | awk '{if ($1 < 1) exit 1}'
+
+      - name: Clean handoff tree
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Dirty working tree at handoff"
+            git status --short
+            exit 1
+          fi
