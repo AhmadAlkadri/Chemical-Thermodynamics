@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -35,7 +35,7 @@ class ComponentData(BaseModel):
     name: str = Field(..., description="Common name (e.g., 'Methane').")
     formula: str = Field(..., description="Chemical formula (e.g., 'CH4').")
     CAS: str | None = Field(default=None, description="CAS Registry Number.")
-    
+
     # Critical properties
     MW: Parameter = Field(..., description="Molecular/Atomic Weight.")
     Tc: Parameter = Field(..., description="Critical Temperature.")

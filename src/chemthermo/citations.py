@@ -8,13 +8,13 @@ from typing import Mapping
 
 import bibtexparser
 from bibtexparser.bparser import BibTexParser
-from bibtexparser.customization import convert_to_unicode, author
+from bibtexparser.customization import convert_to_unicode
 
 
 @lru_cache(maxsize=1)
 def load_references(path: Path | None = None) -> Mapping[str, dict[str, str]]:
     """Load the BibTeX database from the default or specified path.
-    
+
     Returns:
         A dictionary mapping citation keys to BibTeX entry dictionaries.
     """
@@ -26,7 +26,7 @@ def load_references(path: Path | None = None) -> Mapping[str, dict[str, str]]:
         # Ideally, resources should be used or a configured path.
         # Fallback to local dev path for now.
         path = Path(__file__).resolve().parents[2] / "database" / "references.bib"
-    
+
     if not path.exists():
         raise FileNotFoundError(f"BibTeX database not found at {path}")
 
@@ -34,7 +34,7 @@ def load_references(path: Path | None = None) -> Mapping[str, dict[str, str]]:
         parser = BibTexParser()
         parser.customization = convert_to_unicode
         bib_database = bibtexparser.load(f, parser=parser)
-    
+
     return {entry["ID"]: entry for entry in bib_database.entries}
 
 
@@ -53,10 +53,10 @@ class BibliographicDatabase:
         entry = self.get_entry(key)
         if not entry:
             return f"[Unknown citation: {key}]"
-        
+
         # Simple formatting logic suitable for plain text output
         authors = entry.get("author", "Unknown Author").replace("\n", " ")
         title = entry.get("title", "Untitled").replace("{", "").replace("}", "")
         year = entry.get("year", "n.d.")
-        
+
         return f"{authors} ({year}). {title}."
