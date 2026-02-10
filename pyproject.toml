@@ -15,6 +15,9 @@ dependencies = [
   "bibtexparser>=1.4.0",
 ]
 
+[project.scripts]
+chemthermo = "chemthermo.cli:main"
+
 [project.optional-dependencies]
 dev = [
   "build>=1.2.2",
