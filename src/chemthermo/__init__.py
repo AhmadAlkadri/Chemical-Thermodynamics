@@ -20,9 +20,9 @@ from .exceptions import (
 from .flash import FlashResult, FlashSettings, PhaseResult, flash_tp
 from .models import NRTL, ActivityModel, EquationOfState, PengRobinsonEOS
 from .parameters import ActivityParameters, NRTLParameters, PCSAFTParameterError
+from .phase_boundary import bubble_pressure, bubble_temperature, dew_pressure, dew_temperature
 from .units import PA_PER_BAR, STANDARD_P_PA
 from .validation import validate_fractions, validate_pressure, validate_temperature
-from .vle import bubble_pressure, bubble_temperature, dew_pressure, dew_temperature
 
 __version__ = "0.0.0"
 

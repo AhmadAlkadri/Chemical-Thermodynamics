@@ -2,6 +2,18 @@ import numpy as np
 import pytest
 
 import chemthermo as ct
+from chemthermo.phase_boundary import (
+    bubble_pressure as boundary_bubble_pressure,
+)
+from chemthermo.phase_boundary import (
+    bubble_temperature as boundary_bubble_temperature,
+)
+from chemthermo.phase_boundary import (
+    dew_pressure as boundary_dew_pressure,
+)
+from chemthermo.phase_boundary import (
+    dew_temperature as boundary_dew_temperature,
+)
 from chemthermo.vle import bubble_pressure, bubble_temperature, dew_pressure, dew_temperature
 
 
@@ -47,6 +59,13 @@ def _k_values(
         dtype=float,
     )
     return phi_l / phi_v
+
+
+def test_vle_shim_reexports_phase_boundary_module() -> None:
+    assert bubble_temperature is boundary_bubble_temperature
+    assert dew_temperature is boundary_dew_temperature
+    assert bubble_pressure is boundary_bubble_pressure
+    assert dew_pressure is boundary_dew_pressure
 
 
 def test_bubble_temperature_residual_closure_pr_binary(binary_components, eos):
