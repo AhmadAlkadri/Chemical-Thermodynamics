@@ -46,3 +46,17 @@ def test_load_template_db():
     # process components list
     db = Database(**data)
     assert db.schema_version == 1
+
+
+def test_database_source_of_truth_sync_check():
+    """Runtime and authoring component databases must stay byte-equivalent."""
+    runtime_path = Path("src/chemthermo/data/components.json")
+    authoring_path = Path("database/components.json")
+
+    assert runtime_path.exists()
+    assert authoring_path.exists()
+
+    runtime_payload = json.loads(runtime_path.read_text(encoding="utf-8"))
+    authoring_payload = json.loads(authoring_path.read_text(encoding="utf-8"))
+
+    assert runtime_payload == authoring_payload
