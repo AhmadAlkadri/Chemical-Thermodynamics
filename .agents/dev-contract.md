@@ -1,6 +1,7 @@
 # Dev Contract (CI Parity)
 
 This file is the single source of truth for contributor and agent commands.
+Hard-gate policy lives in `AGENTS.md`.
 
 ## Environment bootstrap
 
@@ -9,14 +10,13 @@ From the repo root:
 ```bash
 python -m venv .venv
 source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -e ".[dev]"
+.venv/bin/pip install -e ".[dev]"
 ```
 
 Optional external-validation extras:
 
 ```bash
-python -m pip install -e ".[validation]"
+.venv/bin/pip install -e ".[validation]"
 ```
 
 ## CI gates
@@ -57,7 +57,25 @@ For every thin vertical slice report, include:
 - CI-equivalent gate command(s) and outcome(s).
 - Installability smoke command(s) and outcome(s).
 
-## Cheap check subset
+## Proof of Compliance
+
+Policy source: `AGENTS.md`.
+
+Run:
+
+```bash
+git status --porcelain
+git log --oneline -n 8
+git log -n 20 --format=%B | rg "^Slice:"
+```
+
+Expected:
+
+- `git status --porcelain` prints nothing.
+- `git log --oneline -n 8` shows recent commits.
+- `git log -n 20 --format=%B | rg "^Slice:"` shows slice trailers when slices were used.
+
+## Cheap Checks
 
 Run these quick checks before the full suite when iterating:
 

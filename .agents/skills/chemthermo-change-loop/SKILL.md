@@ -5,6 +5,9 @@ description: Use when implementing or reviewing changes in this Chemical-Thermod
 
 # Chemthermo Change Loop
 
+Hard-gate policy source: `AGENTS.md`.
+Use this skill for execution flow; do not redefine hard gates here.
+
 ## Inputs
 - User request and acceptance criteria
 - Files expected to change
@@ -53,6 +56,8 @@ description: Use when implementing or reviewing changes in this Chemical-Thermod
 - CI-equivalent checks were run and outcomes reported.
 - Editable and non-editable install smoke checks were run and outcomes reported.
 - User-visible behavior changes include docs updates in the same slice.
+- `git status --porcelain` is empty at handoff.
+- If slices were used, recent commit messages include `Slice: <slug>` trailers (`git log -n 20 --format=%B | rg "^Slice:"`).
 
 ## Notebook-specific checklist
 - Keep notebooks in `notebooks/` runnable top-to-bottom.

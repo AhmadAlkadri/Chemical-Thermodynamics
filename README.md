@@ -78,12 +78,7 @@ table-style summary.
 Run TP flash without writing Python:
 
 ```bash
-chemthermo tp-flash \
-  --components Methane,Ethane,Propane \
-  --z 0.5,0.3,0.2 \
-  --temperature-k 240 \
-  --pressure-pa 3000000 \
-  --format json
+chemthermo tp-flash --components Methane,Ethane,Propane --z 0.5,0.3,0.2 --temperature-k 240 --pressure-pa 3000000 --format json
 ```
 
 Module execution is also supported:
