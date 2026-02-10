@@ -26,10 +26,9 @@ def test_basic_example_runs_successfully(script_path: Path) -> None:
 
 
 @pytest.mark.parametrize("script_path", VALIDATION_SCRIPTS, ids=lambda p: p.name)
-def test_validation_example_runs_successfully(script_path: Path, tmp_path: Path) -> None:
+def test_validation_example_runs_successfully(
+    script_path: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     pytest.importorskip("thermo")
-
-    script_copy = tmp_path / script_path.name
-    script_copy.write_text(script_path.read_text(encoding="utf-8"), encoding="utf-8")
-
-    runpy.run_path(str(script_copy), run_name="__main__")
+    monkeypatch.setenv("CHEMTHERMO_OUTDIR", str(tmp_path))
+    runpy.run_path(str(script_path), run_name="__main__")

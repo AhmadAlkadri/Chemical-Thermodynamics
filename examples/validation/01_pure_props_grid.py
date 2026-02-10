@@ -10,9 +10,11 @@ Scope:
 - Temperature: 110 K - 180 K (Critical Temp ~190.56 K)
 """
 
-import sys
-import math
 import csv
+import math
+import os
+import argparse
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -65,7 +67,24 @@ def solve_psat_chemthermo(mixture, T, eos, P_guess, tol=1e-5, max_iter=50):
         
     return None
 
+
+def _parse_outdir() -> Path | None:
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--outdir", type=Path, default=None)
+    args, _ = parser.parse_known_args()
+
+    if args.outdir is not None:
+        return args.outdir
+
+    env_outdir = os.environ.get("CHEMTHERMO_OUTDIR")
+    if env_outdir:
+        return Path(env_outdir)
+
+    return None
+
+
 def main():
+    outdir = _parse_outdir()
     # Setup Component
     name = "Methane"
     # Methane critical properties (approx): Tc=190.56 K, Pc=4.599 MPa
@@ -153,12 +172,19 @@ def main():
                 except Exception:
                     pass
 
-    # Save artifact
-    out_file = Path(__file__).parent / "01_pure_props_grid.csv"
-    with open(out_file, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=["T", "Property", "Thermo", "ChemThermo", "RelError"])
-        writer.writeheader()
-        writer.writerows(results)
+    # Save artifact (optional).
+    if outdir is not None:
+        outdir.mkdir(parents=True, exist_ok=True)
+        out_file = outdir / "01_pure_props_grid.csv"
+        with out_file.open("w", newline="") as f:
+            writer = csv.DictWriter(
+                f, fieldnames=["T", "Property", "Thermo", "ChemThermo", "RelError"]
+            )
+            writer.writeheader()
+            writer.writerows(results)
+        print(f"\nArtifact saved to: {out_file}")
+    else:
+        print("\nNo --outdir/CHEMTHERMO_OUTDIR provided; skipping artifact write.")
     
     # Summary
     if not results:
@@ -173,7 +199,5 @@ def main():
     print(f"Median: {np.median(errs):.2e}")
     print(f"RMS:    {np.sqrt(np.mean(errs**2)):.2e}")
     
-    print(f"\nArtifact saved to: {out_file}")
-
 if __name__ == "__main__":
     main()

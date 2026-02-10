@@ -14,8 +14,10 @@ Metrics:
 - K-values K1, K2
 """
 
-import sys
 import csv
+import argparse
+import os
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -30,7 +32,23 @@ except ImportError:
     print("Error: 'thermo' package not found.")
     sys.exit(1)
 
+def _parse_outdir() -> Path | None:
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--outdir", type=Path, default=None)
+    args, _ = parser.parse_known_args()
+
+    if args.outdir is not None:
+        return args.outdir
+
+    env_outdir = os.environ.get("CHEMTHERMO_OUTDIR")
+    if env_outdir:
+        return Path(env_outdir)
+
+    return None
+
+
 def main():
+    outdir = _parse_outdir()
     # Setup
     comps = ["Methane", "Ethane"]
     T = 160.0
@@ -121,14 +139,17 @@ def main():
         def fmt(x): return f"{x:.4f}" if x is not None else "-"
         print(f"{z1:<8.2f} {fmt(ct_beta):<10} {fmt(ref_beta):<10} {fmt(ct_K[0]):<10} {fmt(ref_K[0]):<10} {fmt(ct_K[1]):<10} {fmt(ref_K[1]):<10} {max_diff:<10.2e}")
 
-    # Save artifact
-    out_file = Path(__file__).parent / "02_binary_k_surface.csv"
-    with open(out_file, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=results[0].keys())
-        writer.writeheader()
-        writer.writerows(results)
-        
-    print(f"\nArtifact saved to: {out_file}")
+    # Save artifact (optional).
+    if outdir is not None:
+        outdir.mkdir(parents=True, exist_ok=True)
+        out_file = outdir / "02_binary_k_surface.csv"
+        with out_file.open("w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=results[0].keys())
+            writer.writeheader()
+            writer.writerows(results)
+        print(f"\nArtifact saved to: {out_file}")
+    else:
+        print("\nNo --outdir/CHEMTHERMO_OUTDIR provided; skipping artifact write.")
     
     # Summary assertions could be here, but we just want the artifact for now.
     worst_case = max(r["max_diff"] for r in results)

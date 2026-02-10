@@ -17,8 +17,10 @@ Metrics:
 - RMS difference in T_bub and T_dew
 """
 
-import sys
 import csv
+import argparse
+import os
+import sys
 import warnings
 from pathlib import Path
 
@@ -33,9 +35,22 @@ except ImportError:
     print("Error: 'thermo' package not found.")
     sys.exit(1)
 
-from chemthermo.vle import bubble_temperature, dew_temperature
+def _parse_outdir() -> Path | None:
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--outdir", type=Path, default=None)
+    args, _ = parser.parse_known_args()
+
+    if args.outdir is not None:
+        return args.outdir
+
+    env_outdir = os.environ.get("CHEMTHERMO_OUTDIR")
+    if env_outdir:
+        return Path(env_outdir)
+
+    return None
 
 def main():
+    outdir = _parse_outdir()
     comps = ["Methane", "Ethane"]
     P = 2.0e6 # 20 bar
     
@@ -79,7 +94,7 @@ def main():
             ref_T_bub = None
             
         # Chemthermo
-        ct_T_bub, _ = bubble_temperature(mix, P, eos)
+        ct_T_bub, _ = ct.bubble_temperature(mix, P, eos)
         
         # --- Dew Point (y=z) ---
         # Thermo
@@ -92,7 +107,7 @@ def main():
             ref_T_dew = None
             
         # Chemthermo
-        ct_T_dew, _ = dew_temperature(mix, P, eos)
+        ct_T_dew, _ = ct.dew_temperature(mix, P, eos)
         
         # Metrics
         d_bub = abs(ct_T_bub - ref_T_bub) if (ct_T_bub and ref_T_bub) else None
@@ -109,14 +124,17 @@ def main():
         def fmtd(x): return f"{x:.2e}" if x is not None else "-"
         print(f"{z1:<5.1f} {fmt(ct_T_bub):<10} {fmt(ref_T_bub):<10} {fmt(ct_T_dew):<10} {fmt(ref_T_dew):<10} {fmtd(d_bub):<10} {fmtd(d_dew):<10}")
 
-    # Artifact
-    out_file = Path(__file__).parent / "03_txy_pxy_curves.csv"
-    with open(out_file, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=results[0].keys())
-        writer.writeheader()
-        writer.writerows(results)
-    
-    print(f"\nArtifact saved to: {out_file}")
+    # Save artifact (optional).
+    if outdir is not None:
+        outdir.mkdir(parents=True, exist_ok=True)
+        out_file = outdir / "03_txy_pxy_curves.csv"
+        with out_file.open("w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=results[0].keys())
+            writer.writeheader()
+            writer.writerows(results)
+        print(f"\nArtifact saved to: {out_file}")
+    else:
+        print("\nNo --outdir/CHEMTHERMO_OUTDIR provided; skipping artifact write.")
 
 if __name__ == "__main__":
     main()

@@ -4,16 +4,19 @@ Run examples from the repo root with `python`.
 
 ## Scripts
 
-- `examples/tp_flash_pr_pure.py`
+- `examples/basic/tp_flash_pr_pure.py`
   - Pure-component TP flash with Peng-Robinson EOS.
-- `examples/tp_flash_pr_mixture.py`
+- `examples/basic/tp_flash_pr_mixture.py`
   - Mixture TP flash with Peng-Robinson EOS.
-- `examples/tp_flash_nrtl_vle.py`
+- `examples/basic/tp_flash_nrtl_vle.py`
   - Gamma-phi TP flash with NRTL (liquid) + Peng-Robinson (vapor).
-- `examples/flash_tp_peng_robinson_demo.py`
+- `examples/basic/flash_tp_peng_robinson_demo.py`
   - Existing TP flash demo (Peng-Robinson EOS).
-- `examples/flash_tp_gamma_phi_demo.py`
+- `examples/basic/flash_tp_gamma_phi_demo.py`
   - Existing TP flash demo (gamma-phi, NRTL + Peng-Robinson).
+- `examples/validation/*.py`
+  - Optional validation sweeps against `thermo` (requires `pip install -e ".[validation]"`).
+  - CSV output is disabled by default; pass `--outdir <dir>` or set `CHEMTHERMO_OUTDIR`.
 
 ## Expected output format
 

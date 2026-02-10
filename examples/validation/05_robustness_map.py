@@ -14,8 +14,10 @@ Metrics:
 - Classification buckets: MATCH, PHASE_MISMATCH, CT_FAIL, TH_FAIL, BOTH_FAIL
 """
 
-import sys
 import csv
+import argparse
+import os
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -29,7 +31,23 @@ except ImportError:
     print("Error: 'thermo' package not found.")
     sys.exit(1)
 
+def _parse_outdir() -> Path | None:
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--outdir", type=Path, default=None)
+    args, _ = parser.parse_known_args()
+
+    if args.outdir is not None:
+        return args.outdir
+
+    env_outdir = os.environ.get("CHEMTHERMO_OUTDIR")
+    if env_outdir:
+        return Path(env_outdir)
+
+    return None
+
+
 def main():
+    outdir = _parse_outdir()
     # Setup
     comps = ["Methane", "Ethane"]
     zs = [0.5, 0.5]
@@ -119,15 +137,19 @@ def main():
             if outcome != "MATCH":
                 print(f"{T:<8.1f} {P/1e5:<8.1f} {outcome:<15} {ct_phases:<10} {th_phases:<10}")
 
-    # Artifact
-    out_file = Path(__file__).parent / "05_robustness_map.csv"
-    with open(out_file, "w", newline="") as f:
-        writer = csv.DictWriter(f, fieldnames=results[0].keys())
-        writer.writeheader()
-        writer.writerows(results)
-    
-    print("-" * 60)
-    print(f"Artifact saved to: {out_file}")
+    # Save artifact (optional).
+    if outdir is not None:
+        outdir.mkdir(parents=True, exist_ok=True)
+        out_file = outdir / "05_robustness_map.csv"
+        with out_file.open("w", newline="") as f:
+            writer = csv.DictWriter(f, fieldnames=results[0].keys())
+            writer.writeheader()
+            writer.writerows(results)
+        print("-" * 60)
+        print(f"Artifact saved to: {out_file}")
+    else:
+        print("-" * 60)
+        print("No --outdir/CHEMTHERMO_OUTDIR provided; skipping artifact write.")
     print("\nSummary Counts:")
     for k, v in counts.items():
         print(f"  {k:<15}: {v}")
