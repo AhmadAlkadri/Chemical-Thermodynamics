@@ -8,6 +8,8 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
 
 ## Scripts
 
+- `examples/database/01_component_database_demo.py`
+  - Inspects canonical packaged runtime DB metadata and sample records.
 - `examples/basic/tp_flash_pr_pure.py`
   - Pure-component TP flash with Peng-Robinson EOS.
 - `examples/basic/tp_flash_pr_mixture.py`
@@ -18,6 +20,8 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
   - Existing TP flash demo (Peng-Robinson EOS).
 - `examples/basic/flash_tp_gamma_phi_demo.py`
   - Existing TP flash demo (gamma-phi, NRTL + Peng-Robinson).
+- `examples/validation/00_reference_case.py`
+  - Deterministic single-case comparison against `thermo` (optional dependency).
 - `examples/validation/*.py`
   - Optional validation sweeps against `thermo` (requires `pip install -e ".[validation]"`).
   - CSV output is disabled by default; pass `--outdir <dir>` or set `CHEMTHERMO_OUTDIR`.

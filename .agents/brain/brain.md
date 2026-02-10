@@ -24,7 +24,7 @@ How to use this document
 ## 0) Repo at a glance
 - Purpose: chemical engineering thermodynamics utilities packaged as `chemthermo`, SI units throughout. (source: README.md)
 - Primary language/toolchain: Python 3.11+, setuptools build via `pyproject.toml`. (source: pyproject.toml)
-- Primary entry points: `chemthermo` top-level API, `chemthermo.eos` registry, `chemthermo.vlle` plugin boundary. (source: src/chemthermo/__init__.py, src/chemthermo/eos/__init__.py, src/chemthermo/vlle/__init__.py)
+- Primary entry points: `chemthermo` top-level API, `chemthermo.eos` registry, `chemthermo.vlle` plugin boundary, and CLI script `chemthermo`. (source: src/chemthermo/__init__.py, src/chemthermo/eos/__init__.py, src/chemthermo/vlle/__init__.py, src/chemthermo/cli.py, pyproject.toml)
 - Tests: `pytest` (plus lint/type checks in CI). (source: .github/workflows/ci.yml)
 - Golden Path command is maintained in `.agents/dev-contract.md`. (source: .agents/dev-contract.md)
 
@@ -52,24 +52,25 @@ Implementation status notes
 - `chemthermo.eos.pcsaft`: Public EOS registry entry and interface with implementation details evolving over time.
 
 CLI entry points
-- No CLI scripts are defined in `pyproject.toml` (no `[project.scripts]` section). (source: pyproject.toml)
+- `chemthermo = "chemthermo.cli:main"` in `[project.scripts]` and module execution via `python -m chemthermo`. (source: pyproject.toml, src/chemthermo/__main__.py, src/chemthermo/cli.py)
 
 ## 3) Architecture
 Text-only diagram
 ```
-components.json -> data loaders -> Component/Composition/Mixture -> models (PR/NRTL) -> flash_tp -> FlashResult
+src/chemthermo/data/components.json -> data loaders -> Component/Composition/Mixture -> models (PR/NRTL) -> flash_tp -> FlashResult
+chemthermo CLI -> parser -> Mixture + PengRobinsonEOS -> flash_tp -> text/json output
 
 ```
 
 Key modules and flow
-- Component databank lives in `src/chemthermo/data/components.json`, loaded via `chemthermo.data` helpers. (source: src/chemthermo/data/__init__.py, src/chemthermo/data/components.json)
+- Component databank lives in `src/chemthermo/data/components.json`, loaded via `chemthermo.data` helpers. Optional non-runtime mirror path is `database/components.mirror.json` and is never loaded by runtime code. (source: src/chemthermo/data/__init__.py, src/chemthermo/data/components.json, tools/build_database.py)
 - Core domain objects: `Component`, `Composition`, `Mixture`. (source: src/chemthermo/core/component.py, src/chemthermo/core/composition.py, src/chemthermo/core/mixture.py)
 - Flash solver (`flash_tp`) orchestrates models and returns `FlashResult`. (source: src/chemthermo/flash/tp.py, src/chemthermo/flash/results.py)
 - EOS registry provides named EOS factories. (source: src/chemthermo/eos/registry.py)
 - Deeper usage docs: `README.md`, `examples/README.md`. (source: README.md, examples/README.md)
 
 Key entry points (top paths)
-- `README.md`, `pyproject.toml`, `.github/workflows/ci.yml`, `src/chemthermo/__init__.py`, `src/chemthermo/flash/tp.py`, `src/chemthermo/models/peng_robinson.py`, `src/chemthermo/models/nrtl.py`, `src/chemthermo/eos/registry.py`, `src/chemthermo/parameters/nrtl.py`, `src/chemthermo/data/components.json`, `examples/basic/flash_tp_peng_robinson_demo.py`, `tests/test_flash_tp.py`. (source: README.md, pyproject.toml, .github/workflows/ci.yml, src/chemthermo/__init__.py, src/chemthermo/flash/tp.py, src/chemthermo/models/peng_robinson.py, src/chemthermo/models/nrtl.py, src/chemthermo/eos/registry.py, src/chemthermo/parameters/nrtl.py, src/chemthermo/data/components.json, examples/basic/flash_tp_peng_robinson_demo.py, tests/test_flash_tp.py)
+- `README.md`, `pyproject.toml`, `.github/workflows/ci.yml`, `src/chemthermo/__init__.py`, `src/chemthermo/cli.py`, `src/chemthermo/flash/tp.py`, `src/chemthermo/models/peng_robinson.py`, `src/chemthermo/models/nrtl.py`, `src/chemthermo/eos/registry.py`, `src/chemthermo/parameters/nrtl.py`, `src/chemthermo/data/components.json`, `examples/basic/flash_tp_peng_robinson_demo.py`, `examples/validation/00_reference_case.py`, `tests/test_flash_tp.py`, `tests/test_cli_tp_flash.py`. (source: README.md, pyproject.toml, .github/workflows/ci.yml, src/chemthermo/__init__.py, src/chemthermo/cli.py, src/chemthermo/flash/tp.py, src/chemthermo/models/peng_robinson.py, src/chemthermo/models/nrtl.py, src/chemthermo/eos/registry.py, src/chemthermo/parameters/nrtl.py, src/chemthermo/data/components.json, examples/basic/flash_tp_peng_robinson_demo.py, examples/validation/00_reference_case.py, tests/test_flash_tp.py, tests/test_cli_tp_flash.py)
 
 ## 4) Key invariants and assumptions
 - SI units everywhere: temperature in K, pressure in Pa. Enforced via validation helpers and documented usage. (source: README.md, src/chemthermo/validation.py, src/chemthermo/flash/tp.py)
@@ -106,17 +107,18 @@ Cheap checks
 - Accepted ADRs:
   - `.agents/brain/adr/0001-public-api-truth-source.md`
   - `.agents/brain/adr/0002-thin-vertical-slices.md` (Adopted 2026-02-10)
+  - `.agents/brain/adr/0003-cli-entrypoint.md` (Adopted 2026-02-10)
 - ADR rules: one decision per ADR; keep under 1 page; include status and supersedes fields.
 
 ## 9) Roadmap: next 3 increments (vertical slices)
-- **Slice 1: Component Database Expansion (End-to-End)**
-  - Capability: Users can access a broad, realistic set of components at runtime.
-  - Requirements: Regenerate `components.json` from `organics.txt`, add representative tests, add Golden Path example.
-- **Slice 2: CLI TP Flash Tool**
-  - Capability: Users can run a TP flash from the command line without writing Python.
-  - Requirements: Minimal CLI entrypoint, integration test, Golden Path (README/script).
-- **Slice 3: Minimal External Validation Slice**
-  - Capability: Users can trust numerical correctness for at least one EOS + mixture combination.
-  - Requirements: Deterministic validation against external reference, CI or documented optional run, Golden Path validation example.
+- **Slice 1: CLI Gamma-Phi Extension**
+  - Capability: Users can run `tp-flash` in gamma-phi mode from CLI.
+  - Requirements: CLI flags for method selection, NRTL model wiring, deterministic json/text output and focused tests.
+- **Slice 2: Provenance Hardening for DB Tooling**
+  - Capability: Contributors can capture richer data provenance while preserving current runtime schema compatibility.
+  - Requirements: thin-slice metadata additions with compatibility tests and migration notes.
+- **Slice 3: Validation Promotion Decision Slice**
+  - Capability: Maintainers can decide and enforce a stable validation gate policy when maturity allows.
+  - Requirements: explicit CI policy ADR update, deterministic gate command, and opt-in/required workflows documented.
 
 ## 10) Open questions / risks

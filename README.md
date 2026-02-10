@@ -73,6 +73,25 @@ print(result.phases["vapor"].composition.fractions)
 See `examples/basic/flash_tp_peng_robinson_demo.py` for a runnable script that prints a
 table-style summary.
 
+## CLI usage
+
+Run TP flash without writing Python:
+
+```bash
+chemthermo tp-flash \
+  --components Methane,Ethane,Propane \
+  --z 0.5,0.3,0.2 \
+  --temperature-k 240 \
+  --pressure-pa 3000000 \
+  --format json
+```
+
+Module execution is also supported:
+
+```bash
+python -m chemthermo tp-flash --components Methane,Ethane --z 0.5,0.5 --temperature-k 240 --pressure-pa 3000000
+```
+
 ## EOS extension points
 
 The public repo defines a minimal residual-Helmholtz EOS protocol and registry
@@ -104,6 +123,28 @@ Install the reference library used by validation tests:
 ```bash
 pip install -e ".[validation]"
 ```
+
+Deterministic single-case validation script:
+
+```bash
+python examples/validation/00_reference_case.py
+```
+
+## Database source of truth
+
+Canonical packaged runtime DB path:
+
+- `src/chemthermo/data/components.json`
+
+Regeneration/check command:
+
+```bash
+python tools/build_database.py --check
+```
+
+Optional non-runtime mirror path (generated, git-ignored):
+
+- `database/components.mirror.json`
 
 ## Project brain
 
