@@ -2,17 +2,47 @@
 Chemical engineering thermodynamics utilities packaged as the `chemthermo`
 library (src layout, SI units).
 
-## Quickstart / Current API usage
+## Local install
 
-Install from the repo (editable):
+macOS/Linux (development install):
 ```bash
-pip install -e .
-```
-
-For contributor/CI-parity tooling (ruff, pyright, pytest):
-```bash
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
+pytest -q
 ```
+
+Windows PowerShell (development install):
+```powershell
+py -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
+pytest -q
+```
+
+Non-dev install (wheel/non-editable):
+```bash
+python -m pip install .
+```
+
+Tiny import and data check:
+```bash
+python - <<'PY'
+from chemthermo import Component
+
+methane = Component.from_database("Methane")
+print(methane.name, methane.tc_k, methane.pc_pa)
+PY
+```
+
+## Common issues
+
+- Editable install fails with an old pip: run `python -m pip install --upgrade pip` inside the active `.venv`, then retry.
+- Build backend errors mentioning setuptools/wheel: run `python -m pip install --upgrade setuptools wheel`, then retry `pip install -e ".[dev]"`.
+
+## Current API usage
 
 SI units are used throughout (temperature in K, pressure in Pa).
 ```python
