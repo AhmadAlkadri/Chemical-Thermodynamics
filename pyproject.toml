@@ -8,7 +8,7 @@ version = "0.0.0"
 description = "Chemical engineering thermodynamics utilities."
 readme = "README.md"
 requires-python = ">=3.11"
-license = { file = "LICENSE" }
+license = "MIT"
 dependencies = [
   "numpy>=1.24",
   "pydantic>=2.0",
@@ -17,6 +17,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+  "build>=1.2.2",
   "nbstripout>=0.7.1",
   "pytest>=7.4",
   "ruff==0.14.13",
