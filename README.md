@@ -9,6 +9,11 @@ Install from the repo (editable):
 pip install -e .
 ```
 
+For contributor/CI-parity tooling (ruff, pyright, pytest):
+```bash
+python -m pip install -e ".[dev]"
+```
+
 SI units are used throughout (temperature in K, pressure in Pa).
 ```python
 from chemthermo import Component, Composition, Mixture, PengRobinsonEOS, flash_tp
@@ -35,7 +40,7 @@ print(result.phases["liquid"].composition.fractions)
 print(result.phases["vapor"].composition.fractions)
 ```
 
-See `examples/flash_tp_peng_robinson_demo.py` for a runnable script that prints a
+See `examples/basic/flash_tp_peng_robinson_demo.py` for a runnable script that prints a
 table-style summary.
 
 ## EOS extension points

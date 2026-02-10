@@ -30,6 +30,8 @@ description: Use when implementing or reviewing changes in this Chemical-Thermod
 
 4. Validate in escalating order.
 - Run focused tests for touched modules first.
+- Bootstrap local tooling for CI parity when needed:
+  - `python -m pip install -e ".[dev]"`
 - Run quality gates (must pass) before finalizing:
   - `ruff format src tests`
   - `ruff format --check src tests`
@@ -37,7 +39,7 @@ description: Use when implementing or reviewing changes in this Chemical-Thermod
   - `pyright`
   - `pytest -q`
 - Run a golden path script for behavior sanity:
-  - `python examples/flash_tp_peng_robinson_demo.py`
+  - `python examples/basic/flash_tp_peng_robinson_demo.py`
 - If validation extras are installed, run optional reference checks under `tests/validation/`.
 
 5. Update docs and decision records.

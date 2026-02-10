@@ -26,7 +26,7 @@ How to use this document
 - Primary language/toolchain: Python 3.11+, setuptools build via `pyproject.toml`. (source: pyproject.toml)
 - Primary entry points: `chemthermo` top-level API, `chemthermo.eos` registry, `chemthermo.vlle` plugin boundary. (source: src/chemthermo/__init__.py, src/chemthermo/eos/__init__.py, src/chemthermo/vlle/__init__.py)
 - Tests: `pytest` (plus lint/type checks in CI). (source: .github/workflows/ci.yml)
-- Golden Path (one command): `python -m pip install -e . && python examples/flash_tp_peng_robinson_demo.py`. (source: README.md, examples/flash_tp_peng_robinson_demo.py)
+- Golden Path (one command): `python -m pip install -e ".[dev]" && python examples/basic/flash_tp_peng_robinson_demo.py`. (source: README.md, examples/basic/flash_tp_peng_robinson_demo.py)
 
 ## 1) Purpose and non-goals
 - Purpose: provide core thermodynamics utilities (components, mixtures, EOS/activities, TP flash) in SI units. (source: README.md, src/chemthermo/flash/tp.py, src/chemthermo/models/base.py)
@@ -63,7 +63,7 @@ Key modules and flow
 - Deeper usage docs: `README.md`, `examples/README.md`. (source: README.md, examples/README.md)
 
 Key entry points (top paths)
-- `README.md`, `pyproject.toml`, `.github/workflows/ci.yml`, `src/chemthermo/__init__.py`, `src/chemthermo/flash/tp.py`, `src/chemthermo/models/peng_robinson.py`, `src/chemthermo/models/nrtl.py`, `src/chemthermo/eos/registry.py`, `src/chemthermo/parameters/nrtl.py`, `src/chemthermo/data/components.json`, `examples/flash_tp_peng_robinson_demo.py`, `tests/test_flash_tp.py`. (source: README.md, pyproject.toml, .github/workflows/ci.yml, src/chemthermo/__init__.py, src/chemthermo/flash/tp.py, src/chemthermo/models/peng_robinson.py, src/chemthermo/models/nrtl.py, src/chemthermo/eos/registry.py, src/chemthermo/parameters/nrtl.py, src/chemthermo/data/components.json, examples/flash_tp_peng_robinson_demo.py, tests/test_flash_tp.py)
+- `README.md`, `pyproject.toml`, `.github/workflows/ci.yml`, `src/chemthermo/__init__.py`, `src/chemthermo/flash/tp.py`, `src/chemthermo/models/peng_robinson.py`, `src/chemthermo/models/nrtl.py`, `src/chemthermo/eos/registry.py`, `src/chemthermo/parameters/nrtl.py`, `src/chemthermo/data/components.json`, `examples/basic/flash_tp_peng_robinson_demo.py`, `tests/test_flash_tp.py`. (source: README.md, pyproject.toml, .github/workflows/ci.yml, src/chemthermo/__init__.py, src/chemthermo/flash/tp.py, src/chemthermo/models/peng_robinson.py, src/chemthermo/models/nrtl.py, src/chemthermo/eos/registry.py, src/chemthermo/parameters/nrtl.py, src/chemthermo/data/components.json, examples/basic/flash_tp_peng_robinson_demo.py, tests/test_flash_tp.py)
 
 ## 4) Key invariants and assumptions
 - SI units everywhere: temperature in K, pressure in Pa. Enforced via validation helpers and documented usage. (source: README.md, src/chemthermo/validation.py, src/chemthermo/flash/tp.py)
@@ -89,13 +89,13 @@ Key entry points (top paths)
 
 Top 10 cheapest checks
 - Confirm Python >= 3.11 (`pyproject.toml` requires it). (source: pyproject.toml)
-- `python -m pip install -e .` installs runtime deps (numpy). (source: pyproject.toml)
+- `python -m pip install -e ".[dev]"` installs CI-parity tooling (`pytest`, `ruff`, `pyright`) and runtime deps. (source: pyproject.toml, .github/workflows/ci.yml)
 - `python -m pytest tests/test_import.py -q` (quick import sanity). (source: tests/test_import.py)
 - `python -m pytest tests/test_validation.py -q` (validation helpers). (source: tests/test_validation.py)
 - `python -m pytest tests/test_flash_tp.py -q` (flash solver basics). (source: tests/test_flash_tp.py)
 - `python -m pytest tests/test_pr_eos.py -q` (Peng-Robinson EOS). (source: tests/test_pr_eos.py)
 - `python -m pytest tests/test_data_loading.py -q` (component databank). (source: tests/test_data_loading.py)
-- `python -m pytest tests/test_examples_smoke.py -q` (example usage). (source: tests/test_examples_smoke.py)
+- `python -m pytest tests/test_examples.py -q` (example usage). (source: tests/test_examples.py)
 - `ruff format src tests` (apply standard formatting before quality gates).
 - `ruff format --check src tests` (format gate in CI). (source: .github/workflows/ci.yml)
 - `ruff check src tests` and `pyright` (lint/type gate in CI). (source: .github/workflows/ci.yml)
