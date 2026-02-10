@@ -9,6 +9,7 @@ import numpy as np
 
 from .core import Mixture
 from .exceptions import ConvergenceError, ModelError
+from .flash._common import as_float_array, normalize_composition, wilson_k
 from .models import ActivityModel, EquationOfState
 from .validation import COMPOSITION_SUM_TOL, validate_pressure, validate_temperature
 
@@ -329,10 +330,10 @@ def _solve_k_bubble(
     inner_tol: float,
     inner_max_iter: int,
 ) -> tuple[np.ndarray, np.ndarray, float]:
-    K = _wilson_k(mixture, temperature_K, pressure_Pa)
+    K = wilson_k(mixture, temperature_K, pressure_Pa)
 
     for _ in range(inner_max_iter):
-        y = _normalize_positive(K * x, "vapor")
+        y = normalize_composition(K * x, label="vapor", error_cls=ConvergenceError)
         K_new = _model_k(
             mixture,
             temperature_K,
@@ -346,7 +347,7 @@ def _solve_k_bubble(
         max_delta = float(np.max(np.abs(K_new - K)))
         K = K_new
         if max_delta <= inner_tol:
-            y = _normalize_positive(K * x, "vapor")
+            y = normalize_composition(K * x, label="vapor", error_cls=ConvergenceError)
             residual = float(np.sum(K * x) - 1.0)
             return K, y, residual
 
@@ -366,10 +367,10 @@ def _solve_k_dew(
     inner_tol: float,
     inner_max_iter: int,
 ) -> tuple[np.ndarray, np.ndarray, float]:
-    K = _wilson_k(mixture, temperature_K, pressure_Pa)
+    K = wilson_k(mixture, temperature_K, pressure_Pa)
 
     for _ in range(inner_max_iter):
-        x = _normalize_positive(y / K, "liquid")
+        x = normalize_composition(y / K, label="liquid", error_cls=ConvergenceError)
         K_new = _model_k(
             mixture,
             temperature_K,
@@ -383,7 +384,7 @@ def _solve_k_dew(
         max_delta = float(np.max(np.abs(K_new - K)))
         K = K_new
         if max_delta <= inner_tol:
-            x = _normalize_positive(y / K, "liquid")
+            x = normalize_composition(y / K, label="liquid", error_cls=ConvergenceError)
             residual = float(np.sum(y / K) - 1.0)
             return K, x, residual
 
@@ -403,7 +404,7 @@ def _model_k(
     activity_model: ActivityModel | None,
 ) -> np.ndarray:
     try:
-        phi_v = _as_array(
+        phi_v = as_float_array(
             eos.fugacity_coefficients(
                 mixture=mixture,
                 temperature_K=temperature_K,
@@ -412,7 +413,7 @@ def _model_k(
                 phase="vapor",
             )
         )
-        phi_l = _as_array(
+        phi_l = as_float_array(
             eos.fugacity_coefficients(
                 mixture=mixture,
                 temperature_K=temperature_K,
@@ -438,7 +439,7 @@ def _model_k(
         gamma_l = np.ones_like(phi_l)
     else:
         try:
-            gamma_l = _as_array(
+            gamma_l = as_float_array(
                 activity_model.activity_coefficients(
                     mixture=mixture,
                     temperature_K=temperature_K,
@@ -462,44 +463,9 @@ def _model_k(
     return K
 
 
-def _wilson_k(mixture: Mixture, temperature_K: float, pressure_Pa: float) -> np.ndarray:
-    values = []
-    for component in mixture.components:
-        ln_k = math.log(component.pc_pa / pressure_Pa) + 5.373 * (1.0 + component.omega) * (
-            1.0 - component.tc_k / temperature_K
-        )
-        values.append(math.exp(ln_k))
-
-    K = np.array(values, dtype=float)
-    if np.any(~np.isfinite(K)) or np.any(K <= 0.0):
-        raise ModelError("Wilson K-value initialization failed.")
-    return K
-
-
-def _normalize_positive(values: np.ndarray, phase_label: str) -> np.ndarray:
-    if np.any(~np.isfinite(values)):
-        raise ConvergenceError(f"Non-finite {phase_label} composition encountered.")
-    if np.any(values < 0.0):
-        raise ConvergenceError(f"Negative {phase_label} composition encountered.")
-
-    total = float(np.sum(values))
-    if total <= 0.0:
-        raise ConvergenceError(f"{phase_label.capitalize()} composition has non-positive total.")
-
-    normalized = values / total
-    if np.any(normalized < 0.0):
-        raise ConvergenceError(f"Negative normalized {phase_label} composition encountered.")
-
-    return normalized
-
-
 def _is_valid_composition(values: np.ndarray) -> bool:
     if np.any(~np.isfinite(values)):
         return False
     if np.any(values < -COMPOSITION_SUM_TOL):
         return False
     return abs(float(np.sum(values)) - 1.0) <= 10.0 * COMPOSITION_SUM_TOL
-
-
-def _as_array(values: list[float] | tuple[float, ...]) -> np.ndarray:
-    return np.array(list(values), dtype=float)

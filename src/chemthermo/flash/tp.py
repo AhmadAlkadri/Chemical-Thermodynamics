@@ -8,7 +8,6 @@ same inputs and settings, results are deterministic.
 from __future__ import annotations
 
 import math
-from typing import Sequence
 
 import numpy as np
 
@@ -16,6 +15,7 @@ from ..core import Composition, Mixture
 from ..exceptions import CompositionError, ConvergenceError, ModelError
 from ..models import ActivityModel, EquationOfState
 from ..validation import COMPOSITION_SUM_TOL, validate_pressure, validate_temperature
+from ._common import as_float_array, normalize_composition, wilson_k
 from .results import FlashResult, PhaseResult
 from .settings import FlashSettings
 
@@ -112,7 +112,7 @@ def _flash_tp_vle(
     if z.size == 0:
         raise CompositionError("Mixture composition must be non-empty.")
 
-    K = _wilson_k(mixture, temperature, pressure)
+    K = wilson_k(mixture, temperature, pressure)
     if np.any(K <= 0.0):
         raise ModelError("Non-positive K-values encountered in Wilson estimate.")
 
@@ -191,16 +191,12 @@ def _flash_tp_vle(
     max_delta = float("inf")
     for iteration in range(1, settings.max_iter + 1):
         x = z / (1.0 + vapor_fraction * (K - 1.0))
-        if np.any(x < 0.0):
-            raise ConvergenceError("Negative liquid composition encountered in flash_tp.")
-        x /= x.sum()
+        x = normalize_composition(x, label="liquid", error_cls=ConvergenceError)
 
         y = K * x
-        if np.any(y < 0.0):
-            raise ConvergenceError("Negative vapor composition encountered in flash_tp.")
-        y /= y.sum()
+        y = normalize_composition(y, label="vapor", error_cls=ConvergenceError)
 
-        phi_v = _as_array(
+        phi_v = as_float_array(
             eos.fugacity_coefficients(
                 mixture=mixture,
                 temperature_K=temperature,
@@ -209,7 +205,7 @@ def _flash_tp_vle(
                 phase="vapor",
             )
         )
-        phi_l = _as_array(
+        phi_l = as_float_array(
             eos.fugacity_coefficients(
                 mixture=mixture,
                 temperature_K=temperature,
@@ -226,7 +222,7 @@ def _flash_tp_vle(
 
         if mode == "gamma-phi":
             assert activity_model is not None
-            gamma_l = _as_array(
+            gamma_l = as_float_array(
                 activity_model.activity_coefficients(
                     mixture=mixture,
                     temperature_K=temperature,
@@ -343,20 +339,6 @@ def _two_phase_result(
     )
 
 
-def _wilson_k(mixture: Mixture, temperature: float, pressure: float) -> np.ndarray:
-    """Wilson K-value estimate for each component (dimensionless)."""
-    values = []
-    for component in mixture.components:
-        tc = component.tc_k
-        pc = component.pc_pa
-        omega = component.omega
-
-        ln_k = math.log(pc / pressure) + 5.373 * (1.0 + omega) * (1.0 - tc / temperature)
-        values.append(math.exp(ln_k))
-
-    return np.array(values, dtype=float)
-
-
 def _rachford_rice(z: np.ndarray, K: np.ndarray) -> tuple[float | None, float, float]:
     """Solve the Rachford-Rice equation; returns (vapor_fraction, f0, f1)."""
 
@@ -388,16 +370,3 @@ def _rachford_rice(z: np.ndarray, K: np.ndarray) -> tuple[float | None, float, f
         else:
             high = mid
     return mid, f0, f1
-
-
-def _normalize(values: np.ndarray) -> np.ndarray:
-    """Clip to positive values and normalize to sum to 1."""
-    values = np.clip(values, 1e-12, None)
-    total = float(np.sum(values))
-    if total <= 0.0:
-        raise CompositionError("Composition fractions must sum to a positive value.")
-    return values / total
-
-
-def _as_array(values: Sequence[float]) -> np.ndarray:
-    return np.array(list(values), dtype=float)
