@@ -7,6 +7,8 @@ This file is the single source of truth for contributor and agent commands.
 From the repo root:
 
 ```bash
+python -m venv .venv
+source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -e ".[dev]"
 ```
@@ -25,7 +27,16 @@ Run the same checks as `.github/workflows/ci.yml`:
 ruff format --check src tests
 ruff check src tests
 pyright
-pytest
+pytest -q
+```
+
+## Installability smoke checks
+
+Run both editable and non-editable install checks:
+
+```bash
+python -c "import chemthermo; print(getattr(chemthermo, '__version__', 'no __version__'))"
+python tools/smoke_install.py --package .
 ```
 
 ## Golden path

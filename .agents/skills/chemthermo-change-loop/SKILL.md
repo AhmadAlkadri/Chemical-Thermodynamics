@@ -1,6 +1,6 @@
 ---
 name: chemthermo-change-loop
-description: Use when implementing or reviewing changes in this Chemical-Thermodynamics repository. Apply the repo contract by reading .agents/brain/brain.md first, preserving SI-unit and public-API invariants, shipping thin vertical slices with a runnable golden path, running CI-equivalent quality gates (ruff format, ruff format --check, ruff check, pyright, pytest), and updating ADR/brain docs when architecture or public API changes.
+description: Use when implementing or reviewing changes in this Chemical-Thermodynamics repository. Apply the repo contract by reading .agents/brain/brain.md first, preserving SI-unit and public-API invariants, shipping thin vertical slices with a runnable golden path, running CI-equivalent quality gates (ruff format, ruff format --check, ruff check, pyright, pytest), verifying editable and non-editable install smoke checks, and updating ADR/brain docs when architecture or public API changes.
 ---
 
 # Chemthermo Change Loop
@@ -31,6 +31,7 @@ description: Use when implementing or reviewing changes in this Chemical-Thermod
 4. Validate in escalating order.
 - Run focused tests for touched modules first.
 - Run canonical bootstrap, CI gates, and golden path from `.agents/dev-contract.md`.
+- Run installability checks from `.agents/dev-contract.md` (`pip install -e ".[dev]"` path and `pip install .` smoke via `tools/smoke_install.py`).
 - Use the cheap-check subset in `.agents/dev-contract.md` during iteration, then run full CI gates before finalizing.
 - If validation extras are installed, run optional reference checks under `tests/validation/`.
 
