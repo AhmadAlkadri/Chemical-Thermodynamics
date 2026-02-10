@@ -30,7 +30,7 @@ def load_references(path: Path | None = None) -> Mapping[str, dict[str, str]]:
 
     with handle as stream:
         parser = BibTexParser()
-        parser.customization = convert_to_unicode
+        setattr(parser, "customization", convert_to_unicode)
         bib_database = bibtexparser.load(stream, parser=parser)
 
     return {entry["ID"]: entry for entry in bib_database.entries}
