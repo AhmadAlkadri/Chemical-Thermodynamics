@@ -25,6 +25,7 @@ description: Use when implementing or reviewing changes in this Chemical-Thermod
 
 3. Implement a thin vertical slice.
 - Prefer the smallest end-to-end usable increment over scaffold-only work.
+- Declare the slice explicitly before implementation: "After this change, user can X by running Y."
 - Keep interfaces and behavior coherent across code, tests, and examples.
 - Avoid opportunistic refactors unrelated to the requested change.
 
@@ -42,7 +43,16 @@ description: Use when implementing or reviewing changes in this Chemical-Thermod
 
 6. Report outcomes clearly.
 - Summarize what changed, what was validated, and any known risks.
+- Include thin-slice evidence from `.agents/dev-contract.md` (slice declaration, golden path, focused tests, CI checks, install smoke).
 - If any checks were skipped, state exactly which checks and why.
+
+## Mandatory completion checklist (hard gate)
+- Slice declaration is present: "After this change, user can X by running Y."
+- At least one golden-path command/test was run and outcome reported.
+- Focused tests for touched behavior were run and outcomes reported.
+- CI-equivalent checks were run and outcomes reported.
+- Editable and non-editable install smoke checks were run and outcomes reported.
+- User-visible behavior changes include docs updates in the same slice.
 
 ## Notebook-specific checklist
 - Keep notebooks in `notebooks/` runnable top-to-bottom.

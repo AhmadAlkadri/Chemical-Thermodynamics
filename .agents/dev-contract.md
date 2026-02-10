@@ -47,6 +47,16 @@ Run the canonical demo from the repo root:
 python examples/basic/flash_tp_peng_robinson_demo.py
 ```
 
+## Slice evidence
+
+For every thin vertical slice report, include:
+
+- Slice declaration in this format: "After this change, user can X by running Y."
+- Golden path command(s) and outcome(s).
+- Focused test command(s) for touched behavior and outcome(s).
+- CI-equivalent gate command(s) and outcome(s).
+- Installability smoke command(s) and outcome(s).
+
 ## Cheap check subset
 
 Run these quick checks before the full suite when iterating:
