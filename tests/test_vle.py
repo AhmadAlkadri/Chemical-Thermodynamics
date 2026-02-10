@@ -1,3 +1,4 @@
+import numpy as np
 import pytest
 
 import chemthermo as ct
@@ -5,75 +6,160 @@ from chemthermo.vle import bubble_pressure, bubble_temperature, dew_pressure, de
 
 
 @pytest.fixture
-def binary_mixture():
-    names = ("Propane", "n-Butane")
-    return tuple(ct.Component.from_database(name) for name in names)
+def binary_components() -> tuple[ct.Component, ct.Component]:
+    return (
+        ct.Component.from_database("Methane"),
+        ct.Component.from_database("Ethane"),
+    )
 
 
 @pytest.fixture
-def eos():
+def eos() -> ct.PengRobinsonEOS:
     return ct.PengRobinsonEOS()
 
 
-def test_bubble_temperature_sanity(binary_mixture, eos):
-    # Pure Propane (x1=1) at 1 atm
-    # Propane Tb ~ 231 K
-    mix = ct.Mixture(components=binary_mixture, composition=ct.Composition(fractions=(1.0, 0.0)))
-    T_bub, y = bubble_temperature(mix, 101325.0, eos)
+def _k_values(
+    mixture: ct.Mixture,
+    eos: ct.PengRobinsonEOS,
+    temperature_K: float,
+    pressure_Pa: float,
+    liquid_composition: tuple[float, ...],
+    vapor_composition: tuple[float, ...],
+) -> np.ndarray:
+    phi_v = np.array(
+        eos.fugacity_coefficients(
+            mixture=mixture,
+            temperature_K=temperature_K,
+            pressure_Pa=pressure_Pa,
+            composition=vapor_composition,
+            phase="vapor",
+        ),
+        dtype=float,
+    )
+    phi_l = np.array(
+        eos.fugacity_coefficients(
+            mixture=mixture,
+            temperature_K=temperature_K,
+            pressure_Pa=pressure_Pa,
+            composition=liquid_composition,
+            phase="liquid",
+        ),
+        dtype=float,
+    )
+    return phi_l / phi_v
 
-    assert 225.0 < T_bub < 235.0
-    assert y[0] > 0.99  # Vapor should be pure propane
+
+def test_bubble_temperature_residual_closure_pr_binary(binary_components, eos):
+    tol = 1e-7
+    x = (0.4, 0.6)
+    mixture = ct.Mixture(components=binary_components, composition=ct.Composition(fractions=x))
+
+    temperature_K, y = bubble_temperature(
+        mixture,
+        pressure_Pa=2.0e6,
+        eos=eos,
+        settings={"tol": tol, "max_iter": 120},
+    )
+
+    K = _k_values(
+        mixture,
+        eos,
+        temperature_K,
+        2.0e6,
+        liquid_composition=x,
+        vapor_composition=tuple(y),
+    )
+    residual = float(np.dot(K, np.array(x, dtype=float)) - 1.0)
+    assert abs(residual) < tol
 
 
-def test_dew_temperature_sanity(binary_mixture, eos):
-    # Pure n-Butane (x2=1) at 1 atm
-    # n-Butane Tb ~ 272 K
-    mix = ct.Mixture(components=binary_mixture, composition=ct.Composition(fractions=(0.0, 1.0)))
-    T_dew, x = dew_temperature(mix, 101325.0, eos)
+def test_dew_temperature_residual_closure_pr_binary(binary_components, eos):
+    tol = 1e-7
+    y = (0.7, 0.3)
+    mixture = ct.Mixture(components=binary_components, composition=ct.Composition(fractions=y))
 
-    assert 268.0 < T_dew < 278.0
-    assert x[1] > 0.99  # Liquid should be pure n-Butane
+    temperature_K, x = dew_temperature(
+        mixture,
+        pressure_Pa=2.0e6,
+        eos=eos,
+        settings={"tol": tol, "max_iter": 120},
+    )
+
+    K = _k_values(
+        mixture,
+        eos,
+        temperature_K,
+        2.0e6,
+        liquid_composition=tuple(x),
+        vapor_composition=y,
+    )
+    residual = float(np.sum(np.array(y, dtype=float) / K) - 1.0)
+    assert abs(residual) < tol
 
 
-def test_bubble_pressure_sanity(binary_mixture, eos):
-    # Equimolar at 300 K
-    mix = ct.Mixture(components=binary_mixture, composition=ct.Composition(fractions=(0.5, 0.5)))
-    P_bub, y = bubble_pressure(mix, 300.0, eos)
+def test_bubble_pressure_residual_closure_pr_binary(binary_components, eos):
+    tol = 1e-7
+    x = (0.5, 0.5)
+    mixture = ct.Mixture(components=binary_components, composition=ct.Composition(fractions=x))
 
-    # 300K is above Tb for both. So P > 1 atm.
-    assert P_bub > 101325.0
-    # Propane is more volatile, so vapor should be richer in propane (y[0] > 0.5)
-    assert y[0] > 0.5
+    pressure_Pa, y = bubble_pressure(
+        mixture,
+        temperature_K=220.0,
+        eos=eos,
+        settings={"tol": tol, "max_iter": 120},
+    )
+
+    K = _k_values(
+        mixture,
+        eos,
+        220.0,
+        pressure_Pa,
+        liquid_composition=x,
+        vapor_composition=tuple(y),
+    )
+    residual = float(np.dot(K, np.array(x, dtype=float)) - 1.0)
+    assert abs(residual) < tol
 
 
-def test_dew_pressure_sanity(binary_mixture, eos):
-    # Equimolar at 300 K
-    mix = ct.Mixture(components=binary_mixture, composition=ct.Composition(fractions=(0.5, 0.5)))
-    P_dew, x = dew_pressure(mix, 300.0, eos)
+def test_dew_pressure_residual_closure_pr_binary(binary_components, eos):
+    tol = 1e-7
+    y = (0.6, 0.4)
+    mixture = ct.Mixture(components=binary_components, composition=ct.Composition(fractions=y))
 
-    assert P_dew > 101325.0
-    assert P_dew < 100e5  # Reasonable upper bound
+    pressure_Pa, x = dew_pressure(
+        mixture,
+        temperature_K=220.0,
+        eos=eos,
+        settings={"tol": tol, "max_iter": 120},
+    )
 
-    # Check monotonicity with bubble pressure
-    # For same T, Bubble P > Dew P usually?
-    # Bubble P is pressure required to keep all liquid.
-    # Dew P is pressure where first drop liquid forms.
-    # At fixed T, compression: Vapor -> Dew P (Liquid forms) -> Bubble P (All liquid).
-    # So Bubble P should be HIGHER than Dew P (for system of same z at same T). NO.
-    # Bubble P (Start of boiling, from Liquid) vs Dew P (Start of condensing, from Vapor).
-    # If we have z=0.5.
-    # Bubble P is the P at the liquid boundary.
-    # Dew P is the P at the vapor boundary.
-    # At fixed T, liquid is stable at high P. Vapor at low P.
-    # So transition Liquid -> Vapor happens as we lower P.
-    # First bubble (Bubble Point) at P_bub.
-    # Last liquid (Dew Point) at P_dew.
-    # So P_bub > P_dew.
+    K = _k_values(
+        mixture,
+        eos,
+        220.0,
+        pressure_Pa,
+        liquid_composition=tuple(x),
+        vapor_composition=y,
+    )
+    residual = float(np.sum(np.array(y, dtype=float) / K) - 1.0)
+    assert abs(residual) < tol
 
-    # Wait, my manual validation showed:
-    # x1=0.50: P_bub=3.48 bar
-    # x1=0.50: P_dew=2.21 bar
-    # So P_bub > P_dew. Correct.
 
-    P_bub, _ = bubble_pressure(mix, 300.0, eos)
-    assert P_bub > P_dew
+def test_vle_raises_convergence_error_when_tolerance_not_met(binary_components, eos):
+    mixture = ct.Mixture(
+        components=binary_components,
+        composition=ct.Composition(fractions=(0.5, 0.5)),
+    )
+
+    with pytest.raises(ct.ConvergenceError):
+        bubble_pressure(
+            mixture,
+            temperature_K=220.0,
+            eos=eos,
+            settings={
+                "tol": 1e-12,
+                "max_iter": 1,
+                "inner_max_iter": 2,
+                "inner_tol": 1e-14,
+            },
+        )
