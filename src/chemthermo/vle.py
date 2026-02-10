@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import Callable
+from typing import TypedDict
 
 import numpy as np
 
@@ -19,6 +20,13 @@ __all__ = [
     "bubble_pressure",
     "dew_pressure",
 ]
+
+
+class _VLESolverSettings(TypedDict):
+    tol: float
+    max_iter: int
+    inner_max_iter: int
+    inner_tol: float
 
 
 def bubble_temperature(
@@ -193,7 +201,7 @@ def dew_pressure(
     return float(pressure), x.tolist()
 
 
-def _parse_settings(settings: dict | None) -> dict[str, float | int]:
+def _parse_settings(settings: dict | None) -> _VLESolverSettings:
     user_settings = settings or {}
 
     tol = float(user_settings.get("tol", 1e-8))
