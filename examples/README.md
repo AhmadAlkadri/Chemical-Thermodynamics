@@ -17,6 +17,7 @@ Run examples from the repo root with `python`.
 - `examples/validation/*.py`
   - Optional validation sweeps against `thermo` (requires `pip install -e ".[validation]"`).
   - CSV output is disabled by default; pass `--outdir <dir>` or set `CHEMTHERMO_OUTDIR`.
+  - Generated CSV outputs are intentionally not tracked in git.
 
 ## Expected output format
 
