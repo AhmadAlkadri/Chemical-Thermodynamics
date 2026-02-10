@@ -33,115 +33,7 @@ except ImportError:
     print("Error: 'thermo' package not found.")
     sys.exit(1)
 
-def solve_bubble_point(mixture, P, x, eos, T_guess=150.0, tol=1e-5):
-    """Simple bubble point solver for T."""
-    # This is a naive implementation for validation.
-    # At bubble point: sum(K*x) = 1.
-    # We iterate T. T affects K.
-    # New T = Old T * (sum(Kx))^-0.1 (simple dumping) or Newton.
-    
-    T = T_guess
-    for _ in range(50):
-        try:
-            # We need K-values. We can get them from fugacities at P, T, x (liquid) and assume y=Kx.
-            # But y is unknown.
-            # Standard algorithm involves inner loop for y.
-            # Let's try probing via flash_tp?
-            # If we flash at T, P, z=x, we get phase split.
-            # If V/F close to 0, we are at bubble point?
-            # No, flash is robust.
-            # Let's iterate T until flash gives V/F = 0 (saturated liquid).
-            # Actually, standard bubble T algo:
-            # 1. Guess T.
-            # 2. Calc K values (assume yi = Ki*xi).
-            # 3. Calc sum_yi = sum(Ki*xi).
-            # 4. Check convergence: sum_yi = 1.
-            # ... this requires ideal solution estimate first.
-            
-            # Use chemthermo loop if we had one. We don't have bubble_t exposed yet.
-            # Let's brute force Search using flash_tp?
-            # Start low T (liquid), increase until 2-phase?
-            # Better: Use thermo as reference helper? No, that defeats validation.
-            
-            # Use a robust bisection/secant on sum(Kx) - 1?
-            # Need K values.
-            # K_i = phi_l / phi_v. Phi_v depends on y. y depends on K.
-            # This is complex to implement from scratch in a script without risk.
-            
-            # Alternative: Use "Flash at fixed P, z=x".
-            # If T < T_bubble, VF=0. If T > T_dew, VF=1. If T_bubble < T < T_dew, 0 < VF < 1.
-            # Bubble point is where VF -> 0+.
-            # So find T such that flash_tp(T, P, z=x).vapor_fraction = 1e-6 approx.
-            
-            # Simple Bisection:
-            T_min, T_max = 100.0, 300.0
-            for _ in range(20):
-                T_mid = 0.5 * (T_min + T_max)
-                res = None
-                try:
-                    with warnings.catch_warnings():
-                        warnings.filterwarnings("ignore", category=RuntimeWarning, module="chemicals")
-                        res = ct.flash_tp(mixture, temperature_K=T_mid, pressure_Pa=P, eos=eos)
-                    vf = res.vapor_fraction
-                except ct.exceptions.ConvergenceError:
-                    vf = None
-
-                # If single phase liquid (vf=0 or None/liquid), we are too cold. T_mid is too low.
-                if vf == 0.0 or (vf is None and res and "liquid" in getattr(res, "phases", {})):
-                    T_min = T_mid
-                # If single phase vapor (vf=1 or None/vapor), we are too hot.
-                elif vf == 1.0 or (vf is None and res and "vapor" in getattr(res, "phases", {})):
-                    T_max = T_mid
-                # If 2-phase, check VF.
-                elif vf is not None:
-                    # We want VF ~ 0.
-                    if vf > 1e-4:
-                        T_max = T_mid # Too hot, too much vapor
-                    else:
-                        return T_mid # Close enough to bubble point
-                else:
-                    return None
-            
-            return 0.5*(T_min + T_max)
-
-        except Exception:
-            return None
-            
-    return None
-
-def solve_dew_point(mixture, P, y, eos, T_guess=150.0):
-    # Dew point is where VF -> 1-.
-    # Find T such that flash_tp(T, P, z=y).vapor_fraction = 1 - 1e-6.
-            
-    T_min, T_max = 100.0, 300.0
-    for _ in range(20):
-        T_mid = 0.5 * (T_min + T_max)
-        res = None
-        try:
-            with warnings.catch_warnings():
-                warnings.filterwarnings("ignore", category=RuntimeWarning, module="chemicals")
-                res = ct.flash_tp(mixture, temperature_K=T_mid, pressure_Pa=P, eos=eos)
-            vf = res.vapor_fraction
-        except ct.exceptions.ConvergenceError:
-            vf = None
-
-        # If single phase liquid, too cold.
-        if vf == 0.0 or (vf is None and res and "liquid" in getattr(res, "phases", {})):
-            T_min = T_mid
-        # If single phase vapor, too hot.
-        elif vf == 1.0 or (vf is None and res and "vapor" in getattr(res, "phases", {})):
-            T_max = T_mid
-        # If 2-phase
-        elif vf is not None:
-            # We want VF ~ 1.
-            if vf < 1.0 - 1e-4:
-                T_min = T_mid # Too cold, too much liquid
-            else:
-                return T_mid # Close enough
-        else:
-            return None
-    
-    return 0.5*(T_min + T_max)
+from chemthermo.vle import bubble_temperature, dew_temperature
 
 def main():
     comps = ["Methane", "Ethane"]
@@ -187,7 +79,7 @@ def main():
             ref_T_bub = None
             
         # Chemthermo
-        ct_T_bub = solve_bubble_point(mix, P, zs, eos)
+        ct_T_bub, _ = bubble_temperature(mix, P, eos)
         
         # --- Dew Point (y=z) ---
         # Thermo
@@ -200,7 +92,7 @@ def main():
             ref_T_dew = None
             
         # Chemthermo
-        ct_T_dew = solve_dew_point(mix, P, zs, eos)
+        ct_T_dew, _ = dew_temperature(mix, P, eos)
         
         # Metrics
         d_bub = abs(ct_T_bub - ref_T_bub) if (ct_T_bub and ref_T_bub) else None

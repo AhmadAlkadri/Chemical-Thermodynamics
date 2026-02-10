@@ -14,6 +14,7 @@ from .models import ActivityModel, EquationOfState, NRTL, PengRobinsonEOS
 from .parameters import ActivityParameters, NRTLParameters, PCSAFTParameterError
 from .units import PA_PER_BAR, STANDARD_P_PA
 from .validation import validate_fractions, validate_pressure, validate_temperature
+from .vle import bubble_pressure, bubble_temperature, dew_pressure, dew_temperature
 
 __version__ = "0.0.0"
 
@@ -47,6 +48,10 @@ __all__ = [
     "validate_pressure",
     "validate_temperature",
     "list_component_names",
+    "bubble_pressure",
+    "bubble_temperature",
+    "dew_pressure",
+    "dew_temperature",
     "cite",
 ]
 
