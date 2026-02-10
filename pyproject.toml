@@ -33,7 +33,7 @@ package-dir = { "" = "src" }
 where = ["src"]
 
 [tool.setuptools.package-data]
-"chemthermo.data" = ["components.json"]
+"chemthermo.data" = ["components.json", "references.bib"]
 "chemthermo.parameters" = ["data/activity/nrtl.json"]
 
 [tool.ruff]

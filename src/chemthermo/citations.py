@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from importlib import resources
 from pathlib import Path
 from typing import Mapping
 
@@ -13,27 +14,24 @@ from bibtexparser.customization import convert_to_unicode
 
 @lru_cache(maxsize=1)
 def load_references(path: Path | None = None) -> Mapping[str, dict[str, str]]:
-    """Load the BibTeX database from the default or specified path.
-
-    Returns:
-        A dictionary mapping citation keys to BibTeX entry dictionaries.
-    """
+    """Load the BibTeX database from package resources or an override path."""
+    handle = None
     if path is None:
-        # Default to database/references.bib relative to the package root or known location
-        # For now, we assume it's in the standard location relative to this file
-        # chemthermo/src/chemthermo/citations.py -> ../../../database/references.bib
-        # This might need adjustment based on installation structure.
-        # Ideally, resources should be used or a configured path.
-        # Fallback to local dev path for now.
-        path = Path(__file__).resolve().parents[2] / "database" / "references.bib"
+        resource = resources.files("chemthermo.data") / "references.bib"
+        if resource.is_file():
+            handle = resource.open("r", encoding="utf-8")
+    else:
+        resolved = Path(path)
+        if resolved.exists():
+            handle = resolved.open("r", encoding="utf-8")
 
-    if not path.exists():
-        raise FileNotFoundError(f"BibTeX database not found at {path}")
+    if handle is None:
+        return {}
 
-    with open(path, encoding="utf-8") as f:
+    with handle as stream:
         parser = BibTexParser()
         parser.customization = convert_to_unicode
-        bib_database = bibtexparser.load(f, parser=parser)
+        bib_database = bibtexparser.load(stream, parser=parser)
 
     return {entry["ID"]: entry for entry in bib_database.entries}
 
@@ -54,7 +52,6 @@ class BibliographicDatabase:
         if not entry:
             return f"[Unknown citation: {key}]"
 
-        # Simple formatting logic suitable for plain text output
         authors = entry.get("author", "Unknown Author").replace("\n", " ")
         title = entry.get("title", "Untitled").replace("{", "").replace("}", "")
         year = entry.get("year", "n.d.")
