@@ -17,19 +17,27 @@ jobs:
           python-version: "3.11"
           cache: "pip"
 
-      - name: Install dependencies
+      - name: Bootstrap venv + install dev dependencies
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install -e ".[dev]"
+          python -m venv .venv
+          .venv/bin/python -m pip install --upgrade pip
+          .venv/bin/pip install -e ".[dev]"
+
+      - name: Editable install smoke
+        run: |
+          .venv/bin/python -c "import chemthermo; print(getattr(chemthermo, '__version__', 'no __version__'))"
 
       - name: Ruff format
-        run: ruff format --check src tests
+        run: .venv/bin/ruff format --check src tests
 
       - name: Ruff lint
-        run: ruff check src tests
+        run: .venv/bin/ruff check src tests
 
       - name: Pyright
-        run: pyright
+        run: .venv/bin/pyright
 
       - name: Pytest
-        run: pytest
+        run: .venv/bin/pytest -q
+
+      - name: Non-editable install smoke
+        run: .venv/bin/python tools/smoke_install.py --package .

@@ -109,6 +109,48 @@ class PengRobinsonEOS(EquationOfState):
         phi = np.exp(np.array(log_phi, dtype=float))
         return phi.tolist()
 
+    def compressibility_factor(
+        self,
+        *,
+        mixture: Mixture,
+        temperature_K: float,
+        pressure_Pa: float,
+        composition: Sequence[float],
+        phase: str,
+    ) -> float:
+        """Return the compressibility factor Z for a phase composition."""
+        temperature = validate_temperature(temperature_K)
+        pressure = validate_pressure(pressure_Pa)
+
+        if len(composition) != len(mixture.components):
+            raise CompositionError("Composition length must match number of mixture components.")
+
+        fractions = validate_fractions(composition, normalize=False, tol=COMPOSITION_SUM_TOL)
+        y = np.array(fractions, dtype=float)
+
+        a_i, b_i = self._component_parameters(mixture, temperature)
+        aij = np.sqrt(np.outer(a_i, a_i)) * (1.0 - self.kij)
+
+        a_mix = float(np.sum(y[:, None] * y[None, :] * aij))
+        b_mix = float(np.sum(y * b_i))
+
+        if a_mix <= 0.0 or b_mix <= 0.0:
+            raise ModelError("Invalid mixture parameters for Peng-Robinson EOS.")
+
+        A = a_mix * pressure / (R_J_PER_MOL_K**2 * temperature**2)
+        B = b_mix * pressure / (R_J_PER_MOL_K * temperature)
+
+        roots = self._compressibility_roots(A, B)
+        if not roots:
+            raise ModelError("No real compressibility roots found for Peng-Robinson EOS.")
+
+        if phase == "vapor":
+            return max(roots)
+        elif phase == "liquid":
+            return min(roots)
+        else:
+            raise ValueError("phase must be 'vapor' or 'liquid'.")
+
     @staticmethod
     def _component_parameters(
         mixture: Mixture, temperature: float

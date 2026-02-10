@@ -1,6 +1,6 @@
 ---
 name: chemthermo-change-loop
-description: Use when implementing or reviewing changes in this Chemical-Thermodynamics repository. Apply the repo contract by reading .agents/brain/brain.md first, preserving SI-unit and public-API invariants, shipping thin vertical slices with a runnable golden path, running CI-equivalent quality gates (ruff format, ruff format --check, ruff check, pyright, pytest), and updating ADR/brain docs when architecture or public API changes.
+description: Use when implementing or reviewing changes in this Chemical-Thermodynamics repository. Apply the repo contract by reading .agents/brain/brain.md first, preserving SI-unit and public-API invariants, shipping thin vertical slices with a runnable golden path, running CI-equivalent quality gates (ruff format, ruff format --check, ruff check, pyright, pytest), verifying editable and non-editable install smoke checks, and updating ADR/brain docs when architecture or public API changes.
 ---
 
 # Chemthermo Change Loop
@@ -16,7 +16,7 @@ description: Use when implementing or reviewing changes in this Chemical-Thermod
 1. Establish scope and constraints.
 - Read `README.md` and `.agents/brain/brain.md` before structural edits.
 - If the change is architectural or API-facing, read relevant ADRs in `.agents/brain/adr/`.
-- Confirm non-goals remain intact: VLLE and PC-SAFT are out of scope.
+- Confirm scope policy remains consistent across docs: VLLE and PC-SAFT are in scope, and no thermodynamic capability class is categorically out of scope.
 
 2. Classify the change.
 - Treat edits touching `src/chemthermo/__init__.py`, `src/chemthermo/eos/__init__.py`, or `src/chemthermo/vlle/__init__.py` as public API-sensitive.
@@ -25,19 +25,15 @@ description: Use when implementing or reviewing changes in this Chemical-Thermod
 
 3. Implement a thin vertical slice.
 - Prefer the smallest end-to-end usable increment over scaffold-only work.
+- Declare the slice explicitly before implementation: "After this change, user can X by running Y."
 - Keep interfaces and behavior coherent across code, tests, and examples.
 - Avoid opportunistic refactors unrelated to the requested change.
 
 4. Validate in escalating order.
 - Run focused tests for touched modules first.
-- Run quality gates (must pass) before finalizing:
-  - `ruff format src tests`
-  - `ruff format --check src tests`
-  - `ruff check src tests`
-  - `pyright`
-  - `pytest -q`
-- Run a golden path script for behavior sanity:
-  - `python examples/flash_tp_peng_robinson_demo.py`
+- Run canonical bootstrap, CI gates, and golden path from `.agents/dev-contract.md`.
+- Run installability checks from `.agents/dev-contract.md` (`pip install -e ".[dev]"` path and `pip install .` smoke via `tools/smoke_install.py`).
+- Use the cheap-check subset in `.agents/dev-contract.md` during iteration, then run full CI gates before finalizing.
 - If validation extras are installed, run optional reference checks under `tests/validation/`.
 
 5. Update docs and decision records.
@@ -47,7 +43,16 @@ description: Use when implementing or reviewing changes in this Chemical-Thermod
 
 6. Report outcomes clearly.
 - Summarize what changed, what was validated, and any known risks.
+- Include thin-slice evidence from `.agents/dev-contract.md` (slice declaration, golden path, focused tests, CI checks, install smoke).
 - If any checks were skipped, state exactly which checks and why.
+
+## Mandatory completion checklist (hard gate)
+- Slice declaration is present: "After this change, user can X by running Y."
+- At least one golden-path command/test was run and outcome reported.
+- Focused tests for touched behavior were run and outcomes reported.
+- CI-equivalent checks were run and outcomes reported.
+- Editable and non-editable install smoke checks were run and outcomes reported.
+- User-visible behavior changes include docs updates in the same slice.
 
 ## Notebook-specific checklist
 - Keep notebooks in `notebooks/` runnable top-to-bottom.

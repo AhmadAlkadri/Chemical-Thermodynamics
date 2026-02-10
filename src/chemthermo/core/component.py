@@ -2,66 +2,68 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Mapping
-
+from ..citations import BibliographicDatabase
 from ..data import get_component_record
-from ..exceptions import PropertyNotFoundError
+from ..schemas import AntoineCoefficients, ComponentData, Parameter
 
 
-@dataclass(frozen=True)
 class Component:
-    """Chemical component metadata in SI units.
+    """Chemical component metadata in SI units."""
 
-    Attributes:
-        name: Component common name.
-        formula: Chemical formula string.
-        properties: Mapping of property name to value (SI units).
-        antoine: Optional Antoine coefficients mapping.
+    def __init__(self, data: ComponentData):
+        self._data = data
+        self._bib_db: BibliographicDatabase | None = None
 
-    Notes:
-        Use Component.from_database to load a record from the built-in
-        databank. Missing properties raise PropertyNotFoundError via
-        require_property().
-    """
+    @property
+    def name(self) -> str:
+        return self._data.name
 
-    name: str
-    formula: str
-    properties: Mapping[str, float]
-    antoine: Mapping[str, float] | None = None
+    @property
+    def formula(self) -> str:
+        return self._data.formula
 
     @classmethod
     def from_database(cls, name: str) -> "Component":
         record = get_component_record(name)
-        antoine = record.get("antoine")
-        return cls(
-            name=str(record["name"]),
-            formula=str(record["formula"]),
-            properties=dict(record["properties"]),
-            antoine=dict(antoine) if isinstance(antoine, dict) else None,
-        )
+        model = ComponentData(**record)
+        return cls(model)
 
-    def require_property(self, key: str) -> float:
-        try:
-            value = self.properties[key]
-        except KeyError as exc:
-            raise PropertyNotFoundError(
-                f"Property '{key}' not available for component '{self.name}'."
-            ) from exc
-        return float(value)
+    def _bibliography(self) -> BibliographicDatabase:
+        if self._bib_db is None:
+            self._bib_db = BibliographicDatabase()
+        return self._bib_db
+
+    def get_citation(self, property_name: str) -> str:
+        """Return the citation text for a given property."""
+        prop = getattr(self._data, property_name, None)
+
+        key: str | None = None
+        if isinstance(prop, Parameter):
+            key = prop.source_key
+        elif isinstance(prop, AntoineCoefficients) and property_name == "antoine":
+            key = prop.source_key
+
+        if not key:
+            return "No citation available."
+
+        return self._bibliography().get_citation_text(key)
 
     @property
     def mw_kg_per_mol(self) -> float:
-        return self.require_property("MW_kg_per_mol")
+        return self._data.MW.value
 
     @property
     def tc_k(self) -> float:
-        return self.require_property("Tc_K")
+        return self._data.Tc.value
 
     @property
     def pc_pa(self) -> float:
-        return self.require_property("Pc_Pa")
+        return self._data.Pc.value
 
     @property
     def omega(self) -> float:
-        return self.require_property("omega")
+        return self._data.omega.value
+
+    @property
+    def antoine(self) -> AntoineCoefficients | None:
+        return self._data.antoine

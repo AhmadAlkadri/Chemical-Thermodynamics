@@ -19,3 +19,6 @@ venv/
 
 # OS files
 .DS_Store
+
+# Generated example outputs
+examples/**/*.csv

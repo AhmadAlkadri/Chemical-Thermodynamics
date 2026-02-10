@@ -1,21 +1,45 @@
-# 2. Adopt Thin Vertical Slices for Feature Development
+# ADR-0002: Thin vertical slices and golden-path proof
 
-Date: 2026-02-06
-Status: Accepted
+Status: accepted
+Date: 2026-02-10
 
 ## Context
-The `chemthermo` repository previously contained several "scaffolded" or "partial" features (e.g., PC-SAFT, VLLE boundary) that existed in code but offered no end-to-end capability to the user. This created a misleading public API surface and complicated maintenance.
+The repository needs an execution model that prevents partial scaffolding from
+looking like delivered capability. Contributors and agents must ship changes
+that are immediately usable end-to-end and verifiable from a clean checkout.
 
 ## Decision
-We will adopt a "Thin Vertical Slice" philosophy for all future development. 
+We adopt a thin-vertical-slice philosophy for feature development.
 
-A **Thin Vertical Slice** is defined as a change that:
-1.  **Delivers a complete, usable capability** to the end-user (e.g., "I can flash Methane with PC-SAFT", not "I added the PC-SAFT class").
-2.  **Touches all necessary layers**: User Interface (API/CLI) -> Logic/Model -> Data -> Tests -> Documentation.
-3.  **Is validated end-to-end**: Must include a runnable "Golden Path" example or test case demonstrating the user flow.
+A thin vertical slice is a change that:
+1) Delivers one complete, usable user capability now (for example, "run a
+   documented binary TP-flash flow") rather than partial scaffolding (for
+   example, "added model class stubs only").
+2) Touches all required layers for that capability: interface (API/CLI), core
+   logic/model, data/parameters, tests, and documentation.
+3) Includes runnable end-to-end validation via at least one golden-path
+   command or test proving the intended user flow.
 
-We will **avoid** horizontal layering (e.g., "Implement the parameter database for all 500 components" before the model works). Instead, we will implement the model for *one* component, verify it works, and *then* expand the database.
+We explicitly avoid horizontal-only layering where broad infrastructure lands
+first and usable behavior lands later.
+
+## Non-negotiable criteria (hard gate)
+A change is incomplete and must not be handed off until all are present:
+1) Slice declaration: "After this change, user can X by running Y."
+2) User-visible capability is runnable end-to-end.
+3) Golden path command/test and outcome are reported.
+4) Focused tests for touched behavior and outcomes are reported.
+5) CI-equivalent checks and installability smoke checks are reported.
+6) User-facing docs are updated when behavior changes.
 
 ## Consequences
-*   **Positive**: Every PR / Task delivers tangible value. "Work in Progress" is minimized. The API is always "honest" (if it's there, it works).
-*   **Negative**: Initial implementations might look "hardcoded" or "limited" (e.g., PC-SAFT only working for Methane). This is acceptable and preferred over "generic but broken".
+- Positive: each task delivers tangible value and keeps API behavior honest.
+- Positive: review quality improves because evidence is explicit and runnable.
+- Tradeoff: initial slices may be narrowly scoped, which is preferred over
+  broad but non-usable scaffolding.
+
+## Supersedes (optional)
+None.
+
+## Superseded by (optional)
+None.

@@ -8,11 +8,16 @@ version = "0.0.0"
 description = "Chemical engineering thermodynamics utilities."
 readme = "README.md"
 requires-python = ">=3.11"
-license = { file = "LICENSE" }
-dependencies = ["numpy>=1.24"]
+license = "MIT"
+dependencies = [
+  "numpy>=1.24",
+  "pydantic>=2.0",
+  "bibtexparser>=1.4.0",
+]
 
 [project.optional-dependencies]
 dev = [
+  "build>=1.2.2",
   "nbstripout>=0.7.1",
   "pytest>=7.4",
   "ruff==0.14.13",
@@ -29,7 +34,7 @@ package-dir = { "" = "src" }
 where = ["src"]
 
 [tool.setuptools.package-data]
-"chemthermo.data" = ["components.json"]
+"chemthermo.data" = ["components.json", "references.bib"]
 "chemthermo.parameters" = ["data/activity/nrtl.json"]
 
 [tool.ruff]

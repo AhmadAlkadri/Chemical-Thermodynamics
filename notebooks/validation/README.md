@@ -3,6 +3,10 @@
 These notebooks mirror the automated validation tests in `tests/validation/` so you can compare
 chemthermo against reference libraries interactively.
 
+## Scope Policy
+
+VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capability class is categorically out of scope; implementation maturity may vary by module and release.
+
 ## Setup
 
 From the repo root:

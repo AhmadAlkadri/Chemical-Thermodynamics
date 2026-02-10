@@ -1,81 +1,80 @@
-"""Chemical engineering thermodynamics package (work in progress)."""
+"""Chemical engineering thermodynamics utilities."""
 
-from .core import Component, Composition, CompositionBasis, Mixture
-from .eos import PCSAFTEOS, EOSProtocol, get_eos, list_eos, register_eos
+from __future__ import annotations
+
+from .core.component import Component
+from .core.composition import Composition
+from .core.mixture import Mixture
+from .data import list_component_names
+from .eos import get_eos, list_eos
 from .exceptions import (
     CompositionError,
     ConvergenceError,
     InputRangeError,
     ModelError,
     PropertyNotFoundError,
-    ThermoError,
+)
+from .exceptions import (
+    ThermoError as ChemThermoError,
 )
 from .flash import FlashResult, FlashSettings, PhaseResult, flash_tp
 from .models import NRTL, ActivityModel, EquationOfState, PengRobinsonEOS
-from .parameters import (
-    ActivityParameters,
-    NRTLParameters,
-    PCSAFTParameterError,
-    PCSAFTParameterRegistry,
-    get_pcsaft_parameters,
-)
-from .units import (
-    BAR_PER_PA,
-    PA_PER_BAR,
-    PA_PER_KPA,
-    PA_PER_MPA,
-    R_J_PER_MOL_K,
-    STANDARD_P_PA,
-    STANDARD_T_K,
-)
-from .validation import (
-    COMPOSITION_SUM_TOL,
-    validate_fractions,
-    validate_pressure,
-    validate_temperature,
-)
+from .parameters import ActivityParameters, NRTLParameters, PCSAFTParameterError
+from .phase_boundary import bubble_pressure, bubble_temperature, dew_pressure, dew_temperature
+from .units import PA_PER_BAR, STANDARD_P_PA
+from .validation import validate_fractions, validate_pressure, validate_temperature
+
+__version__ = "0.0.0"
 
 __all__ = [
-    "__version__",
-    "BAR_PER_PA",
-    "COMPOSITION_SUM_TOL",
+    "ChemThermoError",
     "Component",
-    "CompositionError",
-    "Composition",
-    "CompositionBasis",
-    "ConvergenceError",
+    "Mixture",
+    "InputRangeError",
+    "PropertyNotFoundError",
+    "flash_tp",
+    "get_eos",
+    "list_eos",
+    "ActivityModel",
     "EquationOfState",
-    "EOSProtocol",
+    "NRTL",
+    "PengRobinsonEOS",
+    "ActivityParameters",
+    "NRTLParameters",
+    "CompositionError",
+    "PA_PER_BAR",
+    "STANDARD_P_PA",
+    "validate_fractions",
+    "Composition",
+    "PCSAFTParameterError",
+    "ConvergenceError",
+    "ModelError",
     "FlashResult",
     "FlashSettings",
     "PhaseResult",
-    "InputRangeError",
-    "Mixture",
-    "ModelError",
-    "NRTL",
-    "NRTLParameters",
-    "ActivityParameters",
-    "PA_PER_BAR",
-    "PA_PER_KPA",
-    "PA_PER_MPA",
-    "PCSAFTEOS",
-    "PCSAFTParameterError",
-    "PCSAFTParameterRegistry",
-    "PropertyNotFoundError",
-    "PengRobinsonEOS",
-    "R_J_PER_MOL_K",
-    "STANDARD_P_PA",
-    "STANDARD_T_K",
-    "ThermoError",
-    "ActivityModel",
-    "flash_tp",
-    "get_eos",
-    "get_pcsaft_parameters",
-    "list_eos",
-    "register_eos",
-    "validate_fractions",
     "validate_pressure",
     "validate_temperature",
+    "list_component_names",
+    "bubble_pressure",
+    "bubble_temperature",
+    "dew_pressure",
+    "dew_temperature",
+    "cite",
 ]
 
-__version__ = "0.0.0"
+
+def cite(component_name: str, property_name: str) -> str:
+    """Return the citation for a specific component property.
+
+    Args:
+        component_name: The name of the component (e.g., 'Methane').
+        property_name: The property to cite (e.g., 'Tc', 'MW', 'antoine').
+
+    Returns:
+        The citation text from the bibliography.
+    """
+    try:
+        comp = Component.from_database(component_name)
+        return comp.get_citation(property_name)
+    except Exception as exc:
+        return f"Could not retrieve citation: {exc}"

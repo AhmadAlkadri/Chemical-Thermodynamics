@@ -8,13 +8,13 @@ How to use this document
 **Agent Contract**
 - Read first: `.agents/brain/brain.md`, `.agents/brain/steering-brief.md`, relevant ADRs in `.agents/brain/adr/`.
 - Do-not-touch list (initial): public API boundaries (ADR-0001), CI contract (`.github/workflows/ci.yml`), compatibility rules (public API + schema versions), numerics invariants (SI units, composition tolerance, flash determinism).
-- Definition of done: code formatted (`ruff format src tests`), quality gates pass (`ruff format --check src tests`, `ruff check src tests`, `pyright`, `pytest -q`), docs updated, Golden Path runnable, no TODOs in critical path.
+- Definition of done: run canonical bootstrap, CI gates, and golden path from `.agents/dev-contract.md`; update docs; keep no TODOs in critical path.
 - Stop if >3 plausible root causes: write an experiment/instrumentation plan first.
 - If uncertain after 2 iterations, produce a minimal repro and document findings.
 - Complexity receipts rule: any new abstraction must state why, bug prevented, cost, and what breaks if omitted.
 - ADR rule: any public API or architectural change requires a new ADR (or update + supersede).
 - **Thin Vertical Slice Rule** (ADR-0002): Every exposed capability must be end-to-end usable. No scaffolded/partial features.
-- **Golden Path Rule**: Every Thin Vertical Slice must ship with at least one golden path (example/test) that executes successfully from a clean environment.
+- **Golden Path Rule** (ADR-0002): Every Thin Vertical Slice must ship with at least one golden path (example/test) that executes successfully from a clean environment.
 - Keep claims factual; add evidence tags or links for load-bearing statements.
 
 **Skills**
@@ -26,12 +26,18 @@ How to use this document
 - Primary language/toolchain: Python 3.11+, setuptools build via `pyproject.toml`. (source: pyproject.toml)
 - Primary entry points: `chemthermo` top-level API, `chemthermo.eos` registry, `chemthermo.vlle` plugin boundary. (source: src/chemthermo/__init__.py, src/chemthermo/eos/__init__.py, src/chemthermo/vlle/__init__.py)
 - Tests: `pytest` (plus lint/type checks in CI). (source: .github/workflows/ci.yml)
-- Golden Path (one command): `python -m pip install -e . && python examples/flash_tp_peng_robinson_demo.py`. (source: README.md, examples/flash_tp_peng_robinson_demo.py)
+- Golden Path command is maintained in `.agents/dev-contract.md`. (source: .agents/dev-contract.md)
 
-## 1) Purpose and non-goals
+## 1) Purpose and scope policy
 - Purpose: provide core thermodynamics utilities (components, mixtures, EOS/activities, TP flash) in SI units. (source: README.md, src/chemthermo/flash/tp.py, src/chemthermo/models/base.py)
-- Non-goal: **VLLE is explicitly out of scope**. This repository focuses on VLE only. 
-- Non-goal: **PC-SAFT is explicitly out of scope**. The `pcsaft` module is a non-functional artifact and will not be implemented.
+- Scope policy: VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capability class is categorically out of scope; implementation maturity may vary by module and release.
+
+## 1.1) Thin Vertical Slice Enforcement
+- Handoff blocker: Missing explicit slice declaration, "After this change, user can X by running Y."
+- Handoff blocker: No runnable golden-path command/test proving the claimed user flow.
+- Handoff blocker: No focused test evidence for touched behavior.
+- Handoff blocker: Missing CI-equivalent and install-smoke evidence from `.agents/dev-contract.md`.
+- Handoff blocker: User-visible behavior changed without corresponding docs updates.
 
 ## 2) Public API surface (current)
 Definition of public API follows ADR-0001 (source of truth rules in `.agents/brain/adr/0001-public-api-truth-source.md`).
@@ -41,9 +47,9 @@ Stable (public) entry points
 - EOS registry module (`chemthermo.eos`: `EOSProtocol`, `PCSAFTEOS`, `get_eos`, `list_eos`, `register_eos`). (source: src/chemthermo/eos/__init__.py)
 - VLLE plugin boundary (`chemthermo.vlle`: `get_vlle_engine`, `VLLEEngine`, `VLLEResult`, and related types/errors). (source: src/chemthermo/vlle/__init__.py, README.md)
 
-Unsupported / Out of Scope
-- `chemthermo.vlle`: Legacy boundary. Do not use.
-- `chemthermo.eos.pcsaft`: Non-functional placeholder. Do not use.
+Implementation status notes
+- `chemthermo.vlle`: Public plugin boundary for optional VLLE engines.
+- `chemthermo.eos.pcsaft`: Public EOS registry entry and interface with implementation details evolving over time.
 
 CLI entry points
 - No CLI scripts are defined in `pyproject.toml` (no `[project.scripts]` section). (source: pyproject.toml)
@@ -63,7 +69,7 @@ Key modules and flow
 - Deeper usage docs: `README.md`, `examples/README.md`. (source: README.md, examples/README.md)
 
 Key entry points (top paths)
-- `README.md`, `pyproject.toml`, `.github/workflows/ci.yml`, `src/chemthermo/__init__.py`, `src/chemthermo/flash/tp.py`, `src/chemthermo/models/peng_robinson.py`, `src/chemthermo/models/nrtl.py`, `src/chemthermo/eos/registry.py`, `src/chemthermo/parameters/nrtl.py`, `src/chemthermo/data/components.json`, `examples/flash_tp_peng_robinson_demo.py`, `tests/test_flash_tp.py`. (source: README.md, pyproject.toml, .github/workflows/ci.yml, src/chemthermo/__init__.py, src/chemthermo/flash/tp.py, src/chemthermo/models/peng_robinson.py, src/chemthermo/models/nrtl.py, src/chemthermo/eos/registry.py, src/chemthermo/parameters/nrtl.py, src/chemthermo/data/components.json, examples/flash_tp_peng_robinson_demo.py, tests/test_flash_tp.py)
+- `README.md`, `pyproject.toml`, `.github/workflows/ci.yml`, `src/chemthermo/__init__.py`, `src/chemthermo/flash/tp.py`, `src/chemthermo/models/peng_robinson.py`, `src/chemthermo/models/nrtl.py`, `src/chemthermo/eos/registry.py`, `src/chemthermo/parameters/nrtl.py`, `src/chemthermo/data/components.json`, `examples/basic/flash_tp_peng_robinson_demo.py`, `tests/test_flash_tp.py`. (source: README.md, pyproject.toml, .github/workflows/ci.yml, src/chemthermo/__init__.py, src/chemthermo/flash/tp.py, src/chemthermo/models/peng_robinson.py, src/chemthermo/models/nrtl.py, src/chemthermo/eos/registry.py, src/chemthermo/parameters/nrtl.py, src/chemthermo/data/components.json, examples/basic/flash_tp_peng_robinson_demo.py, tests/test_flash_tp.py)
 
 ## 4) Key invariants and assumptions
 - SI units everywhere: temperature in K, pressure in Pa. Enforced via validation helpers and documented usage. (source: README.md, src/chemthermo/validation.py, src/chemthermo/flash/tp.py)
@@ -87,18 +93,9 @@ Key entry points (top paths)
 
 - No environment-variable configuration is documented in README or `pyproject.toml`. (source: README.md, pyproject.toml)
 
-Top 10 cheapest checks
-- Confirm Python >= 3.11 (`pyproject.toml` requires it). (source: pyproject.toml)
-- `python -m pip install -e .` installs runtime deps (numpy). (source: pyproject.toml)
-- `python -m pytest tests/test_import.py -q` (quick import sanity). (source: tests/test_import.py)
-- `python -m pytest tests/test_validation.py -q` (validation helpers). (source: tests/test_validation.py)
-- `python -m pytest tests/test_flash_tp.py -q` (flash solver basics). (source: tests/test_flash_tp.py)
-- `python -m pytest tests/test_pr_eos.py -q` (Peng-Robinson EOS). (source: tests/test_pr_eos.py)
-- `python -m pytest tests/test_data_loading.py -q` (component databank). (source: tests/test_data_loading.py)
-- `python -m pytest tests/test_examples_smoke.py -q` (example usage). (source: tests/test_examples_smoke.py)
-- `ruff format src tests` (apply standard formatting before quality gates).
-- `ruff format --check src tests` (format gate in CI). (source: .github/workflows/ci.yml)
-- `ruff check src tests` and `pyright` (lint/type gate in CI). (source: .github/workflows/ci.yml)
+Cheap checks
+- Canonical cheap checks are maintained in `.agents/dev-contract.md` to avoid command drift.
+- Use the cheap-check subset first for fast feedback, then run full CI gates from `.agents/dev-contract.md`.
 
 ## 7) Testing & CI contract
 - CI runs: ruff format check, ruff lint, pyright, pytest on Python 3.11. (source: .github/workflows/ci.yml)
@@ -108,7 +105,7 @@ Top 10 cheapest checks
 - ADR folder: `.agents/brain/adr/`
 - Accepted ADRs:
   - `.agents/brain/adr/0001-public-api-truth-source.md`
-  - `.agents/brain/adr/0002-thin-vertical-slices.md` (Adopted 2026-02-06)
+  - `.agents/brain/adr/0002-thin-vertical-slices.md` (Adopted 2026-02-10)
 - ADR rules: one decision per ADR; keep under 1 page; include status and supersedes fields.
 
 ## 9) Roadmap: next 3 increments (vertical slices)

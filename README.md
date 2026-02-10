@@ -2,12 +2,47 @@
 Chemical engineering thermodynamics utilities packaged as the `chemthermo`
 library (src layout, SI units).
 
-## Quickstart / Current API usage
+## Local install
 
-Install from the repo (editable):
+macOS/Linux (development install):
 ```bash
-pip install -e .
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
+pytest -q
 ```
+
+Windows PowerShell (development install):
+```powershell
+py -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -e ".[dev]"
+pytest -q
+```
+
+Non-dev install (wheel/non-editable):
+```bash
+python -m pip install .
+```
+
+Tiny import and data check:
+```bash
+python - <<'PY'
+from chemthermo import Component
+
+methane = Component.from_database("Methane")
+print(methane.name, methane.tc_k, methane.pc_pa)
+PY
+```
+
+## Common issues
+
+- Editable install fails with an old pip: run `python -m pip install --upgrade pip` inside the active `.venv`, then retry.
+- Build backend errors mentioning setuptools/wheel: run `python -m pip install --upgrade setuptools wheel`, then retry `pip install -e ".[dev]"`.
+
+## Current API usage
 
 SI units are used throughout (temperature in K, pressure in Pa).
 ```python
@@ -35,7 +70,7 @@ print(result.phases["liquid"].composition.fractions)
 print(result.phases["vapor"].composition.fractions)
 ```
 
-See `examples/flash_tp_peng_robinson_demo.py` for a runnable script that prints a
+See `examples/basic/flash_tp_peng_robinson_demo.py` for a runnable script that prints a
 table-style summary.
 
 ## EOS extension points
@@ -53,20 +88,14 @@ print(list_eos())
 - `num_components()`
 - `residual_helmholtz(temperature_K, volume_m3, composition)`
 
-> [!WARNING]
-> **PC-SAFT is explicitly unsupported.**
-> While some placeholder code for PC-SAFT exists in the codebase (`chemthermo.eos.pcsaft`), it is **non-functional and out of scope** for this repository. It will not be developed further.
+## Scope Policy
+
+VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capability class is categorically out of scope; implementation maturity may vary by module and release.
 
 ## Examples and notebooks
 
 - Scripted demos: `examples/README.md`
 - Jupyter notebooks: `notebooks/README.md`
-
-## VLLE support
-
-> [!WARNING]
-> **VLLE is explicitly out of scope.**
-> This repository focuses on VLE (Vapor-Liquid Equilibrium) only. Any symbols or hooks related to VLLE (`chemthermo.vlle`) are legacy boundaries and are not supported.
 
 ## Optional validation dependencies
 
