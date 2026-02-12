@@ -108,17 +108,20 @@ Cheap checks
   - `.agents/brain/adr/0001-public-api-truth-source.md`
   - `.agents/brain/adr/0002-thin-vertical-slices.md` (Adopted 2026-02-10)
   - `.agents/brain/adr/0003-cli-entrypoint.md` (Adopted 2026-02-10)
+  - `.agents/brain/adr/0004-cli-tp-flash-gamma-phi.md` (Adopted 2026-02-12)
 - ADR rules: one decision per ADR; keep under 1 page; include status and supersedes fields.
 
 ## 9) Roadmap: next 3 increments (vertical slices)
-- **Slice 1: CLI Gamma-Phi Extension**
-  - Capability: Users can run `tp-flash` in gamma-phi mode from CLI.
-  - Requirements: CLI flags for method selection, NRTL model wiring, deterministic json/text output and focused tests.
-- **Slice 2: Provenance Hardening for DB Tooling**
+- **Recently completed**
+  - CLI gamma-phi extension for `chemthermo tp-flash` via `--flash-mode`.
+- **Slice 1: Provenance Hardening for DB Tooling**
   - Capability: Contributors can capture richer data provenance while preserving current runtime schema compatibility.
   - Requirements: thin-slice metadata additions with compatibility tests and migration notes.
-- **Slice 3: Validation Promotion Decision Slice**
+- **Slice 2: Validation Promotion Decision Slice**
   - Capability: Maintainers can decide and enforce a stable validation gate policy when maturity allows.
   - Requirements: explicit CI policy ADR update, deterministic gate command, and opt-in/required workflows documented.
+- **Slice 3: CLI activity-model configurability**
+  - Capability: Users can choose the gamma-phi activity model configuration from CLI without Python glue.
+  - Requirements: constrained CLI options, explicit compatibility behavior, and focused contract tests.
 
 ## 10) Open questions / risks

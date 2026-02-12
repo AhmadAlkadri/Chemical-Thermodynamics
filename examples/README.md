@@ -27,6 +27,14 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
   - CSV output is disabled by default; pass `--outdir <dir>` or set `CHEMTHERMO_OUTDIR`.
   - Generated CSV outputs are intentionally not tracked in git.
 
+## CLI quick runs
+
+- Phi-phi TP flash:
+  - `chemthermo tp-flash --components Methane,Ethane,Propane --z 0.5,0.3,0.2 --temperature-k 240 --pressure-pa 3000000 --format json`
+- Gamma-phi TP flash (NRTL + Peng-Robinson):
+  - `chemthermo tp-flash --components Methane,Ethane --z 0.5,0.5 --temperature-k 240 --pressure-pa 3000000 --flash-mode gamma-phi --format json`
+- Gamma-phi coverage depends on available NRTL pair data; unsupported pairs return a runtime validation/model error.
+
 ## Expected output format
 
 Each script prints:

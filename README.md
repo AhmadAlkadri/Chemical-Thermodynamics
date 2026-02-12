@@ -81,11 +81,22 @@ Run TP flash without writing Python:
 chemthermo tp-flash --components Methane,Ethane,Propane --z 0.5,0.3,0.2 --temperature-k 240 --pressure-pa 3000000 --format json
 ```
 
+Run gamma-phi mode (NRTL liquid activity + Peng-Robinson EOS):
+
+```bash
+chemthermo tp-flash --components Methane,Ethane --z 0.5,0.5 --temperature-k 240 --pressure-pa 3000000 --flash-mode gamma-phi --format json
+```
+
 Module execution is also supported:
 
 ```bash
 python -m chemthermo tp-flash --components Methane,Ethane --z 0.5,0.5 --temperature-k 240 --pressure-pa 3000000
 ```
+
+Notes:
+- `--flash-mode` defaults to `phi-phi`; valid choices are `phi-phi` and `gamma-phi`.
+- Gamma-phi mode currently uses `NRTL()` for the liquid activity model.
+- NRTL pair coverage is data-dependent; missing pair data returns a runtime validation/model error.
 
 ## EOS extension points
 
