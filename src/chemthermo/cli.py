@@ -11,7 +11,7 @@ from typing import Any
 from .core import Mixture
 from .exceptions import ConvergenceError, ThermoError
 from .flash import FlashSettings, flash_tp
-from .models import PengRobinsonEOS
+from .models import NRTL, PengRobinsonEOS
 
 CLI_SCHEMA_VERSION = 1
 
@@ -42,6 +42,7 @@ def _tp_flash_payload(
     temperature_K: float,
     pressure_Pa: float,
     normalize: bool,
+    flash_mode: str,
     settings: FlashSettings,
     result: Any,
 ) -> dict[str, Any]:
@@ -66,7 +67,7 @@ def _tp_flash_payload(
         },
         "solver": {
             "eos": "peng_robinson",
-            "method": "phi-phi",
+            "method": flash_mode,
             "algorithm": "wilson+rachford-rice+fixed-point",
             "settings": {
                 "max_iter": settings.max_iter,
@@ -132,13 +133,16 @@ def _run_tp_flash(args: argparse.Namespace) -> int:
 
     mixture = Mixture.from_database(component_names, feed_fractions, normalize=args.normalize)
     settings = FlashSettings(max_iter=args.max_iter, tol=args.tol, damping=args.damping)
+    flash_mode = args.flash_mode
+    activity_model = NRTL() if flash_mode == "gamma-phi" else None
 
     result = flash_tp(
         mixture,
         temperature_K=args.temperature_k,
         pressure_Pa=args.pressure_pa,
         eos=PengRobinsonEOS(),
-        flash_mode="phi-phi",
+        activity_model=activity_model,
+        flash_mode=flash_mode,
         settings=settings,
     )
 
@@ -148,6 +152,7 @@ def _run_tp_flash(args: argparse.Namespace) -> int:
         temperature_K=args.temperature_k,
         pressure_Pa=args.pressure_pa,
         normalize=args.normalize,
+        flash_mode=flash_mode,
         settings=settings,
         result=result,
     )
@@ -165,7 +170,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     tp_flash = subparsers.add_parser(
-        "tp-flash", help="Run TP flash using Peng-Robinson EOS (phi-phi)."
+        "tp-flash", help="Run TP flash using Peng-Robinson EOS (phi-phi or gamma-phi)."
     )
     tp_flash.add_argument(
         "--components",
@@ -179,6 +184,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     tp_flash.add_argument("--temperature-k", type=float, required=True, help="Temperature in K.")
     tp_flash.add_argument("--pressure-pa", type=float, required=True, help="Pressure in Pa.")
+    tp_flash.add_argument(
+        "--flash-mode",
+        choices=("phi-phi", "gamma-phi"),
+        default="phi-phi",
+        help="Flash method selection.",
+    )
     tp_flash.add_argument(
         "--normalize",
         action="store_true",

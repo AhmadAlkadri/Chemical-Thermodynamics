@@ -10,6 +10,7 @@ import pytest
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 FIXTURE_PATH = REPO_ROOT / "tests" / "fixtures" / "cli" / "tp_flash_v1.json"
+GAMMA_FIXTURE_PATH = REPO_ROOT / "tests" / "fixtures" / "cli" / "tp_flash_gamma_phi_v1.json"
 
 
 def _run_cli(*args: str) -> subprocess.CompletedProcess[str]:
@@ -76,6 +77,62 @@ def test_cli_tp_flash_json_output_matches_fixture_contract() -> None:
             assert actual == expected
 
 
+def test_cli_tp_flash_gamma_phi_json_output_matches_fixture_contract() -> None:
+    proc = _run_cli(
+        "tp-flash",
+        "--components",
+        "Methane,Ethane",
+        "--z",
+        "0.5,0.5",
+        "--temperature-k",
+        "240",
+        "--pressure-pa",
+        "3000000",
+        "--flash-mode",
+        "gamma-phi",
+        "--format",
+        "json",
+    )
+    assert proc.returncode == 0, proc.stderr
+
+    payload = json.loads(proc.stdout)
+    fixture = json.loads(GAMMA_FIXTURE_PATH.read_text(encoding="utf-8"))
+
+    assert set(payload) == set(fixture)
+    assert payload["cli_schema_version"] == fixture["cli_schema_version"]
+    assert payload["command"] == fixture["command"]
+    assert payload["solver"] == fixture["solver"]
+
+    assert payload["inputs"]["components"] == fixture["inputs"]["components"]
+    assert payload["inputs"]["z_mole"] == fixture["inputs"]["z_mole"]
+    assert payload["result"]["component_order"] == fixture["result"]["component_order"]
+    assert payload["result"]["phase_names"] == fixture["result"]["phase_names"]
+
+    assert payload["result"]["vapor_fraction"] == pytest.approx(
+        fixture["result"]["vapor_fraction"], rel=1e-9, abs=1e-12
+    )
+
+    assert np.allclose(
+        payload["result"]["phases"]["liquid"]["fractions"],
+        fixture["result"]["phases"]["liquid"]["fractions"],
+        rtol=1e-9,
+        atol=1e-12,
+    )
+    assert np.allclose(
+        payload["result"]["phases"]["vapor"]["fractions"],
+        fixture["result"]["phases"]["vapor"]["fractions"],
+        rtol=1e-9,
+        atol=1e-12,
+    )
+
+    for key, expected in fixture["diagnostics"].items():
+        actual = payload["diagnostics"][key]
+        if isinstance(expected, float):
+            assert actual == pytest.approx(expected, rel=1e-9, abs=1e-12)
+        else:
+            assert actual == expected
+
+
 def test_cli_tp_flash_text_output_contains_core_fields() -> None:
     proc = _run_cli(
         "tp-flash",
@@ -87,6 +144,26 @@ def test_cli_tp_flash_text_output_contains_core_fields() -> None:
         "240",
         "--pressure-pa",
         "3000000",
+    )
+    assert proc.returncode == 0, proc.stderr
+    assert "TP flash (chemthermo CLI)" in proc.stdout
+    assert "Vapor fraction beta" in proc.stdout
+    assert "Diagnostics:" in proc.stdout
+
+
+def test_cli_tp_flash_gamma_phi_text_output_contains_core_fields() -> None:
+    proc = _run_cli(
+        "tp-flash",
+        "--components",
+        "Methane,Ethane",
+        "--z",
+        "0.5,0.5",
+        "--temperature-k",
+        "240",
+        "--pressure-pa",
+        "3000000",
+        "--flash-mode",
+        "gamma-phi",
     )
     assert proc.returncode == 0, proc.stderr
     assert "TP flash (chemthermo CLI)" in proc.stdout
@@ -110,10 +187,46 @@ def test_cli_tp_flash_validation_error_returns_exit_code_1() -> None:
     assert "same number" in proc.stderr
 
 
+def test_cli_tp_flash_gamma_phi_missing_pair_returns_exit_code_1() -> None:
+    proc = _run_cli(
+        "tp-flash",
+        "--components",
+        "Methane,Ethane,Propane",
+        "--z",
+        "0.5,0.3,0.2",
+        "--temperature-k",
+        "240",
+        "--pressure-pa",
+        "3000000",
+        "--flash-mode",
+        "gamma-phi",
+    )
+    assert proc.returncode == 1
+    assert "Missing NRTL parameters" in proc.stderr
+
+
 def test_cli_tp_flash_usage_error_returns_exit_code_2() -> None:
     proc = _run_cli("tp-flash")
     assert proc.returncode == 2
     assert "usage:" in proc.stderr
+
+
+def test_cli_tp_flash_invalid_mode_returns_exit_code_2() -> None:
+    proc = _run_cli(
+        "tp-flash",
+        "--components",
+        "Methane,Ethane",
+        "--z",
+        "0.5,0.5",
+        "--temperature-k",
+        "240",
+        "--pressure-pa",
+        "3000000",
+        "--flash-mode",
+        "bad-mode",
+    )
+    assert proc.returncode == 2
+    assert "invalid choice" in proc.stderr
 
 
 def test_cli_tp_flash_nonconvergence_returns_exit_code_3() -> None:
