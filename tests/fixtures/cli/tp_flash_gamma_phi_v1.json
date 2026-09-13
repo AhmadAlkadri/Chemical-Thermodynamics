@@ -13,6 +13,8 @@
     "phase_detection": "wilson-heuristic",
     "phase_regime": "VLE",
     "phase_state": "two_phase",
+    "post_split_checked": false,
+    "post_split_skipped_reason": "gamma_phi_stability_unsupported",
     "termination_reason": "tolerance_met"
   },
   "inputs": {
