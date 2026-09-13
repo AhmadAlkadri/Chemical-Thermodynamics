@@ -45,6 +45,7 @@ Definition of public API follows ADR-0001 (source of truth rules in `.agents/bra
 Stable (public) entry points
 - `chemthermo` top-level exports in `__all__` (core types, flash API, phase-stability API, models, parameters, exceptions, units, validation helpers). (source: src/chemthermo/__init__.py)
 - Phase stability: `stability_tp`, `StabilityResult`, `StabilitySettings`, `StabilityTrial` (ADR-0005). `stability_tp` reports `status` in {"stable","unstable","inconclusive"}; "stable" means "no negative tangent-plane distance was found from the deterministic trial set", not a global proof. (source: src/chemthermo/stability/, .agents/brain/adr/0005-stability-tp-public-api.md)
+- `PengRobinsonEOS.kij` accepts a scalar (off-diagonal only; diagonal always unaffected) or a `Mapping[tuple[str, str], float]` keyed by normalized component-name pairs, default per-pair value `0.0` (ADR-0006). `flash_tp` and `stability_tp` results for nonzero `kij` are now trustworthy (previously the diagonal was silently corrupted; see ADR-0006). (source: src/chemthermo/models/peng_robinson.py, .agents/brain/adr/0006-pr-kij-matrix.md)
 - EOS registry module (`chemthermo.eos`: `EOSProtocol`, `PCSAFTEOS`, `get_eos`, `list_eos`, `register_eos`). (source: src/chemthermo/eos/__init__.py)
 - VLLE plugin boundary (`chemthermo.vlle`: `get_vlle_engine`, `VLLEEngine`, `VLLEResult`, and related types/errors). (source: src/chemthermo/vlle/__init__.py, README.md)
 
@@ -114,20 +115,21 @@ Cheap checks
   - `.agents/brain/adr/0003-cli-entrypoint.md` (Adopted 2026-02-10)
   - `.agents/brain/adr/0004-cli-tp-flash-gamma-phi.md` (Adopted 2026-02-12)
   - `.agents/brain/adr/0005-stability-tp-public-api.md` (Adopted 2026-09-13)
+  - `.agents/brain/adr/0006-pr-kij-matrix.md` (Adopted 2026-09-13)
 - ADR rules: one decision per ADR; keep under 1 page; include status and supersedes fields.
 
 ## 9) Roadmap: next 3 increments (vertical slices)
 - **Recently completed**
   - `stability-tpd-pr`: public `stability_tp` (Michelsen tangent-plane stability) with Peng-Robinson, min-Gibbs root selection, deterministic trial set, golden path and thermo cross-check.
   - CLI gamma-phi extension for `chemthermo tp-flash` via `--flash-mode`.
-- **Slice 1: `pr-kij-matrix`**
-  - Capability: Users can supply a per-pair binary interaction parameter matrix to `PengRobinsonEOS`.
-  - Requirements: fix the existing bug where the scalar `kij` is also applied to the diagonal of `aij`; accept a symmetric kij matrix with zero diagonal; keep `kij=0.0` results bit-comparable; regression tests plus a validation case entry. Stability and flash results for non-zero kij are not trustworthy until this lands.
-- **Slice 2: `stability-tpd-nrtl`**
+  - `pr-kij-matrix`: fixed the diagonal-kij bug and added per-pair `kij` support (`float` or name-keyed `Mapping`) to `PengRobinsonEOS`; `flash_tp` and `stability_tp` results for nonzero kij are now trustworthy. See ADR-0006 and validation Case K-1.
+- **Slice 1: `stability-tpd-nrtl`**
   - Capability: Users can run liquid-liquid tangent-plane stability with an activity model instead of an EOS.
   - Requirements: activity-model tangent-plane intercepts, a documented LLE-splitting trial set, and a known partially-miscible binary as the golden path. A narrow phase-thermodynamics contract becomes earned here (second model family), not before.
-- **Slice 3: `flash-auto-phase-detection`**
+- **Slice 2: `flash-auto-phase-detection`**
   - Capability: `flash_tp` decides 1-vs-2 phases from `stability_tp` instead of K-bound heuristics, and seeds K-values from the converged stationary point.
   - Requirements: keep the `FlashResult` shape and CLI JSON contract, add diagnostics for the stability verdict, and prove behavior change only where the heuristic was wrong.
+- **Slice 3: (not yet scoped)**
+  - To be defined after `flash-auto-phase-detection` lands.
 
 ## 10) Open questions / risks

@@ -74,6 +74,33 @@ print(result.phases["vapor"].composition.fractions)
 See `examples/basic/flash_tp_peng_robinson_demo.py` for a runnable script that prints a
 table-style summary.
 
+### Binary interaction parameters (`kij`)
+
+`PengRobinsonEOS.kij` accepts either a scalar (applied to every `i != j` pair,
+never to the diagonal) or a mapping from an unordered pair of component names
+to a per-pair value. Names are matched case/whitespace-insensitively; a pair
+missing from the mapping defaults to `0.0`.
+
+```python
+from chemthermo import Mixture, PengRobinsonEOS, flash_tp
+
+mixture = Mixture.from_database(("Methane", "n-Decane"), (0.50, 0.50))
+eos = PengRobinsonEOS(kij={("Methane", "n-Decane"): 0.0411})
+
+result = flash_tp(mixture, temperature_K=350.0, pressure_Pa=3.0e6, eos=eos)
+print(result.vapor_fraction)
+```
+
+Both orders of a pair (`("A", "B")` and `("B", "A")`) refer to the same value;
+giving both with *different* values raises `ModelError`, as does a pair
+naming the same component twice. The diagonal is always unaffected by `kij`,
+so pure-component fugacities never change with it (this was a bug in earlier
+versions -- see ADR-0006). Runnable demo:
+
+```bash
+python examples/basic/tp_flash_pr_kij_demo.py
+```
+
 ## Phase stability (tangent-plane analysis)
 
 `stability_tp` answers "is this feed one phase or more?" at fixed T, P and z
