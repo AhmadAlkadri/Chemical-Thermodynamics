@@ -114,7 +114,10 @@ class StabilityResult:
             ``trial_surfaces`` holds the per-surface trial counts as a
             deterministic ``"<label>:<count>"`` string in order of first
             appearance, and ``minimizing_trial_surface`` names the surface the
-            minimizing trial ran on.
+            minimizing trial ran on. ``tpd_from_sum_W`` is then equation (7) on
+            *that* surface: it equals ``tpd_min`` whenever the minimizing trial
+            stopped where its own candidate is the lowest-Gibbs one, which is
+            every unstable verdict measured so far.
 
     Honesty note:
         ``stable`` means "no negative tangent-plane distance was found from the
