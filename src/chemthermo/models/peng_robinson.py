@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Sequence
+from typing import Mapping, Sequence
 
 import numpy as np
 
 from ..core import Mixture
+from ..data import normalize_name
 from ..exceptions import CompositionError, ModelError
 from ..validation import (
     COMPOSITION_SUM_TOL,
@@ -20,6 +21,54 @@ from .base import EquationOfState
 
 R_J_PER_MOL_K = 8.314462618
 
+#: Canonical stored form of a per-pair kij matrix: a sorted tuple of
+#: ``((name_a, name_b), value)`` entries with ``name_a < name_b`` (both
+#: normalized via ``chemthermo.data.normalize_name``). Kept immutable so the
+#: frozen dataclass stays hashable/comparable and its repr is deterministic.
+KijPairs = tuple[tuple[tuple[str, str], float], ...]
+KijInput = float | Mapping[tuple[str, str], float]
+
+
+def _canonicalize_kij(kij: KijInput | KijPairs) -> float | KijPairs:
+    """Normalize constructor input for ``PengRobinsonEOS.kij``.
+
+    A scalar is returned unchanged (as a ``float``); it is applied to every
+    off-diagonal pair and never to the diagonal. A mapping from unordered
+    component-name pairs to values is normalized (name case/whitespace via
+    ``normalize_name``, pair order) into a sorted tuple. Both orders of a pair
+    must agree if both are given; a pair naming the same component twice is
+    rejected. Values are looked up per-mixture later, so pair names unknown to
+    any particular mixture are simply never used.
+
+    Idempotent: re-running this on an already-canonical tuple (as happens on
+    ``dataclasses.replace``) returns it unchanged rather than re-validating,
+    since it was already validated when first constructed.
+    """
+    if isinstance(kij, tuple):
+        return kij
+    if isinstance(kij, Mapping):
+        canonical: dict[tuple[str, str], float] = {}
+        for (name_a, name_b), value in kij.items():
+            key_a = normalize_name(name_a)
+            key_b = normalize_name(name_b)
+            if not key_a or not key_b:
+                raise ModelError("PengRobinsonEOS kij component names must be non-empty.")
+            if key_a == key_b:
+                raise ModelError(
+                    "PengRobinsonEOS kij pair components must be distinct "
+                    f"(got {name_a!r} paired with itself)."
+                )
+            pair_key = (key_a, key_b) if key_a < key_b else (key_b, key_a)
+            value_f = float(value)
+            if pair_key in canonical and canonical[pair_key] != value_f:
+                raise ModelError(
+                    f"Conflicting kij values given for pair {pair_key!r}: "
+                    f"{canonical[pair_key]!r} vs {value_f!r}."
+                )
+            canonical[pair_key] = value_f
+        return tuple(sorted(canonical.items()))
+    return float(kij)
+
 
 @dataclass(frozen=True)
 class PengRobinsonEOS(EquationOfState):
@@ -27,10 +76,25 @@ class PengRobinsonEOS(EquationOfState):
 
     Supports "vapor" and "liquid" phase labels and returns fugacity
     coefficients (dimensionless).
+
+    ``kij`` is either a scalar applied to every off-diagonal pair (never to
+    the diagonal, so pure-component behavior never changes with ``kij``), or a
+    mapping from an unordered pair of component names to a per-pair value,
+    e.g. ``{("Methane", "n-Decane"): 0.0411}``. Names are matched via
+    ``chemthermo.data.normalize_name`` and pairs missing from the mapping
+    default to ``0.0``. See ADR-0006 for the rationale.
+
+    After construction ``kij`` holds the *canonical* form: unchanged if given
+    as a scalar, or normalized to a sorted ``KijPairs`` tuple if given as a
+    mapping (see :func:`_canonicalize_kij`); the type annotation below
+    includes that canonical tuple shape for that reason.
     """
 
-    kij: float = 0.0
+    kij: KijInput | KijPairs = 0.0
     name: str = "Peng-Robinson"
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "kij", _canonicalize_kij(self.kij))
 
     def fugacity_coefficients(
         self,
@@ -68,11 +132,7 @@ class PengRobinsonEOS(EquationOfState):
         fractions = validate_fractions(composition, normalize=False, tol=COMPOSITION_SUM_TOL)
         y = np.array(fractions, dtype=float)
 
-        a_i, b_i = self._component_parameters(mixture, temperature)
-        aij = np.sqrt(np.outer(a_i, a_i)) * (1.0 - self.kij)
-
-        a_mix = float(np.sum(y[:, None] * y[None, :] * aij))
-        b_mix = float(np.sum(y * b_i))
+        a_i, b_i, aij, a_mix, b_mix = self._mixture_parameters(mixture, temperature, y)
 
         if a_mix <= 0.0 or b_mix <= 0.0:
             raise ModelError("Invalid mixture parameters for Peng-Robinson EOS.")
@@ -128,11 +188,7 @@ class PengRobinsonEOS(EquationOfState):
         fractions = validate_fractions(composition, normalize=False, tol=COMPOSITION_SUM_TOL)
         y = np.array(fractions, dtype=float)
 
-        a_i, b_i = self._component_parameters(mixture, temperature)
-        aij = np.sqrt(np.outer(a_i, a_i)) * (1.0 - self.kij)
-
-        a_mix = float(np.sum(y[:, None] * y[None, :] * aij))
-        b_mix = float(np.sum(y * b_i))
+        _a_i, _b_i, _aij, a_mix, b_mix = self._mixture_parameters(mixture, temperature, y)
 
         if a_mix <= 0.0 or b_mix <= 0.0:
             raise ModelError("Invalid mixture parameters for Peng-Robinson EOS.")
@@ -150,6 +206,60 @@ class PengRobinsonEOS(EquationOfState):
             return min(roots)
         else:
             raise ValueError("phase must be 'vapor' or 'liquid'.")
+
+    def _mixture_parameters(
+        self, mixture: Mixture, temperature: float, y: np.ndarray
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, float, float]:
+        """Return ``(a_i, b_i, aij, a_mix, b_mix)`` for a phase composition ``y``.
+
+        Single source of truth for the quadratic mixing rule shared by
+        :meth:`fugacity_coefficients` and :meth:`compressibility_factor`.
+        ``aij``'s diagonal always uses a ``(1 - kij) = 1`` factor (pure a_ii is
+        never corrupted by a nonzero kij); off-diagonal entries use the
+        resolved per-pair (or scalar) kij for this mixture's component order.
+        """
+        a_i, b_i = self._component_parameters(mixture, temperature)
+        kij_matrix = self._kij_matrix(mixture)
+        aij = np.sqrt(np.outer(a_i, a_i)) * (1.0 - kij_matrix)
+
+        a_mix = float(np.sum(y[:, None] * y[None, :] * aij))
+        b_mix = float(np.sum(y * b_i))
+        return a_i, b_i, aij, a_mix, b_mix
+
+    def _kij_matrix(self, mixture: Mixture) -> np.ndarray:
+        """Build the dense n x n kij matrix for ``mixture``'s component order.
+
+        The diagonal is always zero. A scalar ``kij`` fills every off-diagonal
+        entry; a per-pair mapping fills only the pairs it names (by
+        normalized component name) and defaults missing pairs to zero.
+        """
+        n = len(mixture.components)
+        matrix = np.zeros((n, n), dtype=float)
+
+        if isinstance(self.kij, (int, float)):
+            if self.kij != 0.0:
+                matrix[:, :] = self.kij
+                np.fill_diagonal(matrix, 0.0)
+            return matrix
+
+        # self.kij is always the canonical KijPairs tuple here (never a raw
+        # Mapping at runtime; __post_init__ already converted it). Both
+        # branches call the same dict(...) constructor -- the isinstance
+        # split exists only so pyright resolves a single dict() overload per
+        # branch instead of over-widening a `Mapping | KijPairs` union.
+        pairs: dict[tuple[str, str], float]
+        if isinstance(self.kij, Mapping):
+            pairs = dict(self.kij)
+        else:
+            pairs = dict(self.kij)
+        names = [normalize_name(name) for name in mixture.component_names]
+        for i in range(n):
+            for j in range(i + 1, n):
+                key = (names[i], names[j]) if names[i] < names[j] else (names[j], names[i])
+                value = pairs.get(key, 0.0)
+                matrix[i, j] = value
+                matrix[j, i] = value
+        return matrix
 
     @staticmethod
     def _component_parameters(
