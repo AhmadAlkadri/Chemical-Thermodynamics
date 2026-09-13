@@ -55,17 +55,21 @@ convergence tolerance and is classified ``"marginal"`` here, not as an
 instability (validation Case S-3). A phase whose tangent-plane minimum is
 genuinely negative somewhere else means the phase set is not the answer.
 
-On the ``modified-raoult`` path that failure is now *resolved* rather than
-refused (ADR-0011): the minimizer found on the failing phase is the incipient
-new phase, it is added, and the enlarged set is re-solved with the multiphase
-Rachford-Rice of :mod:`chemthermo.flash._multiphase_rr`; a phase whose fraction
-converges to zero or below is removed again. The search is bounded by
-``FlashSettings.max_phases`` (default 3) and the sets it visited are reported
-in ``diagnostics["phase_set_history"]``. ``max_phases=2`` reproduces the
-pre-ADR-0011 behavior, which raises
-:class:`chemthermo.ConvergenceError`; so does the phi-phi and gamma-gamma path
-at any ``max_phases``, because no state in this repository exercises a third
-phase there (ADR-0011 "What remains").
+On the ``modified-raoult`` path (ADR-0011) and on the phi-phi path (ADR-0020)
+that failure is *resolved* rather than refused: the minimizer found on the
+failing phase is the incipient new phase, it is added, and the enlarged set is
+re-solved with the multiphase Rachford-Rice of
+:mod:`chemthermo.flash._multiphase_rr`; a phase whose fraction converges to
+zero or below is removed again. Each phase carries its own tangent-plane
+surface - a phase candidate for the activity path, a pinned density root
+(:class:`chemthermo.flash._split._PhaseRoot`, ADR-0019) for an equation of
+state - so a vapour and two liquids sit on three independent roots. The search
+is bounded by ``FlashSettings.max_phases`` (default 3) and the sets it visited
+are reported in ``diagnostics["phase_set_history"]``. ``max_phases=2``
+reproduces the pre-search behavior, which raises
+:class:`chemthermo.ConvergenceError`; so does the ``gamma-gamma`` path at any
+``max_phases``, because no activity-only state in this repository exercises a
+third liquid (ADR-0011 "What remains", narrowed by ADR-0020).
 ``FlashSettings(post_split_stability=False)`` returns the two-phase result
 anyway with the failure recorded in ``diagnostics``, without searching.
 
@@ -114,8 +118,8 @@ near a plait point - hundreds to thousands of iterations on the Tessier et al.
 Limits
 ------
 Up to ``FlashSettings.max_phases`` phases are returned on the
-``modified-raoult`` path; the phi-phi and gamma-gamma paths still stop at two
-and raise when a third is needed. A negative ``tpd_min`` proves a feed is not
+``modified-raoult`` and phi-phi paths; ``gamma-gamma`` still stops at two and
+raises when a third is needed. A negative ``tpd_min`` proves a feed is not
 one phase; ``"stable"`` only means no negative tangent-plane distance was found
 from the deterministic trial set - so a phase count is never more reliable than
 the stability test that produced it. Each trial of that set runs on one fixed
@@ -268,8 +272,9 @@ def flash_tp(
             modes only) if the stability analysis is inconclusive, if an
             unstable feed admits no Rachford-Rice root from either seed, or if
             a converged phase set fails the post-split stability check and no
-            further phase may be added (phi-phi and gamma-gamma always, or
-            ``FlashSettings.max_phases`` reached on the modified-Raoult path).
+            further phase may be added (``gamma-gamma`` always, or
+            ``FlashSettings.max_phases`` reached on the modified-Raoult and
+            phi-phi paths).
 
     Notes:
         **``flash_mode="gamma-phi"`` is DEPRECATED** in favour of

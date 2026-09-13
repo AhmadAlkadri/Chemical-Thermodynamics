@@ -480,27 +480,17 @@ def test_the_phi_phi_grid_never_reaches_a_third_phase() -> None:
     assert counts == {1: 97, 2: 47}, counts
 
 
-def test_the_other_paths_still_stop_at_two_phases_whatever_max_phases_says(
+def test_gamma_gamma_still_stops_at_two_phases_whatever_max_phases_says(
     butanol_water,
 ) -> None:
-    """ADR-0011 wires the search to the modified-Raoult path only.
+    """ADR-0020 wires the search to phi-phi; `gamma-gamma` is still two-phase.
 
-    No in-repo phi-phi or gamma-gamma state needs a third phase (Case L-4), so
-    wiring the loop there would ship a path nothing exercises. Both failures
-    below are manufactured by loosening the split tolerance, exactly as in
+    No in-repo activity-only state needs a third liquid (Case L-4), so wiring
+    the loop there would ship a path nothing exercises. The failure below is
+    manufactured by loosening the split tolerance, exactly as in
     `tests/test_flash_lle.py::test_post_split_failure_raises_and_post_split_stability_false_returns`;
-    what this test pins is that `max_phases` does not change either of them.
+    what this test pins is that `max_phases` does not change it.
     """
-    phi_phi = ct.Mixture.from_database(["Ethane", "n-Heptane"], [0.7, 0.3], normalize=True)
-    with pytest.raises(ct.ConvergenceError, match="not a stable phase set"):
-        ct.flash_tp(
-            phi_phi,
-            temperature_K=360.0,
-            pressure_Pa=1.0e6,
-            eos=ct.PengRobinsonEOS(),
-            settings=ct.FlashSettings(tol=1e-3, max_phases=4),
-        )
-
     gamma_gamma = ct.Mixture.from_database(list(NAMES), list(FEED), normalize=True)
     with pytest.raises(ct.ConvergenceError, match="not a stable phase set"):
         ct.flash_tp(
@@ -510,3 +500,39 @@ def test_the_other_paths_still_stop_at_two_phases_whatever_max_phases_says(
             activity_model=butanol_water,
             settings=ct.FlashSettings(tol=1e-3, second_order=False, max_phases=4),
         )
+
+
+def test_a_manufactured_phi_phi_instability_is_resolved_by_removal() -> None:
+    """The phi-phi path now enters the search, and removal is what ends it.
+
+    Ethane / n-Heptane at 360 K and 1 MPa with a deliberately loose `tol`
+    converges a two-phase split whose phases do not pass their own stability
+    test - the same manufactured failure the pre-ADR-0020 version of this test
+    used to pin the refusal. With `max_phases = 2` the documented refusal is
+    unchanged; with the default 3 the search adds the incipient phase, the
+    multiphase Rachford-Rice drives it back out, and the answer is the same two
+    phases, reached through `V -> LV -> LLV -> LV`.
+    """
+    phi_phi = ct.Mixture.from_database(["Ethane", "n-Heptane"], [0.7, 0.3], normalize=True)
+    with pytest.raises(ct.ConvergenceError, match="not a stable phase set"):
+        ct.flash_tp(
+            phi_phi,
+            temperature_K=360.0,
+            pressure_Pa=1.0e6,
+            eos=ct.PengRobinsonEOS(),
+            settings=ct.FlashSettings(tol=1e-3, max_phases=2),
+        )
+
+    resolved = ct.flash_tp(
+        phi_phi,
+        temperature_K=360.0,
+        pressure_Pa=1.0e6,
+        eos=ct.PengRobinsonEOS(),
+        settings=ct.FlashSettings(tol=1e-3, max_phases=3),
+    )
+    assert sorted(resolved.phases) == ["liquid", "vapor"]
+    assert resolved.diagnostics["phase_count"] == 2
+    assert resolved.diagnostics["phase_set_history"] == "V -> LV -> LLV -> LV"
+    assert resolved.diagnostics["phases_added"] == 1
+    assert resolved.diagnostics["phases_removed"] == 1
+    assert resolved.diagnostics["post_split_status"] == "stable"

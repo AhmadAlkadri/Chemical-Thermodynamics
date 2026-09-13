@@ -448,9 +448,15 @@ def test_post_split_failure_raises_and_post_split_stability_false_returns() -> N
     path a genuine third phase would take, and it is exercised here because it
     is the only way to reach it today. A real third-phase state would look
     identical from `flash_tp`'s side.
+
+    Since ADR-0020 the phi-phi path *resolves* such a failure by adding a phase
+    (here the search adds one and the multiphase Rachford-Rice removes it
+    again - see
+    `tests/test_flash_vlle.py::test_a_manufactured_phi_phi_instability_is_resolved_by_removal`),
+    so the refusal this test pins is the one `max_phases = 2` still produces.
     """
     mixture = _mixture(("Ethane", "n-Heptane"), (0.7, 0.3))
-    loose = ct.FlashSettings(tol=1e-3)
+    loose = ct.FlashSettings(tol=1e-3, max_phases=2)
 
     with pytest.raises(ct.ConvergenceError, match="not a stable phase set"):
         ct.flash_tp(mixture, temperature_K=360.0, pressure_Pa=1.0e6, eos=EOS, settings=loose)

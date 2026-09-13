@@ -28,7 +28,12 @@ from ..exceptions import ConvergenceError, ModelError
 from ..models import ActivityModel, EquationOfState
 from ._assemble import _single_phase_result, _two_phase_result
 from ._common import wilson_k
-from ._multiphase import _flash_tp_phase_addition, _phase_set_label
+from ._multiphase import (
+    _ActivityPhaseSet,
+    _EosPhaseSet,
+    _flash_tp_phase_addition,
+    _phase_set_label,
+)
 from ._second_order import _second_order_split
 from ._split import (
     _ln_gamma_function,
@@ -511,7 +516,7 @@ def _flash_tp_tangent_plane(
             "phase_ii_branch": naming.identities[1],
         }
 
-    post_split = _post_split_stability(
+    report = _post_split_report(
         mixture,
         temperature,
         pressure,
@@ -520,6 +525,69 @@ def _flash_tp_tangent_plane(
         phases=((names[0], x), (names[1], y)),
         settings=settings,
     )
+
+    if report.status != "stable" and settings.post_split_stability:
+        # ADR-0020: the phi-phi path joins the ADR-0011 phase addition/removal
+        # search. Every state of the bit-identity fixture and of the PR /
+        # PC-SAFT grids is post-split *stable*, so this branch is not entered
+        # there and those results are unchanged, diagnostics included.
+        if settings.max_phases < 3:
+            detail = ", ".join(
+                [failure.phase_name for failure in report.instabilities] or report.inconclusive
+            )
+            raise ConvergenceError(
+                "The converged two-phase solution is not a stable phase set: the "
+                f"post-split stability test reports '{report.status}' for phase(s) "
+                f"{detail} (most negative post-split tpd = {report.tpd_min:.6e}). A third "
+                "phase is required, and FlashSettings.max_phases = "
+                f"{settings.max_phases} forbids it. Raise max_phases (the default 3 "
+                "resolves this state), or pass FlashSettings(post_split_stability=False) "
+                "to receive the two-phase result anyway, with this failure recorded in "
+                "diagnostics."
+            )
+        if report.status == "inconclusive":
+            raise ConvergenceError(
+                "A post-split stability test was inconclusive for phase(s) "
+                f"{', '.join(report.inconclusive)}, so flash_tp cannot decide whether the "
+                "two-phase set is the answer."
+            )
+        failure = report.instabilities[0]
+        third_branch = failure.branch or _LIQUID
+        phase_set = _EosPhaseSet(eos, mixture, temperature, pressure)
+        history = [
+            _phase_set_label((stability.feed_branch or _LIQUID,)),
+            _phase_set_label(branches),
+            _phase_set_label((*branches, third_branch)),
+        ]
+        two_phase_g_rt = (1.0 - float(beta)) * _reduced_g(x, ln_f_x) + float(beta) * _reduced_g(
+            y, ln_f_y
+        )
+        return _flash_tp_phase_addition(
+            mixture,
+            temperature,
+            pressure,
+            z=z,
+            model=phase_set,
+            labels=(branches[0], branches[1], third_branch),
+            # The two converged phases keep the very holders the split used,
+            # so the multiphase solve continues on the roots they are already
+            # on (ADR-0019); the third gets a fresh one pinned to the branch
+            # the stability test found it on.
+            surfaces=(
+                roots_x.ln_fugacity_terms,
+                roots_y.ln_fugacity_terms,
+                phase_set.surface(third_branch),
+            ),
+            compositions=(x, y, failure.composition),
+            history=history,
+            ln_f_feed=ln_phi_feed,
+            two_phase_g_rt=two_phase_g_rt,
+            settings=settings,
+            base={**base, "incipient_phase": incipient_phase},
+            additions=1,
+        )
+
+    post_split = report.diagnostics
 
     return _two_phase_result(
         mixture,
@@ -1055,22 +1123,28 @@ def _flash_tp_modified_raoult(
         two_phase_g_rt = (1.0 - float(beta)) * _reduced_g(x, ln_f_x) + float(beta) * _reduced_g(
             y, ln_f_y
         )
+        surfaces = {
+            _LIQUID: candidates[_LIQUID].ln_fugacity_terms,
+            _VAPOR: candidates[_VAPOR].ln_fugacity_terms,
+        }
+        third_label = failure.branch or _LIQUID
+        phase_set = _ActivityPhaseSet(activity_model, candidates=surfaces)
         return _flash_tp_phase_addition(
             mixture,
             temperature,
             pressure,
             z=z,
-            candidates={
-                _LIQUID: candidates[_LIQUID].ln_fugacity_terms,
-                _VAPOR: candidates[_VAPOR].ln_fugacity_terms,
-            },
-            labels=(feed_label, incipient_label, failure.branch or _LIQUID),
+            model=phase_set,
+            labels=(feed_label, incipient_label, third_label),
+            surfaces=(
+                surfaces[feed_label],
+                surfaces[incipient_label],
+                surfaces[third_label],
+            ),
             compositions=(x, y, failure.composition),
             history=history,
             ln_f_feed=terms_x(z / float(np.sum(z))),
             two_phase_g_rt=two_phase_g_rt,
-            activity_model=activity_model,
-            vapor="ideal",
             settings=settings,
             base=base,
             additions=1,

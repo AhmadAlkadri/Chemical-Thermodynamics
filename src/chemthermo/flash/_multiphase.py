@@ -91,16 +91,23 @@ than returning an unverified phase set.
 from __future__ import annotations
 
 import math
-from typing import Callable, Literal, Mapping, Sequence
+from typing import Callable, Mapping, Protocol, Sequence
 
 import numpy as np
 
 from ..core import Mixture
 from ..exceptions import ConvergenceError, ModelError
-from ..models import ActivityModel
+from ..models import ActivityModel, EquationOfState
 from ._assemble import _multi_phase_result
 from ._multiphase_rr import _multiphase_rachford_rice, _NoMultiphaseSolution
-from ._verify import _is_same_phase, _post_split_report, _PostSplitReport, _reduced_g
+from ._split import _PhaseRoot
+from ._verify import (
+    _is_same_phase,
+    _PhaseInstability,
+    _post_split_report,
+    _PostSplitReport,
+    _reduced_g,
+)
 from .results import FlashResult
 from .settings import FlashSettings
 
@@ -122,6 +129,188 @@ _ABSENT_PHASE_FRACTION = 0.0
 #: Extra rounds allowed beyond the additions and removals a successful search
 #: needs, so that one add-then-remove detour still terminates cleanly.
 _EXTRA_ROUNDS = 4
+
+
+class _PhaseSetModel(Protocol):
+    """The model side of a phase set: **each phase carries its own surface.**
+
+    The search above is model-agnostic: it only ever needs, per phase, a
+    tangent-plane fugacity term ``t_i(x)``. What supplies that term differs by
+    family, and the difference is exactly the one ADR-0012 and ADR-0019 already
+    drew:
+
+    - modified-Raoult (ADR-0010, ADR-0011): the surface is the phase
+      *candidate* the label names - an activity liquid with Antoine reference
+      fugacities, or an ideal vapor - and the label **is** the phase identity,
+      because those two candidates are two different models rather than two
+      roots of one;
+    - an equation of state (ADR-0019, generalized here to any number of
+      phases): the surface is a :class:`chemthermo.flash._split._PhaseRoot`,
+      one density/compressibility branch of one model, pinned for the whole
+      solve. A vapour and two liquids then sit on three independent roots,
+      which is precisely the bookkeeping a three-phase EOS set needs and the
+      reason a single label-to-callable mapping is not enough: two phases may
+      carry the *same* label ``"liquid"`` and still be two different phases.
+
+    Which phase is called what is then a separate question from which surface
+    it sits on, and only the EOS family has to *measure* it (ADR-0017).
+
+    Complexity receipt: one protocol with four methods replaces a
+    ``Mapping[label, callable]``. It buys the three-phase EOS set (two phases
+    with one label), the per-phase root pinning ADR-0019 requires, and the
+    ADR-0017 measurement of what each converged phase is; without it the loop
+    would have to branch on the model family internally, which is what
+    ADR-0007 forbids. Cost: two small classes below and one extra
+    ``phase_identity`` call per phase per round on the EOS path.
+    """
+
+    #: Order two liquid phases by composition (ADR-0019 decision 3) rather than
+    #: by the order the search created them (ADR-0011 decision 5).
+    composition_ordered_liquids: bool
+
+    def surface(self, label: str) -> Callable[[np.ndarray], np.ndarray]:
+        """The tangent-plane term callable of a new phase pinned to ``label``."""
+        ...  # pragma: no cover - protocol
+
+    def identity(self, label: str, composition: np.ndarray) -> str | None:
+        """What the phase *is* (``"liquid"`` / ``"vapor"``), or None if unmeasurable."""
+        ...  # pragma: no cover - protocol
+
+    def report(
+        self,
+        mixture: Mixture,
+        temperature: float,
+        pressure: float,
+        *,
+        phases: Sequence[tuple[str, np.ndarray]],
+        settings: FlashSettings,
+    ) -> _PostSplitReport:
+        """Post-split stability of every converged phase, in this family."""
+        ...  # pragma: no cover - protocol
+
+    def label_diagnostics(self, measured: Sequence[str | None]) -> Mapping[str, str]:
+        """Extra diagnostics recording how the phase names were decided."""
+        ...  # pragma: no cover - protocol
+
+
+class _ActivityPhaseSet:
+    """Modified-Raoult phase set: the label names the candidate (ADR-0010).
+
+    Unchanged behaviour, expressed through the protocol: ``surface`` hands back
+    the very same bound method the pre-slice ``candidates[label]`` lookup did,
+    so the arithmetic is identical, and ``identity`` is the label itself
+    because an activity liquid and an ideal gas are two models, not two roots.
+    """
+
+    composition_ordered_liquids = False
+
+    def __init__(
+        self,
+        activity_model: ActivityModel,
+        *,
+        candidates: Mapping[str, Callable[[np.ndarray], np.ndarray]],
+    ) -> None:
+        self._activity_model = activity_model
+        self._candidates = candidates
+
+    def surface(self, label: str) -> Callable[[np.ndarray], np.ndarray]:
+        return self._candidates[label]
+
+    def identity(self, label: str, composition: np.ndarray) -> str | None:
+        return label
+
+    def report(
+        self,
+        mixture: Mixture,
+        temperature: float,
+        pressure: float,
+        *,
+        phases: Sequence[tuple[str, np.ndarray]],
+        settings: FlashSettings,
+    ) -> _PostSplitReport:
+        return _post_split_report(
+            mixture,
+            temperature,
+            pressure,
+            eos=None,
+            activity_model=self._activity_model,
+            phases=phases,
+            settings=settings,
+            vapor="ideal",
+        )
+
+    def label_diagnostics(self, measured: Sequence[str | None]) -> Mapping[str, str]:
+        return {}
+
+
+class _EosPhaseSet:
+    """Equation-of-state phase set: the label names a density root (ADR-0019).
+
+    Each phase gets its **own** :class:`chemthermo.flash._split._PhaseRoot`,
+    pinned to the branch the tangent-plane test found that phase on and held
+    for the whole solve, with the lowest-Gibbs rule as the fallback and the
+    post-split stability test as the check - ADR-0019's rule, unchanged, just
+    applied to three phases instead of two.
+
+    The names come from ``EquationOfState.phase_identity`` measured on the root
+    each phase converged on (ADR-0017), not from the pinned label, because two
+    liquids and a vapour cannot be told apart by a label that says ``"liquid"``
+    twice.
+    """
+
+    composition_ordered_liquids = True
+
+    def __init__(
+        self,
+        eos: EquationOfState,
+        mixture: Mixture,
+        temperature: float,
+        pressure: float,
+    ) -> None:
+        self._eos = eos
+        self._mixture = mixture
+        self._temperature = temperature
+        self._pressure = pressure
+
+    def surface(self, label: str) -> Callable[[np.ndarray], np.ndarray]:
+        root = _PhaseRoot(self._eos, self._mixture, self._temperature, self._pressure, branch=label)
+        return root.ln_fugacity_terms
+
+    def identity(self, label: str, composition: np.ndarray) -> str | None:
+        try:
+            measured = self._eos.phase_identity(
+                mixture=self._mixture,
+                temperature_K=self._temperature,
+                pressure_Pa=self._pressure,
+                composition=np.asarray(composition, dtype=float).tolist(),
+                phase=label,
+            )
+        except ModelError:
+            return None
+        return measured if measured in (_LIQUID, _VAPOR) else None
+
+    def report(
+        self,
+        mixture: Mixture,
+        temperature: float,
+        pressure: float,
+        *,
+        phases: Sequence[tuple[str, np.ndarray]],
+        settings: FlashSettings,
+    ) -> _PostSplitReport:
+        return _post_split_report(
+            mixture,
+            temperature,
+            pressure,
+            eos=self._eos,
+            activity_model=None,
+            phases=phases,
+            settings=settings,
+        )
+
+    def label_diagnostics(self, measured: Sequence[str | None]) -> Mapping[str, str]:
+        every = all(value in (_LIQUID, _VAPOR) for value in measured)
+        return {"phase_label_method": "compressibility" if every else "tie-break"}
 
 
 class _MultiphaseSolution:
@@ -461,11 +650,15 @@ def _solve_phase_set(
     z: np.ndarray,
     labels: Sequence[str],
     compositions: Sequence[np.ndarray],
-    candidates: Mapping[str, Callable[[np.ndarray], np.ndarray]],
+    terms_by_phase: Sequence[Callable[[np.ndarray], np.ndarray]],
     settings: FlashSettings,
 ) -> _MultiphaseSolution:
-    """Solve one fixed phase set: successive substitution, then the Newton stage."""
-    terms_by_phase = [candidates[label] for label in labels]
+    """Solve one fixed phase set: successive substitution, then the Newton stage.
+
+    ``terms_by_phase`` pairs positionally with ``labels`` and ``compositions``:
+    one surface per phase, so two phases may share a label and still be
+    evaluated on two different density roots (ADR-0019).
+    """
     budget = (
         min(settings.ssi_iterations, settings.max_iter)
         if settings.second_order
@@ -600,6 +793,55 @@ def _phase_names(labels: Sequence[str]) -> tuple[str, ...]:
     return tuple(names)
 
 
+def _ordered_phases(
+    model: _PhaseSetModel,
+    labels: Sequence[str],
+    compositions: Sequence[np.ndarray],
+) -> tuple[list[int], tuple[str, ...], tuple[str, ...], list[str | None]]:
+    """Measure what each phase is, then order and name the set.
+
+    Returns ``(order, identities, names, measured)`` where ``order`` lists the
+    solve-order indices in *report* order (liquids before the vapour) and
+    ``identities`` / ``names`` are in **solve order**, so a caller can index
+    them alongside ``compositions``.
+
+    Two rules differ by family and both live here rather than in the loop:
+
+    - what a phase *is* comes from ``model.identity``, which is the label
+      itself for the modified-Raoult candidates and an ADR-0017 compressibility
+      measurement for an equation of state;
+    - two liquids are ordered by the first component's mole fraction when the
+      model says so (ADR-0019 decision 3, so the labels do not swap between two
+      feeds on one tie line) and otherwise by the order the search created
+      them (ADR-0011 decision 5, where they are roles).
+
+    The vapour-last sort is stable, so on the modified-Raoult path this
+    reproduces the pre-slice ordering and naming exactly.
+    """
+    measured = [
+        model.identity(label, composition) for label, composition in zip(labels, compositions)
+    ]
+    identities = tuple(
+        value if value is not None else label for value, label in zip(measured, labels)
+    )
+    if model.composition_ordered_liquids:
+        order = sorted(
+            range(len(identities)),
+            key=lambda index: (
+                identities[index] == _VAPOR,
+                tuple(-value for value in compositions[index].tolist()),
+            ),
+        )
+    else:
+        order = sorted(range(len(identities)), key=lambda index: identities[index] == _VAPOR)
+
+    ordered_names = _phase_names([identities[index] for index in order])
+    names: list[str] = [""] * len(identities)
+    for position, index in enumerate(order):
+        names[index] = ordered_names[position]
+    return order, identities, tuple(names), measured
+
+
 def _phase_regime(labels: Sequence[str]) -> str:
     """``"single-phase"``, ``"VLE"``, ``"LLE"`` or ``"VLLE"``."""
     if len(labels) == 1:
@@ -617,20 +859,35 @@ def _phase_state(count: int) -> str:
     return {1: "single_phase", 2: "two_phase", 3: "three_phase"}.get(count, f"{count}_phase")
 
 
+def _extend(
+    labels: list[str],
+    surfaces: list[Callable[[np.ndarray], np.ndarray]],
+    compositions: list[np.ndarray],
+    *,
+    model: _PhaseSetModel,
+    failure: _PhaseInstability,
+) -> int:
+    """Append one incipient phase to the set in place; return its index."""
+    label = failure.branch or _LIQUID
+    labels.append(label)
+    surfaces.append(model.surface(label))
+    compositions.append(failure.composition)
+    return len(labels) - 1
+
+
 def _flash_tp_phase_addition(
     mixture: Mixture,
     temperature: float,
     pressure: float,
     *,
     z: np.ndarray,
-    candidates: Mapping[str, Callable[[np.ndarray], np.ndarray]],
+    model: _PhaseSetModel,
     labels: Sequence[str],
+    surfaces: Sequence[Callable[[np.ndarray], np.ndarray]],
     compositions: Sequence[np.ndarray],
     history: list[str],
     ln_f_feed: np.ndarray,
     two_phase_g_rt: float | None,
-    activity_model: ActivityModel,
-    vapor: Literal["none", "ideal"],
     settings: FlashSettings,
     base: Mapping[str, float | int | str | bool],
     additions: int = 0,
@@ -639,9 +896,14 @@ def _flash_tp_phase_addition(
 
     Args:
         z: Feed mole fractions (normalized).
-        candidates: Tangent-plane term callables keyed by candidate label.
-        labels: Candidate labels of the starting phase set (the converged
-            two-phase split), reference phase first.
+        model: The phase-set model (:class:`_PhaseSetModel`): it supplies a new
+            phase's surface, the identity of a converged one, and the
+            post-split stability report for this model family.
+        labels: Candidate label of each phase of the starting set (the
+            converged two-phase split), reference phase first. On the EOS path
+            a label names a density root, so two phases may carry the same one.
+        surfaces: Tangent-plane term callable of each starting phase, pairing
+            positionally with ``labels`` and ``compositions``.
         compositions: Compositions of that starting phase set.
         history: Phase-set labels visited so far, e.g. ``["L", "LV"]``; this
             function appends to it.
@@ -660,8 +922,14 @@ def _flash_tp_phase_addition(
             if the round budget is exhausted, or if a solve fails.
     """
     current_labels = list(labels)
+    current_surfaces = list(surfaces)
     current = [np.array(value, dtype=float) for value in compositions]
     rounds = settings.max_phases + _EXTRA_ROUNDS
+    #: Stationary points of the last post-split report that have not been tried
+    #: as the incipient phase, deepest first, and the index of the phase the
+    #: search added last. See the "duplicate incipient phase" branch below.
+    pending: list[_PhaseInstability] = []
+    added_index: int | None = len(current_labels) - 1 if additions else None
     removals = 0
     total_ssi = 0
     total_second_order = 0
@@ -672,7 +940,7 @@ def _flash_tp_phase_addition(
             z=z,
             labels=current_labels,
             compositions=current,
-            candidates=candidates,
+            terms_by_phase=current_surfaces,
             settings=settings,
         )
         total_ssi += solution.ssi_iterations
@@ -687,24 +955,47 @@ def _flash_tp_phase_addition(
                     "count: the tangent-plane test had already proved the feed unstable."
                 )
             index = solution.removal_index
+            # ADR-0020: a phase the search has just added, removed again by the
+            # multiphase Rachford-Rice *before it could move*, is a stationary
+            # point that duplicates a phase already in the set - not a phase
+            # that tried to exist and could not. Adding it again would cycle
+            # (measured: PC-SAFT water / n-hexane, z = 0.5/0.5, 1 atm, 330 K,
+            # where the deepest minimum found from the vapour is the water-rich
+            # liquid already present, and the search runs
+            # LV -> LLV -> LV -> ... until the round budget). The *next*
+            # stationary point of the same report is tried instead, each one at
+            # most once, so the rule terminates with the phase count.
+            duplicate = index == added_index and bool(pending)
             current_labels.pop(index)
+            current_surfaces.pop(index)
             current = [
                 value for position, value in enumerate(solution.compositions) if position != index
             ]
             removals += 1
+            added_index = None
             history.append(_phase_set_label(current_labels))
+            if duplicate:
+                failure = pending.pop(0)
+                added_index = _extend(
+                    current_labels,
+                    current_surfaces,
+                    current,
+                    model=model,
+                    failure=failure,
+                )
+                additions += 1
+                history.append(_phase_set_label(current_labels))
             continue
 
-        names = _phase_names(current_labels)
-        report = _post_split_report(
+        order, identities, names, measured = _ordered_phases(
+            model, current_labels, solution.compositions
+        )
+        report = model.report(
             mixture,
             temperature,
             pressure,
-            eos=None,
-            activity_model=activity_model,
             phases=tuple(zip(names, solution.compositions)),
             settings=settings,
-            vapor=vapor,
         )
 
         if report.status != "stable":
@@ -725,9 +1016,15 @@ def _flash_tp_phase_addition(
                     "max_phases, or pass FlashSettings(post_split_stability=False) to "
                     "receive this phase set anyway with the failure in diagnostics."
                 )
-            failure = report.instabilities[0]
-            current_labels.append(failure.branch or _LIQUID)
-            current = [*solution.compositions, failure.composition]
+            pending = list(report.instabilities[1:])
+            current = list(solution.compositions)
+            added_index = _extend(
+                current_labels,
+                current_surfaces,
+                current,
+                model=model,
+                failure=report.instabilities[0],
+            )
             additions += 1
             history.append(_phase_set_label(current_labels))
             continue
@@ -739,6 +1036,10 @@ def _flash_tp_phase_addition(
             z=z,
             solution=solution,
             report=report,
+            model=model,
+            order=order,
+            identities=identities,
+            measured=measured,
             history=history,
             ln_f_feed=ln_f_feed,
             two_phase_g_rt=two_phase_g_rt,
@@ -764,6 +1065,10 @@ def _assemble(
     z: np.ndarray,
     solution: _MultiphaseSolution,
     report: _PostSplitReport,
+    model: _PhaseSetModel,
+    order: Sequence[int],
+    identities: Sequence[str],
+    measured: Sequence[str | None],
     history: list[str],
     ln_f_feed: np.ndarray,
     two_phase_g_rt: float | None,
@@ -774,12 +1079,16 @@ def _assemble(
     total_second_order: int,
     total_rr: int,
 ) -> FlashResult:
-    """Verify the converged phase set and build the `FlashResult`."""
+    """Verify the converged phase set and build the `FlashResult`.
+
+    ``order`` / ``identities`` / ``measured`` come from :func:`_ordered_phases`
+    on the same compositions, so the ``phase_stability_<name>`` keys the
+    post-split report just wrote carry the same names this result does.
+    """
     # Report liquids before the vapor, whatever order the solve held them in,
     # so that a three-phase answer always reads liquid1 / liquid2 / vapor. The
     # Rachford-Rice reference phase (index 0 of the solve) is unaffected.
-    order = sorted(range(len(solution.labels)), key=lambda index: solution.labels[index] == _VAPOR)
-    labels = tuple(solution.labels[index] for index in order)
+    labels = tuple(identities[index] for index in order)
     names = _phase_names(labels)
     fractions = np.array([solution.fractions[index] for index in order])
     compositions = [solution.compositions[index] for index in order]
@@ -816,6 +1125,7 @@ def _assemble(
         "equilibrium_residual": solution.residual,
         "mass_balance_residual": mass_balance,
         "delta_g_split_rt": split_g - feed_g,
+        **model.label_diagnostics(measured),
         **report.diagnostics,
     }
     if two_phase_g_rt is not None:
