@@ -43,7 +43,8 @@ How to use this document
 Definition of public API follows ADR-0001 (source of truth rules in `.agents/brain/adr/0001-public-api-truth-source.md`).
 
 Stable (public) entry points
-- `chemthermo` top-level exports in `__all__` (core types, flash API, models, parameters, exceptions, units, validation helpers). (source: src/chemthermo/__init__.py)
+- `chemthermo` top-level exports in `__all__` (core types, flash API, phase-stability API, models, parameters, exceptions, units, validation helpers). (source: src/chemthermo/__init__.py)
+- Phase stability: `stability_tp`, `StabilityResult`, `StabilitySettings`, `StabilityTrial` (ADR-0005). `stability_tp` reports `status` in {"stable","unstable","inconclusive"}; "stable" means "no negative tangent-plane distance was found from the deterministic trial set", not a global proof. (source: src/chemthermo/stability/, .agents/brain/adr/0005-stability-tp-public-api.md)
 - EOS registry module (`chemthermo.eos`: `EOSProtocol`, `PCSAFTEOS`, `get_eos`, `list_eos`, `register_eos`). (source: src/chemthermo/eos/__init__.py)
 - VLLE plugin boundary (`chemthermo.vlle`: `get_vlle_engine`, `VLLEEngine`, `VLLEResult`, and related types/errors). (source: src/chemthermo/vlle/__init__.py, README.md)
 
@@ -58,6 +59,7 @@ CLI entry points
 Text-only diagram
 ```
 src/chemthermo/data/components.json -> data loaders -> Component/Composition/Mixture -> models (PR/NRTL) -> flash_tp -> FlashResult
+src/chemthermo/data/components.json -> Component/Composition/Mixture -> models (PR) -> stability_tp (min-Gibbs root + Michelsen TPD) -> StabilityResult
 chemthermo CLI -> parser -> Mixture + PengRobinsonEOS -> flash_tp -> text/json output
 
 ```
@@ -65,7 +67,8 @@ chemthermo CLI -> parser -> Mixture + PengRobinsonEOS -> flash_tp -> text/json o
 Key modules and flow
 - Component databank lives in `src/chemthermo/data/components.json`, loaded via `chemthermo.data` helpers. Optional non-runtime mirror path is `database/components.mirror.json` and is never loaded by runtime code. (source: src/chemthermo/data/__init__.py, src/chemthermo/data/components.json, tools/build_database.py)
 - Core domain objects: `Component`, `Composition`, `Mixture`. (source: src/chemthermo/core/component.py, src/chemthermo/core/composition.py, src/chemthermo/core/mixture.py)
-- Flash solver (`flash_tp`) orchestrates models and returns `FlashResult`. (source: src/chemthermo/flash/tp.py, src/chemthermo/flash/results.py)
+- Flash solver (`flash_tp`) orchestrates models and returns `FlashResult`. Its single-phase decision is still a Wilson K-bound / Rachford-Rice heuristic, NOT a stability analysis. (source: src/chemthermo/flash/tp.py, src/chemthermo/flash/results.py)
+- Phase stability (`stability_tp`) implements Michelsen's tangent-plane test independently of the flash solver and returns `StabilityResult`. It selects the lowest-Gibbs compressibility root generically by minimizing `sum_i w_i ln phi_i(w)` over the `phase="vapor"`/`phase="liquid"` calls of the existing `EquationOfState` interface. (source: src/chemthermo/stability/tp.py, src/chemthermo/stability/results.py)
 - EOS registry provides named EOS factories. (source: src/chemthermo/eos/registry.py)
 - Deeper usage docs: `README.md`, `examples/README.md`. (source: README.md, examples/README.md)
 
@@ -100,7 +103,8 @@ Cheap checks
 
 ## 7) Testing & CI contract
 - CI runs: ruff format check, ruff lint, pyright, pytest on Python 3.11. (source: .github/workflows/ci.yml)
-- Optional validation tests compare against the `thermo` library and are skipped if not installed. (source: tests/validation/test_flash_vs_thermo.py, pyproject.toml)
+- Optional validation tests compare against the `thermo` library and are skipped if not installed. (source: tests/validation/test_flash_vs_thermo.py, tests/validation/test_stability_vs_thermo.py, pyproject.toml)
+- Validation case ledger ("thermodynamics exam"): `.agents/brain/validation-cases.md`. One entry per case with source, location, assumptions, parameters and provenance, expected outcome, tolerance achieved, independent route, and test path. Never record an expected value that was not read from a source or produced by an independent route.
 
 ## 8) Decisions log (index)
 - ADR folder: `.agents/brain/adr/`
@@ -109,19 +113,21 @@ Cheap checks
   - `.agents/brain/adr/0002-thin-vertical-slices.md` (Adopted 2026-02-10)
   - `.agents/brain/adr/0003-cli-entrypoint.md` (Adopted 2026-02-10)
   - `.agents/brain/adr/0004-cli-tp-flash-gamma-phi.md` (Adopted 2026-02-12)
+  - `.agents/brain/adr/0005-stability-tp-public-api.md` (Adopted 2026-09-13)
 - ADR rules: one decision per ADR; keep under 1 page; include status and supersedes fields.
 
 ## 9) Roadmap: next 3 increments (vertical slices)
 - **Recently completed**
+  - `stability-tpd-pr`: public `stability_tp` (Michelsen tangent-plane stability) with Peng-Robinson, min-Gibbs root selection, deterministic trial set, golden path and thermo cross-check.
   - CLI gamma-phi extension for `chemthermo tp-flash` via `--flash-mode`.
-- **Slice 1: Provenance Hardening for DB Tooling**
-  - Capability: Contributors can capture richer data provenance while preserving current runtime schema compatibility.
-  - Requirements: thin-slice metadata additions with compatibility tests and migration notes.
-- **Slice 2: Validation Promotion Decision Slice**
-  - Capability: Maintainers can decide and enforce a stable validation gate policy when maturity allows.
-  - Requirements: explicit CI policy ADR update, deterministic gate command, and opt-in/required workflows documented.
-- **Slice 3: CLI activity-model configurability**
-  - Capability: Users can choose the gamma-phi activity model configuration from CLI without Python glue.
-  - Requirements: constrained CLI options, explicit compatibility behavior, and focused contract tests.
+- **Slice 1: `pr-kij-matrix`**
+  - Capability: Users can supply a per-pair binary interaction parameter matrix to `PengRobinsonEOS`.
+  - Requirements: fix the existing bug where the scalar `kij` is also applied to the diagonal of `aij`; accept a symmetric kij matrix with zero diagonal; keep `kij=0.0` results bit-comparable; regression tests plus a validation case entry. Stability and flash results for non-zero kij are not trustworthy until this lands.
+- **Slice 2: `stability-tpd-nrtl`**
+  - Capability: Users can run liquid-liquid tangent-plane stability with an activity model instead of an EOS.
+  - Requirements: activity-model tangent-plane intercepts, a documented LLE-splitting trial set, and a known partially-miscible binary as the golden path. A narrow phase-thermodynamics contract becomes earned here (second model family), not before.
+- **Slice 3: `flash-auto-phase-detection`**
+  - Capability: `flash_tp` decides 1-vs-2 phases from `stability_tp` instead of K-bound heuristics, and seeds K-values from the converged stationary point.
+  - Requirements: keep the `FlashResult` shape and CLI JSON contract, add diagnostics for the stability verdict, and prove behavior change only where the heuristic was wrong.
 
 ## 10) Open questions / risks
