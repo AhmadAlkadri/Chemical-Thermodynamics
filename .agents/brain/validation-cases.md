@@ -1714,3 +1714,151 @@ Rules:
 - **Honesty note:** this case is evidence that the phase-count verdict is right
   *on this grid, for this model*. It is not a proof of global correctness, and
   it is not a comparison against measurement.
+
+---
+
+## Case P-0: PC-SAFT invariants, constants, and the Eq. (A.11) typo
+
+- **Source:** J. Gross and G. Sadowski, "Perturbed-Chain SAFT: An Equation of
+  State Based on a Perturbation Theory for Chain Molecules", Ind. Eng. Chem.
+  Res. 40 (2001) 1244-1260 (DOI 10.1021/ie0003887). Erratum on Eq. (A.11)
+  stated by NIST TRC, https://trc.nist.gov/TDE/TDE_Help/eos-PC-SAFT.htm.
+- **Location:** Appendix equations (A.3)-(A.19) and (A.31)-(A.35); the paper's
+  Table 1 (both the 21 + 21 universal constants and the pure-component
+  parameters). Restated in the module docstring of
+  `src/chemthermo/eos/pcsaft.py` with the index conventions.
+- **Assumptions:** Non-associating, non-polar. Hard-chain plus dispersion only.
+  Fixed `(T, molar density, x)`; no density root solving.
+- **Components / units:** Methane, n-Hexane, n-Decane, Nitrogen and their
+  binaries/ternaries. `sigma` in Angstrom, `epsilon/k` in K, densities in
+  mol/m^3, volumes in m^3/mol, `k_B = 1.380649e-23` J/K,
+  `N_A = 6.02214076e23` /mol (exact SI).
+- **Parameters and provenance:** **The primary source was NOT read.** ACS
+  returns HTTP 403 for `pubs.acs.org/doi/10.1021/ie0003887` from this
+  environment and no open copy was located. Both tables were therefore taken
+  from independent secondary sources that agree digit for digit:
+  - *42 universal constants*: teqp (NIST, MIT) `src/data/PCSAFT.cpp`, namespace
+    `teqp::saft::PCSAFT::PCSAFTMatrices::GrossSadowski2001`; and the table in
+    the Wikipedia article "PC-SAFT", section "Dispersion Term". Checked
+    entry-by-entry: **0 differences in 42 values**.
+  - *11 pure-component parameter triples*: FeOs `parameters/pcsaft/gross2001.json`
+    and Clapeyron.jl `database/SAFT/PCSAFT/PCSAFT_like.csv` (rows whose `source`
+    column is the DOI of this paper). **0 differences.** teqp's built-in
+    `PCSAFTLibrary` independently confirms Methane / Ethane / Propane with the
+    BibTeXKey `Gross-IECR-2001`.
+- **Expected outcome:**
+  - `C1` is the **reciprocal** of the bracket of Eq. (A.11) (the printed
+    equation drops the outer `-1` on its right-hand side); `C1 -> 1` as
+    `eta -> 0`, and `0 < C1 < 1` at any `eta > 0` with `mbar >= 1`.
+  - Ideal-gas limit: `A^res/RT -> 0`, `Z -> 1`, `ln phi_i -> 0` as `rho -> 0`.
+  - Pure-component limit: the mixture code equals independently written pure
+    formulas (Carnahan-Starling `a_hs`, `g = (1 - eta/2)/(1 - eta)^3`).
+  - `Z = 1 + rho (d a_res/d rho)`, `mu_i^res/RT = d(n a_res)/dn_i|_{T,V}`.
+  - Euler identity `sum_i x_i ln phi_i = A^res/RT + Z - 1 - ln Z`.
+  - Gibbs-Duhem **at fixed (T, rho)**: `sum_i x_i d ln phi_i = (1 - 1/Z) dZ`.
+    (The familiar `= 0` form holds at fixed T **and P**; these `ln phi` are
+    evaluated at fixed density, where `P` moves with composition, so the right
+    identity is derived in the test docstring rather than assumed.)
+- **Tolerance achieved** (asserted -> measured on the states in the test file):
+  - `C1 * bracket - 1`: 1e-14 -> exact to round-off.
+  - `dC1/deta` vs central difference (step 1e-7): 1e-6 rel -> **8.7e-11**.
+    `dC1/dmbar` likewise: 1e-6 rel -> **3.9e-08**.
+  - Hard-chain and dispersion density derivatives, separately, vs central
+    differences (step `rho * 1e-6`): 1e-7 rel, both pass.
+  - Ideal-gas limit at `rho = 1e-6` mol/m^3: `< 1e-8` -> **1.3e-09** for
+    `|A^res/RT|`, `|Z - 1|` and `max |ln phi|` alike (they coincide there).
+  - Pure-component formulas: 1e-13 rel -> **2.2e-14** worst over 4 fluids
+    x 3 states.
+  - `Z` vs FD of `A^res` in density: 1e-8 rel -> **5.9e-09**
+    (finite-difference limited).
+  - `mu_i^res` vs FD of `n A^res` in mole numbers at fixed `(T, V)`:
+    1e-7 rel -> **1.4e-08** (finite-difference limited).
+  - Euler identity: 1e-13 -> **2.0e-15** here, **8.9e-16** worst over the
+    Case P-1 state set.
+  - Gibbs-Duhem at fixed `(T, rho)`: 1e-6 -> **9.4e-09** (finite-difference
+    limited).
+- **Independent route:** internal invariants plus independently written pure
+  formulas; no external library is used in this case.
+- **Test path:** `tests/test_pcsaft.py`.
+
+---
+
+## Case P-1: PC-SAFT residual properties against teqp 0.23.2
+
+- **Source:** teqp (NIST, MIT licence), https://github.com/usnistgov/teqp -
+  an independent implementation of Gross & Sadowski (2001) whose derivatives
+  are all obtained by **automatic differentiation** of one hand-written
+  `alphar`, where chemthermo writes them analytically. The two share the model
+  and the universal constants and share no derivative code.
+- **Location:** `teqp.make_model({'kind': 'PCSAFT', ...})`, methods
+  `get_Ar00` (= `A^res/RT`), `get_Ar01` (= `rho dAr/drho` = `Z - 1`),
+  `get_fugacity_coefficients(T, rhovec)`.
+- **Assumptions:** Non-associating PC-SAFT; `k_ij` only (no `l_ij`); the state
+  is fixed by `(T, rho, x)` on both sides, so no root selection is involved.
+- **Components / units:** 14 states -
+  pure n-hexane at (300 K, 100), (300 K, 7700), (400 K, 6800), (500 K, 3000)
+  mol/m^3; methane/n-hexane 0.5/0.5 at (300 K, 200) and (300 K, 11000);
+  methane/n-hexane 0.2/0.8 at (450 K, 8000) and at (300 K, 8000) (inside the
+  spinodal, `Z = -0.775`); methane/n-decane with `k_ij = 0.03` at 0.3/0.7,
+  (350 K, 100) and (350 K, 6500); nitrogen/methane 0.4/0.6 at (150 K, 20000);
+  carbon dioxide/n-decane 0.4/0.6 at (320 K, 8000); and two ternaries
+  methane/n-hexane/nitrogen, 0.3/0.4/0.3 at (250 K, 500) and 0.1/0.7/0.2 at
+  (250 K, 10000). Nine of the ten mixture states have `Z > 0`; five of them are
+  liquid-like (`eta` between 0.29 and 0.45).
+- **Parameters and provenance:** as Case P-0. The teqp model in the test is
+  built from parameter values written **in the test file**, not read from the
+  package under test.
+- **Expected outcome:** `A^res/RT`, `Z`, `P = Z rho R T` and `ln phi_i` equal
+  teqp's to 1e-10 (relative and absolute). At the spinodal state teqp's `Z` is
+  negative and chemthermo **refuses** to return `ln phi` (`ModelError`) rather
+  than returning a `nan`.
+- **Tolerance:** asserted 1e-10. **Achieved:** worst `|d A^res/RT| = 4.44e-15`,
+  worst `|dZ| = 2.58e-14`, worst `max_i |d ln phi_i| = 2.66e-14` - i.e. four
+  orders inside the asserted tolerance and at the level of double-precision
+  summation order. Per-state numbers are printed by the golden-path script.
+- **Negative control:** perturbing one `sigma` by 1 % moves `A^res/RT` by
+  4.15e-03, so the agreement is not vacuous (asserted `> 1e-3`).
+- **Not compared:** teqp's `get_Ar10` (the temperature derivative).
+  chemthermo does not implement one; recorded here as a gap, not skipped
+  silently.
+- **Independent route:** teqp (external, autodiff).
+- **Test path:** `tests/validation/test_pcsaft_vs_teqp.py::test_residual_properties_match_teqp`
+- **Script:** `examples/validation/13_pcsaft_vs_teqp.py`.
+
+---
+
+## Case P-2: Pure n-hexane saturation from equal fugacity on two density roots
+
+- **Source:** teqp's `pure_VLE_T` (its own Newton solve of the pure saturation
+  condition) as the reference; the model is Gross & Sadowski (2001).
+- **Location:** `model.pure_VLE_T(T, rho_liquid_guess, rho_vapour_guess, 200)`.
+- **Assumptions:** Pure fluid, so equality of fugacity reduces to
+  `ln phi(rho_L) = ln phi(rho_V)` at one pressure. chemthermo ships **no**
+  density solver in this slice, so the test and the script write their own
+  (scan the isotherm for the two spinodal extrema, bisect `P(rho) = P` on each
+  branch, then bisect on the fugacity difference). That solver is test-only and
+  deliberately unsophisticated.
+- **Components / units:** n-hexane at 300 K and 400 K; pressures in Pa,
+  densities in mol/m^3.
+- **Parameters and provenance:** as Case P-0 (m = 3.0576, sigma = 3.7983 A,
+  eps/k = 236.77 K).
+- **Expected outcome (teqp):**
+  - 300 K: `Psat = 21858.084278 Pa`, `rho_L = 7518.498734`,
+    `rho_V = 8.868596` mol/m^3.
+  - 400 K: `Psat = 463846.275296 Pa`, `rho_L = 6367.988628`,
+    `rho_V = 158.932771` mol/m^3.
+- **Tolerance:** asserted 1e-6 relative on all six numbers. **Achieved:**
+  300 K - `Psat` 2.9e-12, `rho_L` 1.2e-16, `rho_V` 4.2e-12;
+  400 K - `Psat` 3.0e-13, `rho_L` 1.4e-15, `rho_V` 1.0e-13.
+  The saturation condition restated on chemthermo's own numbers gives
+  `|ln phi_L - ln phi_V| <= 1e-9`.
+- **Independent route:** teqp's Newton solve versus bisection written in the
+  test; only the model is shared.
+- **Model versus experiment (remark, not an assertion):** PC-SAFT with these
+  parameters gives 21.858 kPa at 300 K. The n-hexane vapour pressure at 300 K
+  is **commonly tabulated near 21.7 kPa; that figure was not verified against a
+  primary source here**, so the ~0.7 % difference is reported and nothing
+  asserts it. This case validates one implementation of PC-SAFT against
+  another, not PC-SAFT against measurement.
+- **Test path:** `tests/validation/test_pcsaft_vs_teqp.py::test_pure_hexane_saturation_matches_teqp_pure_vle`
+- **Script:** `examples/validation/13_pcsaft_vs_teqp.py`.

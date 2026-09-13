@@ -760,6 +760,90 @@ Notes:
   packaged **synthetic** pair parameters (see "NRTL activity coefficients").
 - NRTL pair coverage is data-dependent; missing pair data returns a runtime validation/model error.
 
+## PC-SAFT (`chemthermo.eos`)
+
+`chemthermo.eos.PCSAFTEOS` implements the **non-associating** PC-SAFT equation
+of state of Gross & Sadowski, *Ind. Eng. Chem. Res.* **40** (2001) 1244-1260
+(hard-chain plus dispersion), with the packaged pure-component parameters of
+that paper's Table 1 (ADR-0014).
+
+```python
+from chemthermo.eos import PCSAFTEOS
+
+eos = PCSAFTEOS(components=("Methane", "n-Hexane"))
+x = [0.5, 0.5]
+
+eos.residual_helmholtz(temperature_K=300.0, volume_m3=1 / 200.0, composition=x)
+# -0.0908711764                     A^res / (R T), volume_m3 is MOLAR volume
+
+eos.compressibility_factor(temperature_K=300.0, density_mol_m3=200.0, composition=x)
+# 0.9102033819
+
+eos.pressure_Pa(temperature_K=300.0, density_mol_m3=200.0, composition=x)
+# 454071.12
+
+eos.ln_fugacity_coefficients(temperature_K=300.0, density_mol_m3=200.0, composition=x)
+# [0.0365173954, -0.2096785687]     natural logs, one per component
+```
+
+The state is always `(T, molar density, x)` (or `(T, molar volume, x)` for
+`residual_helmholtz`). Binary interaction parameters use the same contract as
+Peng-Robinson (ADR-0006) - a scalar applied to every off-diagonal pair, or a
+mapping keyed by an unordered pair of component names:
+
+```python
+PCSAFTEOS(components=("Methane", "n-Decane"), kij={("Methane", "n-Decane"): 0.03})
+```
+
+### Parameters
+
+Eleven compounds ship with the package: Methane, Ethane, Propane, n-Butane,
+n-Pentane, n-Hexane, n-Heptane, n-Octane, n-Decane, Nitrogen and Carbon
+dioxide. Their provenance is recorded in
+`src/chemthermo/parameters/data/eos/pcsaft.json`: the primary citation is the
+paper above, but the paper is paywalled and **was not read directly** when this
+file was written - the values were transcribed from two independent secondary
+sources that cite it and agree digit for digit (FeOs' `gross2001.json` and
+Clapeyron.jl's `PCSAFT_like.csv`), and the 42 universal constants were taken
+from teqp's source and Wikipedia's PC-SAFT article, which likewise agree.
+
+Supply your own with `PCSAFTParameters.from_records(...)`:
+
+```python
+from chemthermo import PCSAFTParameters
+from chemthermo.eos import PCSAFTEOS
+
+parameters = PCSAFTParameters.from_records(
+    [{"name": "My fluid", "m": 2.5, "sigma_A": 3.6, "epsilon_k_K": 210.0}]
+)
+eos = PCSAFTEOS(components=("My fluid",), parameters=parameters)
+```
+
+A component with no record raises `PCSAFTParameterError`.
+
+### Limits, stated plainly
+
+- **Non-associating only.** The association term (Gross & Sadowski, *IECR* **41**
+  (2002) 5510) and the polar terms are not implemented. Do not use this for
+  water, alcohols, acids or amines: nothing in the code stops you, and the
+  answer will be wrong.
+- **No density solver.** Every method takes the density (or molar volume) as an
+  input. PC-SAFT is Helmholtz-explicit, so a `(T, P)` state is several states
+  until a root is chosen, and this release does not choose. Between the two
+  spinodals `Z` is negative, `pressure_Pa` returns the (real) negative
+  pressure, and `ln_fugacity_coefficients` raises `ModelError` instead of
+  returning a `nan`.
+- **Not wired into `flash_tp` or `stability_tp`.** `PCSAFTEOS` is not an
+  `EquationOfState` (that interface is pressure-based and needs the root
+  solver). Phase equilibrium still means Peng-Robinson or the activity-model
+  paths. Wiring PC-SAFT in is the next slice, `pcsaft-density-roots-flash`.
+- **No temperature derivative**, so no residual enthalpy or entropy.
+- Validated against [teqp](https://github.com/usnistgov/teqp) (NIST, MIT,
+  automatic differentiation) to better than 3e-14 in `A^res/RT`, `Z` and
+  `ln phi` over fourteen states, and against its `pure_VLE_T` saturation solver
+  for n-hexane at 300 K and 400 K. See validation Cases P-0, P-1, P-2 and
+  `examples/validation/13_pcsaft_vs_teqp.py`.
+
 ## EOS extension points
 
 The public repo defines a minimal residual-Helmholtz EOS protocol and registry
@@ -768,12 +852,17 @@ hooks in `chemthermo.eos`:
 ```python
 from chemthermo.eos import EOSProtocol, list_eos
 
-print(list_eos())
+print(list_eos())      # ['pcsaft']
 ```
 
 `EOSProtocol` requires:
 - `num_components()`
-- `residual_helmholtz(temperature_K, volume_m3, composition)`
+- `residual_helmholtz(temperature_K, volume_m3, composition)` - reduced
+  residual Helmholtz energy `A^res/(R T)`, with `volume_m3` the **molar**
+  volume in m^3/mol
+
+`get_eos("pcsaft", components=[...], kij=..., parameters=...)` builds the
+model above through the registry.
 
 ## Scope Policy
 
@@ -786,7 +875,8 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
 
 ## Optional validation dependencies
 
-Install the reference library used by validation tests:
+Install the reference libraries used by validation tests - `thermo` (cubic EOS
+and activity models) and `teqp` (PC-SAFT, NIST):
 
 ```bash
 pip install -e ".[validation]"
@@ -797,7 +887,11 @@ Deterministic single-case validation scripts:
 ```bash
 python examples/validation/00_reference_case.py
 python examples/validation/06_stability_vs_thermo.py
+python examples/validation/13_pcsaft_vs_teqp.py
 ```
+
+Every validation test and script skips cleanly when its optional dependency is
+missing.
 
 ## Database source of truth
 
