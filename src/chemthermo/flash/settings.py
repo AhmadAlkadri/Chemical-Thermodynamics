@@ -77,6 +77,25 @@ class FlashSettings:
             stage takes over. Capped by ``max_iter``.
         second_order_max_iter: Maximum second-order iterations in the
             liquid-liquid and modified-Raoult splits.
+        max_phases: Largest number of phases :func:`chemthermo.flash_tp` may
+            return (ADR-0011). Validated ``>= 1``.
+
+            The default 3 lets the ``"modified-raoult"`` path *discover* a
+            third phase: after any converged phase set fails its post-split
+            stability test, the incipient phase found there is added and the
+            set is re-solved, and a phase whose fraction converges to zero or
+            below is removed again. ``max_phases=2`` reproduces the pre-ADR-0011
+            behavior exactly - a phase set that needs a third phase raises
+            :class:`chemthermo.ConvergenceError` instead of being resolved.
+
+            The cap is only consulted for the *third* and further phases. The
+            one-versus-two decision is thermodynamic (Michelsen's tangent-plane
+            test on the feed), not a setting, so ``max_phases=1`` behaves like
+            ``max_phases=2``: it cannot turn a feed the stability test proved
+            unstable into a single-phase answer.
+
+            The phi-phi and gamma-gamma paths still stop at two phases whatever
+            this is set to; see ADR-0011 "What remains".
         second_order_tol: Target for the second-order stage, measured on the
             equal-activity residual ``max_i |ln(x_i^I gamma_i^I)
             - ln(x_i^II gamma_i^II)|``. It is tighter than ``tol`` because the
@@ -99,6 +118,7 @@ class FlashSettings:
     ssi_iterations: int = 50
     second_order_max_iter: int = 100
     second_order_tol: float = 1e-12
+    max_phases: int = 3
 
     def __post_init__(self) -> None:
         if self.max_iter <= 0:
@@ -119,3 +139,5 @@ class FlashSettings:
             raise InputRangeError("second_order_max_iter must be positive.")
         if self.second_order_tol <= 0.0:
             raise InputRangeError("second_order_tol must be positive.")
+        if self.max_phases < 1:
+            raise InputRangeError("max_phases must be at least 1.")

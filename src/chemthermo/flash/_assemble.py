@@ -1,6 +1,8 @@
-"""Assemble a single- or two-phase `FlashResult` from converged compositions."""
+"""Assemble a `FlashResult` with any number of phases from converged compositions."""
 
 from __future__ import annotations
+
+from typing import Sequence
 
 import numpy as np
 
@@ -69,6 +71,58 @@ def _two_phase_result(
         temperature_K=temperature_K,
         pressure_Pa=pressure_Pa,
         phases={first_name: first, second_name: second},
+        vapor_fraction=None if vapor_fraction is None else float(vapor_fraction),
+        phase_fractions=phase_fractions,
+        diagnostics=diagnostics,
+    )
+
+
+def _multi_phase_result(
+    mixture: Mixture,
+    temperature_K: float,
+    pressure_Pa: float,
+    *,
+    compositions: Sequence[np.ndarray],
+    fractions: Sequence[float] | np.ndarray,
+    names: Sequence[str],
+    diagnostics: dict[str, float | int | str | bool],
+) -> FlashResult:
+    """Assemble a `FlashResult` for any number of phases (ADR-0011).
+
+    ``vapor_fraction`` is the fraction of the phase named ``"vapor"`` when the
+    phase set contains one, and None otherwise: reporting a vapor fraction for
+    a set with no vapor in it would be fiction, and that is the same rule the
+    two-phase liquid-liquid paths already follow.
+
+    Phase fractions are renormalized to sum to exactly one in floating point,
+    because `FlashResult` enforces that invariant and a converged multiphase
+    Rachford-Rice solution satisfies it only to round-off.
+    """
+    total = float(sum(float(value) for value in fractions))
+    normalized = [float(value) / total for value in fractions]
+    # Absorb the remaining ULPs into the largest phase, which is the least
+    # sensitive to them, so the sum is exactly 1.0.
+    largest = max(range(len(normalized)), key=lambda index: normalized[index])
+    normalized[largest] += 1.0 - float(sum(normalized))
+
+    phases = {
+        name: PhaseResult(
+            name=name,
+            composition=Composition(
+                fractions=tuple(np.asarray(composition, dtype=float).tolist()),
+                basis=mixture.basis,
+                normalize=True,
+                tol=COMPOSITION_SUM_TOL,
+            ),
+        )
+        for name, composition in zip(names, compositions)
+    }
+    phase_fractions = {name: value for name, value in zip(names, normalized)}
+    vapor_fraction = phase_fractions.get("vapor")
+    return FlashResult(
+        temperature_K=temperature_K,
+        pressure_Pa=pressure_Pa,
+        phases=phases,
         vapor_fraction=None if vapor_fraction is None else float(vapor_fraction),
         phase_fractions=phase_fractions,
         diagnostics=diagnostics,

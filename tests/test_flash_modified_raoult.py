@@ -611,19 +611,24 @@ def test_two_kelvin_above_t3_the_feed_has_evaporated(butanol_water) -> None:
 
 
 def test_at_t3_the_two_phase_answer_is_refused(butanol_water) -> None:
-    """Control (iii): three phases coexist, and `flash_tp` returns at most two.
+    """Control (iii): the knife edge at T3, and the refusal window with `max_phases=2`.
 
     At T3 the solver converges a vapor-liquid pair whose liquid sits *on* the
     binodal. Which side of the knife-edge the post-split test lands on is set
     by how exactly T3 is known, so both outcomes are accepted here and the
     numbers are recorded: at T3 to 1e-7 K the pair is marginal
     (`post_split_tpd_min` at round-off), and 0.01 K below it the same pair is
-    reported unstable and `flash_tp` raises.
+    reported unstable.
+
+    Below T3 the answer is now *resolved* by phase addition and removal
+    (ADR-0011, Case V-3); this test pins the pre-ADR-0011 behavior, which
+    `FlashSettings(max_phases=2)` still reproduces exactly.
     """
     names, model = butanol_water
+    two_phase = ct.FlashSettings(max_phases=2)
 
     try:
-        result = _flash(names, model, (0.20, 0.80), T3_K)
+        result = _flash(names, model, (0.20, 0.80), T3_K, two_phase)
     except ct.ConvergenceError as error:
         assert "third phase is required" in str(error)
     else:
@@ -639,7 +644,7 @@ def test_at_t3_the_two_phase_answer_is_refused(butanol_water) -> None:
     # it (two coexisting phases share one plane, so the tpd is the same from
     # either). This is the documented negative control.
     with pytest.raises(ct.ConvergenceError, match="third phase is required"):
-        _flash(names, model, (0.20, 0.80), T3_K - 0.01)
+        _flash(names, model, (0.20, 0.80), T3_K - 0.01, two_phase)
 
     unchecked = _flash(
         names,
