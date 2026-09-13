@@ -1,0 +1,5865 @@
+{
+  "gamma-gamma-binary|z1=0.05": {
+    "diagnostics": {
+      "converged": true,
+      "converged_stage": "second-order",
+      "delta_g_split_rt": -0.0041054848183843945,
+      "equilibrium_residual": 1.0336176359260207e-13,
+      "flash_mode": "gamma-gamma",
+      "iterations": 51,
+      "k_max": 18.001412995341,
+      "k_min": 0.6530603670752837,
+      "k_seed": "stability",
+      "mass_balance_residual": 1.1102230246251565e-16,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_regime": "LLE",
+      "phase_stability_liquid1": "stable",
+      "phase_stability_liquid2": "stable",
+      "phase_stability_tpd_min_liquid1": -1.2745526250436788e-14,
+      "phase_stability_tpd_min_liquid2": 7.43206690446512e-14,
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -1.2745526250436788e-14,
+      "second_order_iterations": 1,
+      "ssi_iterations": 50,
+      "stability_status": "unstable",
+      "stability_trials": 2,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -0.07274708608681013
+    },
+    "phase_fractions": {
+      "liquid1": 0.9117603796006686,
+      "liquid2": 0.08823962039933148
+    },
+    "phase_names": [
+      "liquid1",
+      "liquid2"
+    ],
+    "phases": {
+      "liquid1": [
+        0.019998419466948768,
+        0.9800015805330512
+      ],
+      "liquid2": [
+        0.35999966150854007,
+        0.64000033849146
+      ]
+    },
+    "vapor_fraction": null
+  },
+  "gamma-gamma-binary|z1=0.1": {
+    "diagnostics": {
+      "converged": true,
+      "converged_stage": "second-order",
+      "delta_g_split_rt": -0.010530069106221222,
+      "equilibrium_residual": 8.382183835919932e-14,
+      "flash_mode": "gamma-gamma",
+      "iterations": 51,
+      "k_max": 18.001401410013838,
+      "k_min": 0.6530606034534546,
+      "k_seed": "stability",
+      "mass_balance_residual": 1.1102230246251565e-16,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_regime": "LLE",
+      "phase_stability_liquid1": "stable",
+      "phase_stability_liquid2": "stable",
+      "phase_stability_tpd_min_liquid1": 1.2879531369743177e-14,
+      "phase_stability_tpd_min_liquid2": 2.4577196523187908e-14,
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": 1.2879531369743177e-14,
+      "second_order_iterations": 1,
+      "ssi_iterations": 50,
+      "stability_status": "unstable",
+      "stability_trials": 2,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -0.029994488834921215
+    },
+    "phase_fractions": {
+      "liquid1": 0.7647020932844062,
+      "liquid2": 0.2352979067155938
+    },
+    "phase_names": [
+      "liquid1",
+      "liquid2"
+    ],
+    "phases": {
+      "liquid1": [
+        0.01999841946694517,
+        0.9800015805330548
+      ],
+      "liquid2": [
+        0.3599996615083939,
+        0.6400003384916061
+      ]
+    },
+    "vapor_fraction": null
+  },
+  "gamma-gamma-binary|z1=0.2": {
+    "diagnostics": {
+      "converged": true,
+      "converged_stage": "second-order",
+      "delta_g_split_rt": -0.008580513142190369,
+      "equilibrium_residual": 7.653877531765829e-13,
+      "flash_mode": "gamma-gamma",
+      "iterations": 51,
+      "k_max": 1.531250420516622,
+      "k_min": 0.05555129734169623,
+      "k_seed": "stability",
+      "mass_balance_residual": 2.7755575615628914e-17,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_regime": "LLE",
+      "phase_stability_liquid1": "stable",
+      "phase_stability_liquid2": "stable",
+      "phase_stability_tpd_min_liquid1": 6.141693226367315e-13,
+      "phase_stability_tpd_min_liquid2": -1.3578155195713792e-13,
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -1.3578155195713792e-13,
+      "second_order_iterations": 1,
+      "ssi_iterations": 50,
+      "stability_status": "unstable",
+      "stability_trials": 2,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -0.021438718091209643
+    },
+    "phase_fractions": {
+      "liquid1": 0.5294144793453016,
+      "liquid2": 0.4705855206546984
+    },
+    "phase_names": [
+      "liquid1",
+      "liquid2"
+    ],
+    "phases": {
+      "liquid1": [
+        0.35999966151012314,
+        0.6400003384898769
+      ],
+      "liquid2": [
+        0.019998419466966167,
+        0.9800015805330339
+      ]
+    },
+    "vapor_fraction": null
+  },
+  "gamma-gamma-binary|z1=0.3": {
+    "diagnostics": {
+      "converged": true,
+      "converged_stage": "second-order",
+      "delta_g_split_rt": -0.0016229344604118678,
+      "equilibrium_residual": 3.5416114485542494e-14,
+      "flash_mode": "gamma-gamma",
+      "iterations": 51,
+      "k_max": 1.5312513942109507,
+      "k_min": 0.055551234541950475,
+      "k_seed": "stability",
+      "mass_balance_residual": 0.0,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_regime": "LLE",
+      "phase_stability_liquid1": "stable",
+      "phase_stability_liquid2": "stable",
+      "phase_stability_tpd_min_liquid1": 2.8174111027404062e-14,
+      "phase_stability_tpd_min_liquid2": -6.285138458995874e-15,
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -6.285138458995874e-15,
+      "second_order_iterations": 1,
+      "ssi_iterations": 50,
+      "stability_status": "unstable",
+      "stability_trials": 2,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -0.01588166320315777
+    },
+    "phase_fractions": {
+      "liquid1": 0.8235310519804262,
+      "liquid2": 0.17646894801957386
+    },
+    "phase_names": [
+      "liquid1",
+      "liquid2"
+    ],
+    "phases": {
+      "liquid1": [
+        0.3599996615084043,
+        0.6400003384915957
+      ],
+      "liquid2": [
+        0.019998419466947855,
+        0.9800015805330522
+      ]
+    },
+    "vapor_fraction": null
+  },
+  "gamma-gamma-binary|z1=0.45": {
+    "diagnostics": {
+      "converged": true,
+      "flash_mode": "gamma-gamma",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 2,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.04078313911885775
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.45,
+        0.55
+      ]
+    },
+    "vapor_fraction": null
+  },
+  "gamma-gamma-single-component-water": {
+    "diagnostics": {
+      "converged": true,
+      "flash_mode": "gamma-gamma",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 1,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        1.0
+      ]
+    },
+    "vapor_fraction": null
+  },
+  "gamma-gamma-tessier2000-near-plait": {
+    "diagnostics": {
+      "converged": true,
+      "converged_stage": "second-order",
+      "delta_g_split_rt": -1.0652091256280194e-06,
+      "equilibrium_residual": 4.440892098500626e-16,
+      "flash_mode": "gamma-gamma",
+      "iterations": 55,
+      "k_max": 1.062830833144479,
+      "k_min": 0.6918313498327368,
+      "k_seed": "stability",
+      "mass_balance_residual": 1.1102230246251565e-16,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_regime": "LLE",
+      "phase_stability_liquid1": "stable",
+      "phase_stability_liquid2": "stable",
+      "phase_stability_tpd_min_liquid1": 1.1185189914120888e-16,
+      "phase_stability_tpd_min_liquid2": -1.4137742232502317e-16,
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -1.4137742232502317e-16,
+      "second_order_iterations": 5,
+      "ssi_iterations": 50,
+      "stability_status": "unstable",
+      "stability_trials": 3,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -9.85103732556174e-06
+    },
+    "phase_fractions": {
+      "liquid1": 0.8284964650030374,
+      "liquid2": 0.17150353499696258
+    },
+    "phase_names": [
+      "liquid1",
+      "liquid2"
+    ],
+    "phases": {
+      "liquid1": [
+        0.15447363046658763,
+        0.05509005817404164,
+        0.7904363113593706
+      ],
+      "liquid2": [
+        0.11672729207943833,
+        0.03707259763542141,
+        0.8462001102851402
+      ]
+    },
+    "vapor_fraction": null
+  },
+  "gamma-phi-single-phase": {
+    "diagnostics": {
+      "converged": true,
+      "flash_mode": "gamma-phi",
+      "iterations": 0,
+      "k_max": 534.895962817694,
+      "k_min": 534.895962817694,
+      "k_seed": "wilson",
+      "max_delta_k": 0.0,
+      "phase_count": 1,
+      "phase_detection": "wilson-heuristic",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "termination_reason": "single_phase_k_bounds"
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        1.0
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "gamma-phi-two-phase": {
+    "diagnostics": {
+      "converged": true,
+      "flash_mode": "gamma-phi",
+      "iterations": 12,
+      "k_max": 3.433875573623854,
+      "k_min": 0.4846789528468791,
+      "k_seed": "wilson",
+      "max_delta_k": 2.557426270755059e-09,
+      "phase_count": 2,
+      "phase_detection": "wilson-heuristic",
+      "phase_regime": "VLE",
+      "phase_state": "two_phase",
+      "post_split_checked": false,
+      "post_split_skipped_reason": "gamma_phi_stability_unsupported",
+      "termination_reason": "tolerance_met"
+    },
+    "phase_fractions": {
+      "liquid": 0.23516474545613164,
+      "vapor": 0.7648352545438684
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.17473268589184338,
+        0.8252673141081566
+      ],
+      "vapor": [
+        0.6000103024449528,
+        0.3999896975550472
+      ]
+    },
+    "vapor_fraction": 0.7648352545438684
+  },
+  "legacy-wilson-heuristic-binary": {
+    "diagnostics": {
+      "converged": true,
+      "flash_mode": "phi-phi",
+      "iterations": 11,
+      "k_max": 2.7314577615560434,
+      "k_min": 0.48094668930658135,
+      "k_seed": "wilson",
+      "max_delta_k": 4.916861584547405e-09,
+      "phase_count": 2,
+      "phase_detection": "wilson-heuristic",
+      "phase_regime": "VLE",
+      "phase_state": "two_phase",
+      "post_split_checked": false,
+      "post_split_skipped_reason": "legacy_wilson_heuristic_path",
+      "termination_reason": "tolerance_met"
+    },
+    "phase_fractions": {
+      "liquid": 0.32548181986931013,
+      "vapor": 0.6745181801306899
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.2306379720437405,
+        0.7693620279562595
+      ],
+      "vapor": [
+        0.629977879982237,
+        0.37002212001776313
+      ]
+    },
+    "vapor_fraction": 0.6745181801306899
+  },
+  "legacy-wilson-heuristic-ternary": {
+    "diagnostics": {
+      "converged": true,
+      "flash_mode": "phi-phi",
+      "iterations": 12,
+      "k_max": 3.032556671711272,
+      "k_min": 0.11340778305954853,
+      "k_seed": "wilson",
+      "max_delta_k": 2.197746429288827e-09,
+      "phase_count": 2,
+      "phase_detection": "wilson-heuristic",
+      "phase_regime": "VLE",
+      "phase_state": "two_phase",
+      "post_split_checked": false,
+      "post_split_skipped_reason": "legacy_wilson_heuristic_path",
+      "termination_reason": "tolerance_met"
+    },
+    "phase_fractions": {
+      "liquid": 0.5317095621994667,
+      "vapor": 0.46829043780053325
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.2561702636693892,
+        0.4018426141197695,
+        0.3419871222108412
+      ],
+      "vapor": [
+        0.7768508427470485,
+        0.18436515590374694,
+        0.03878400134920465
+      ]
+    },
+    "vapor_fraction": 0.46829043780053325
+  },
+  "phi-phi-grid|Ethane-n-Heptane|z=(0.7, 0.3)|T=170.0|P=1000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.7,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Ethane-n-Heptane|z=(0.7, 0.3)|T=170.0|P=200000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.7,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Ethane-n-Heptane|z=(0.7, 0.3)|T=170.0|P=3000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.7,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Ethane-n-Heptane|z=(0.7, 0.3)|T=170.0|P=8000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.7,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Ethane-n-Heptane|z=(0.7, 0.3)|T=200.0|P=1000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.7,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Ethane-n-Heptane|z=(0.7, 0.3)|T=200.0|P=200000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.2672959714756204
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.7,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Ethane-n-Heptane|z=(0.7, 0.3)|T=200.0|P=3000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.7,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Ethane-n-Heptane|z=(0.7, 0.3)|T=200.0|P=8000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.7,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Ethane-n-Heptane|z=(0.7, 0.3)|T=240.0|P=1000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.7,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Ethane-n-Heptane|z=(0.7, 0.3)|T=240.0|P=200000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.49645776231030947,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 4.65883717021276e-10,
+      "incipient_phase": "vapor",
+      "iterations": 5,
+      "k_max": 4.431913713475625,
+      "k_min": 0.0009323758406903805,
+      "k_seed": "stability",
+      "mass_balance_residual": 5.728750807065808e-14,
+      "max_delta_k": 2.0661401478605512e-09,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": -4.654488642741577e-10,
+      "phase_stability_tpd_min_vapor": -3.147278722744332e-13,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -4.654488642741577e-10,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -1.099593948091909
+    },
+    "phase_fractions": {
+      "liquid": 0.386761513042984,
+      "vapor": 0.613238486957016
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.22547321879672313,
+        0.7745267812032769
+      ],
+      "vapor": [
+        0.9992778499411401,
+        0.00072215005885985
+      ]
+    },
+    "vapor_fraction": 0.613238486957016
+  },
+  "phi-phi-grid|Ethane-n-Heptane|z=(0.7, 0.3)|T=240.0|P=3000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.7,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Ethane-n-Heptane|z=(0.7, 0.3)|T=240.0|P=8000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.7,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Ethane-n-Heptane|z=(0.7, 0.3)|T=280.0|P=1000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.15257043316886554,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 4.954964494263692e-10,
+      "incipient_phase": "vapor",
+      "iterations": 7,
+      "k_max": 2.396850823891121,
+      "k_min": 0.004402611987019557,
+      "k_seed": "stability",
+      "mass_balance_residual": 2.1649348980190553e-14,
+      "max_delta_k": 1.1879879302512109e-09,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": -4.933149041786572e-10,
+      "phase_stability_tpd_min_vapor": -1.5230316094606314e-13,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -4.933149041786572e-10,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -0.475879908541267
+    },
+    "phase_fractions": {
+      "liquid": 0.5116733614322584,
+      "vapor": 0.4883266385677416
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.4161416675823963,
+        0.5838583324176037
+      ],
+      "vapor": [
+        0.9974294983060686,
+        0.0025705016939314563
+      ]
+    },
+    "vapor_fraction": 0.4883266385677416
+  },
+  "phi-phi-grid|Ethane-n-Heptane|z=(0.7, 0.3)|T=280.0|P=200000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.7120857434913257,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 4.923653568189579e-10,
+      "incipient_phase": "liquid",
+      "iterations": 4,
+      "k_max": 11.125445342079383,
+      "k_min": 0.013395544918035438,
+      "k_seed": "stability",
+      "mass_balance_residual": 1.1957101975212936e-13,
+      "max_delta_k": 5.484579901349207e-09,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": -4.808061336155285e-10,
+      "phase_stability_tpd_min_vapor": -3.7056223960723175e-10,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -4.808061336155285e-10,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -3.0681641636818107
+    },
+    "phase_fractions": {
+      "liquid": 0.3201241311389822,
+      "vapor": 0.6798758688610178
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.08878690012843585,
+        0.9112130998715642
+      ],
+      "vapor": [
+        0.9877938039852187,
+        0.01220619601478134
+      ]
+    },
+    "vapor_fraction": 0.6798758688610178
+  },
+  "phi-phi-grid|Ethane-n-Heptane|z=(0.7, 0.3)|T=280.0|P=3000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.7,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Ethane-n-Heptane|z=(0.7, 0.3)|T=280.0|P=8000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.7,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Ethane-n-Heptane|z=(0.7, 0.3)|T=320.0|P=1000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.47359576663187064,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 1.274648442350923e-10,
+      "incipient_phase": "vapor",
+      "iterations": 7,
+      "k_max": 4.386148180752124,
+      "k_min": 0.0255133604359521,
+      "k_seed": "stability",
+      "mass_balance_residual": 6.605826996519681e-14,
+      "max_delta_k": 5.60722135389824e-10,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": -1.241905370571953e-10,
+      "phase_stability_tpd_min_vapor": -8.818550349947838e-13,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -1.241905370571953e-10,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -1.0089090043027316
+    },
+    "phase_fractions": {
+      "liquid": 0.37026930695265037,
+      "vapor": 0.6297306930473496
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.22347357204692095,
+        0.776526427953079
+      ],
+      "vapor": [
+        0.9801882013548415,
+        0.019811798645158505
+      ]
+    },
+    "vapor_fraction": 0.6297306930473496
+  },
+  "phi-phi-grid|Ethane-n-Heptane|z=(0.7, 0.3)|T=320.0|P=200000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.18410351016145687,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 1.9103429949041129e-10,
+      "incipient_phase": "liquid",
+      "iterations": 5,
+      "k_max": 20.761237357288692,
+      "k_min": 0.09040489123919511,
+      "k_seed": "stability",
+      "mass_balance_residual": 4.674038933671909e-14,
+      "max_delta_k": 3.688924721245712e-10,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": 5.423012591098275e-13,
+      "phase_stability_tpd_min_vapor": -1.8186063403560966e-10,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -1.8186063403560966e-10,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -1.188288472666768
+    },
+    "phase_fractions": {
+      "liquid": 0.2456080559795737,
+      "vapor": 0.7543919440204263
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.04400379666635165,
+        0.9559962033336483
+      ],
+      "vapor": [
+        0.9135732671960276,
+        0.08642673280397242
+      ]
+    },
+    "vapor_fraction": 0.7543919440204263
+  },
+  "phi-phi-grid|Ethane-n-Heptane|z=(0.7, 0.3)|T=320.0|P=3000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.01926308641704111,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 3.2543541195195758e-09,
+      "incipient_phase": "vapor",
+      "iterations": 10,
+      "k_max": 1.6647346170350297,
+      "k_min": 0.023649326813102643,
+      "k_seed": "stability",
+      "mass_balance_residual": 6.161737786669619e-14,
+      "max_delta_k": 3.689446304022681e-09,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": -2.1646226654845637e-09,
+      "phase_stability_tpd_min_vapor": 8.05815832209698e-13,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -2.1646226654845637e-09,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -0.12675224402018695
+    },
+    "phase_fractions": {
+      "liquid": 0.7343524111201987,
+      "vapor": 0.26564758887980133
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.5949420674043617,
+        0.40505793259563816
+      ],
+      "vapor": [
+        0.9904206525426316,
+        0.009579347457368539
+      ]
+    },
+    "vapor_fraction": 0.26564758887980133
+  },
+  "phi-phi-grid|Ethane-n-Heptane|z=(0.7, 0.3)|T=320.0|P=8000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.7,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Ethane-n-Heptane|z=(0.7, 0.3)|T=360.0|P=1000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.18268026179153762,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 8.246305416292898e-09,
+      "incipient_phase": "liquid",
+      "iterations": 6,
+      "k_max": 6.599479236588173,
+      "k_min": 0.09686262427341395,
+      "k_seed": "stability",
+      "mass_balance_residual": 1.1324274851176597e-14,
+      "max_delta_k": 4.538692088829066e-09,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": 5.7514595832789776e-11,
+      "phase_stability_tpd_min_vapor": -7.00548362099378e-09,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -7.00548362099378e-09,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -1.0721386509779864
+    },
+    "phase_fractions": {
+      "liquid": 0.27850052603571385,
+      "vapor": 0.7214994739642862
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.13888830135836322,
+        0.8611116986416368
+      ],
+      "vapor": [
+        0.9165904603892133,
+        0.08340953961078666
+      ]
+    },
+    "vapor_fraction": 0.7214994739642862
+  },
+  "phi-phi-grid|Ethane-n-Heptane|z=(0.7, 0.3)|T=360.0|P=200000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.18648971523072888
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.7,
+        0.3
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Ethane-n-Heptane|z=(0.7, 0.3)|T=360.0|P=3000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.1459740123068649,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 9.647079801666791e-10,
+      "incipient_phase": "vapor",
+      "iterations": 10,
+      "k_max": 2.417357273387794,
+      "k_min": 0.06543365664810133,
+      "k_seed": "stability",
+      "mass_balance_residual": 1.1379786002407855e-14,
+      "max_delta_k": 2.3318480479872505e-09,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": -9.013038141830478e-10,
+      "phase_stability_tpd_min_vapor": -4.276942858678646e-12,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -9.013038141830478e-10,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -0.38563582827742326
+    },
+    "phase_fractions": {
+      "liquid": 0.4626510283405878,
+      "vapor": 0.5373489716594122
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.3973625408586723,
+        0.6026374591413277
+      ],
+      "vapor": [
+        0.9605672273898991,
+        0.039432772610100864
+      ]
+    },
+    "vapor_fraction": 0.5373489716594122
+  },
+  "phi-phi-grid|Ethane-n-Heptane|z=(0.7, 0.3)|T=360.0|P=8000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.7,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Methane-Ethane-Propane|z=(0.5, 0.3, 0.2)|T=170.0|P=1000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.011455514309336223,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 4.185494617559016e-09,
+      "incipient_phase": "vapor",
+      "iterations": 10,
+      "k_max": 2.345184062479416,
+      "k_min": 0.004353047732371325,
+      "k_seed": "stability",
+      "mass_balance_residual": 6.777911565336581e-14,
+      "max_delta_k": 9.330727301914976e-09,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": -3.84383301739115e-09,
+      "phase_stability_tpd_min_vapor": 1.5987190722158416e-11,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -3.84383301739115e-09,
+      "stability_status": "unstable",
+      "stability_trials": 5,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -0.14181309966957759
+    },
+    "phase_fractions": {
+      "liquid": 0.8514276681780757,
+      "vapor": 0.1485723318219243
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.41671627968949065,
+        0.34856243599043446,
+        0.23472128432007489
+      ],
+      "vapor": [
+        0.9772763738143088,
+        0.021701873226965943,
+        0.0010217529587253295
+      ]
+    },
+    "vapor_fraction": 0.1485723318219243
+  },
+  "phi-phi-grid|Methane-Ethane-Propane|z=(0.5, 0.3, 0.2)|T=170.0|P=200000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.606157897323893,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 5.720679485676783e-11,
+      "incipient_phase": "vapor",
+      "iterations": 7,
+      "k_max": 11.941436310794543,
+      "k_min": 0.013081664026174918,
+      "k_seed": "stability",
+      "mass_balance_residual": 6.661338147750939e-16,
+      "max_delta_k": 6.831690768649423e-10,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": -5.050586968888037e-11,
+      "phase_stability_tpd_min_vapor": 8.306745157466341e-13,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -5.050586968888037e-11,
+      "stability_status": "unstable",
+      "stability_trials": 5,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -1.6319316917604858
+    },
+    "phase_fractions": {
+      "liquid": 0.47026309530019716,
+      "vapor": 0.5297369046998028
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.07357179556851182,
+        0.507310516139805,
+        0.4191176882916832
+      ],
+      "vapor": [
+        0.8785529110019209,
+        0.11596433221235825,
+        0.005482756785720731
+      ]
+    },
+    "vapor_fraction": 0.5297369046998028
+  },
+  "phi-phi-grid|Methane-Ethane-Propane|z=(0.5, 0.3, 0.2)|T=170.0|P=3000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.5,
+        0.3,
+        0.2
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Methane-Ethane-Propane|z=(0.5, 0.3, 0.2)|T=170.0|P=8000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.5,
+        0.3,
+        0.2
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Methane-Ethane-Propane|z=(0.5, 0.3, 0.2)|T=200.0|P=1000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.2418728281563729,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 1.8471218998783456e-10,
+      "incipient_phase": "vapor",
+      "iterations": 9,
+      "k_max": 4.985494190812744,
+      "k_min": 0.030457340384562413,
+      "k_seed": "stability",
+      "mass_balance_residual": 5.473399511402022e-14,
+      "max_delta_k": 9.224612185221304e-10,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": -1.5929922533574599e-10,
+      "phase_stability_tpd_min_vapor": 4.634174084375465e-12,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -1.5929922533574599e-10,
+      "stability_status": "unstable",
+      "stability_trials": 5,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -0.7944119960462125
+    },
+    "phase_fractions": {
+      "liquid": 0.5306325633791857,
+      "vapor": 0.46936743662081426
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.17417590117119774,
+        0.45880330106087297,
+        0.36702079776792906
+      ],
+      "vapor": [
+        0.8683529433081856,
+        0.12046857932517792,
+        0.011178477366636491
+      ]
+    },
+    "vapor_fraction": 0.46936743662081426
+  },
+  "phi-phi-grid|Methane-Ethane-Propane|z=(0.5, 0.3, 0.2)|T=200.0|P=200000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.07978641797284336,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 1.0067169320393532e-11,
+      "incipient_phase": "liquid",
+      "iterations": 6,
+      "k_max": 25.034585003337735,
+      "k_min": 0.1106413037831999,
+      "k_seed": "stability",
+      "mass_balance_residual": 3.991251773527438e-14,
+      "max_delta_k": 2.419042743895261e-10,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": 6.8473924839836926e-12,
+      "phase_stability_tpd_min_vapor": -6.215456833036342e-13,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -6.215456833036342e-13,
+      "stability_status": "unstable",
+      "stability_trials": 5,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -0.738863639940323
+    },
+    "phase_fractions": {
+      "liquid": 0.1993601442227373,
+      "vapor": 0.8006398557772627
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.024699839314099095,
+        0.28072061503736556,
+        0.6945795456485353
+      ],
+      "vapor": [
+        0.6183502268838221,
+        0.3048005866045061,
+        0.07684918651167166
+      ]
+    },
+    "vapor_fraction": 0.8006398557772627
+  },
+  "phi-phi-grid|Methane-Ethane-Propane|z=(0.5, 0.3, 0.2)|T=200.0|P=3000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.06995180698297318
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.5,
+        0.3,
+        0.2
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Methane-Ethane-Propane|z=(0.5, 0.3, 0.2)|T=200.0|P=8000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.5,
+        0.3,
+        0.2
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Methane-Ethane-Propane|z=(0.5, 0.3, 0.2)|T=240.0|P=1000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.028700998462951155,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 2.0586099491737286e-10,
+      "incipient_phase": "liquid",
+      "iterations": 7,
+      "k_max": 9.040162229646832,
+      "k_min": 0.18794608901112303,
+      "k_seed": "stability",
+      "mass_balance_residual": 8.881784197001252e-15,
+      "max_delta_k": 1.859866927134135e-09,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": 1.3046109664864784e-10,
+      "phase_stability_tpd_min_vapor": -1.2833704893238093e-11,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -1.2833704893238093e-11,
+      "stability_status": "unstable",
+      "stability_trials": 5,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -0.34408894660219896
+    },
+    "phase_fractions": {
+      "liquid": 0.16037640053673385,
+      "vapor": 0.8396235994632661
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.06451021945426448,
+        0.3069154955948803,
+        0.6285742849508551
+      ],
+      "vapor": [
+        0.5831828494567246,
+        0.2986790720363938,
+        0.11813807850688154
+      ]
+    },
+    "vapor_fraction": 0.8396235994632661
+  },
+  "phi-phi-grid|Methane-Ethane-Propane|z=(0.5, 0.3, 0.2)|T=240.0|P=200000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.5,
+        0.3,
+        0.2
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-Ethane-Propane|z=(0.5, 0.3, 0.2)|T=240.0|P=3000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.10308174629879852,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 6.913299932520545e-10,
+      "incipient_phase": "vapor",
+      "iterations": 12,
+      "k_max": 3.0325566708205094,
+      "k_min": 0.11340778307803721,
+      "k_seed": "stability",
+      "mass_balance_residual": 9.869882688917642e-14,
+      "max_delta_k": 2.0941874900870516e-09,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": -5.174972726253474e-10,
+      "phase_stability_tpd_min_vapor": 3.5975184220562495e-11,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -5.174972726253474e-10,
+      "stability_status": "unstable",
+      "stability_trials": 5,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -0.34927702066775673
+    },
+    "phase_fractions": {
+      "liquid": 0.5317095627178787,
+      "vapor": 0.4682904372821213
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.2561702641262199,
+        0.4018426139611814,
+        0.3419871219125986
+      ],
+      "vapor": [
+        0.7768508428047598,
+        0.184365155843058,
+        0.03878400135218233
+      ]
+    },
+    "vapor_fraction": 0.4682904372821213
+  },
+  "phi-phi-grid|Methane-Ethane-Propane|z=(0.5, 0.3, 0.2)|T=240.0|P=8000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.5,
+        0.3,
+        0.2
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Methane-Ethane-Propane|z=(0.5, 0.3, 0.2)|T=280.0|P=1000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.5,
+        0.3,
+        0.2
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-Ethane-Propane|z=(0.5, 0.3, 0.2)|T=280.0|P=200000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.5,
+        0.3,
+        0.2
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-Ethane-Propane|z=(0.5, 0.3, 0.2)|T=280.0|P=3000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.0006975610794528464,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 1.263912863258554e-09,
+      "incipient_phase": "liquid",
+      "iterations": 9,
+      "k_max": 4.002913948185376,
+      "k_min": 0.3311405003218401,
+      "k_seed": "stability",
+      "mass_balance_residual": 6.772360450213455e-15,
+      "max_delta_k": 5.057477991954329e-09,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": 7.317433465392414e-10,
+      "phase_stability_tpd_min_vapor": -2.0850544664520404e-10,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -2.0850544664520404e-10,
+      "stability_status": "unstable",
+      "stability_trials": 5,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -0.035287790647987614
+    },
+    "phase_fractions": {
+      "liquid": 0.03931133504738682,
+      "vapor": 0.9606886649526132
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.12870458791787606,
+        0.31175195953479096,
+        0.559543452547333
+      ],
+      "vapor": [
+        0.5151933908230766,
+        0.2995191103678126,
+        0.1852874988091109
+      ]
+    },
+    "vapor_fraction": 0.9606886649526132
+  },
+  "phi-phi-grid|Methane-Ethane-Propane|z=(0.5, 0.3, 0.2)|T=280.0|P=8000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0003595376558755513
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.5,
+        0.3,
+        0.2
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-Ethane-Propane|z=(0.5, 0.3, 0.2)|T=320.0|P=1000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.5,
+        0.3,
+        0.2
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-Ethane-Propane|z=(0.5, 0.3, 0.2)|T=320.0|P=200000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.5,
+        0.3,
+        0.2
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-Ethane-Propane|z=(0.5, 0.3, 0.2)|T=320.0|P=3000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.5,
+        0.3,
+        0.2
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-Ethane-Propane|z=(0.5, 0.3, 0.2)|T=320.0|P=8000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.5,
+        0.3,
+        0.2
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-Ethane-Propane|z=(0.5, 0.3, 0.2)|T=360.0|P=1000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.5,
+        0.3,
+        0.2
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-Ethane-Propane|z=(0.5, 0.3, 0.2)|T=360.0|P=200000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.5,
+        0.3,
+        0.2
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-Ethane-Propane|z=(0.5, 0.3, 0.2)|T=360.0|P=3000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.5,
+        0.3,
+        0.2
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-Ethane-Propane|z=(0.5, 0.3, 0.2)|T=360.0|P=8000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.5,
+        0.3,
+        0.2
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-Ethane|z=(0.5, 0.5)|T=170.0|P=1000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.008762643960910976,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 2.341906335523447e-09,
+      "incipient_phase": "vapor",
+      "iterations": 10,
+      "k_max": 2.253720155673497,
+      "k_min": 0.0639300553771652,
+      "k_seed": "stability",
+      "mass_balance_residual": 5.773159728050814e-14,
+      "max_delta_k": 5.275926362457994e-09,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": -2.192246628221006e-09,
+      "phase_stability_tpd_min_vapor": 9.087729897001854e-13,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -2.192246628221006e-09,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -0.12064810607479626
+    },
+    "phase_fractions": {
+      "liquid": 0.8646649653983332,
+      "vapor": 0.13533503460166685
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.4274701701722043,
+        0.5725298298277957
+      ],
+      "vapor": [
+        0.9633981362100884,
+        0.036601863789911634
+      ]
+    },
+    "vapor_fraction": 0.13533503460166685
+  },
+  "phi-phi-grid|Methane-Ethane|z=(0.5, 0.5)|T=170.0|P=200000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.19776947000619005,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 1.5478385240186299e-10,
+      "incipient_phase": "liquid",
+      "iterations": 6,
+      "k_max": 11.497592875144967,
+      "k_min": 0.22916007264193983,
+      "k_seed": "stability",
+      "mass_balance_residual": 5.900835375882707e-14,
+      "max_delta_k": 1.7835795063092519e-09,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": 1.192380869323239e-10,
+      "phase_stability_tpd_min_vapor": 3.228629644191513e-13,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": 3.228629644191513e-13,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -0.7949040897070456
+    },
+    "phase_fractions": {
+      "liquid": 0.3989868668932104,
+      "vapor": 0.6010131331067896
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.06840702169937922,
+        0.9315929783006207
+      ],
+      "vapor": [
+        0.7865160854224097,
+        0.21348391457759014
+      ]
+    },
+    "vapor_fraction": 0.6010131331067896
+  },
+  "phi-phi-grid|Methane-Ethane|z=(0.5, 0.5)|T=170.0|P=3000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.5,
+        0.5
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Methane-Ethane|z=(0.5, 0.5)|T=170.0|P=8000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.5,
+        0.5
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Methane-Ethane|z=(0.5, 0.5)|T=200.0|P=1000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.17899708796126812,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 3.296802830732304e-10,
+      "incipient_phase": "liquid",
+      "iterations": 8,
+      "k_max": 4.71228414689515,
+      "k_min": 0.2663434666249123,
+      "k_seed": "stability",
+      "mass_balance_residual": 7.943645741192995e-14,
+      "max_delta_k": 1.5560122079705252e-09,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": 2.417521357489093e-10,
+      "phase_stability_tpd_min_vapor": 4.526576910175077e-13,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": 4.526576910175077e-13,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -0.6649813861888585
+    },
+    "phase_fractions": {
+      "liquid": 0.45317014741158346,
+      "vapor": 0.5468298525884165
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.16501716642083977,
+        0.8349828335791603
+      ],
+      "vapor": [
+        0.7776077775468438,
+        0.22239222245315607
+      ]
+    },
+    "vapor_fraction": 0.5468298525884165
+  },
+  "phi-phi-grid|Methane-Ethane|z=(0.5, 0.5)|T=200.0|P=200000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.5,
+        0.5
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-Ethane|z=(0.5, 0.5)|T=200.0|P=3000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.08157638187196786
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.5,
+        0.5
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Methane-Ethane|z=(0.5, 0.5)|T=200.0|P=8000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.5,
+        0.5
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Methane-Ethane|z=(0.5, 0.5)|T=240.0|P=1000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.5,
+        0.5
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-Ethane|z=(0.5, 0.5)|T=240.0|P=200000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.5,
+        0.5
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-Ethane|z=(0.5, 0.5)|T=240.0|P=3000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.030927393470532527,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 1.6855069562282665e-09,
+      "incipient_phase": "liquid",
+      "iterations": 10,
+      "k_max": 2.731457761505854,
+      "k_min": 0.4809466893117552,
+      "k_seed": "stability",
+      "mass_balance_residual": 9.43689570931383e-15,
+      "max_delta_k": 4.604180148248815e-09,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": 8.859331716903715e-10,
+      "phase_stability_tpd_min_vapor": -2.3008337095973026e-11,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -2.3008337095973026e-11,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -0.17630943293481124
+    },
+    "phase_fractions": {
+      "liquid": 0.32548181984748226,
+      "vapor": 0.6745181801525177
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.2306379720657268,
+        0.7693620279342732
+      ],
+      "vapor": [
+        0.6299778799587319,
+        0.37002212004126817
+      ]
+    },
+    "vapor_fraction": 0.6745181801525177
+  },
+  "phi-phi-grid|Methane-Ethane|z=(0.5, 0.5)|T=240.0|P=8000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.5,
+        0.5
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Methane-Ethane|z=(0.5, 0.5)|T=280.0|P=1000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.5,
+        0.5
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-Ethane|z=(0.5, 0.5)|T=280.0|P=200000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.5,
+        0.5
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-Ethane|z=(0.5, 0.5)|T=280.0|P=3000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.5,
+        0.5
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-Ethane|z=(0.5, 0.5)|T=280.0|P=8000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.5,
+        0.5
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-Ethane|z=(0.5, 0.5)|T=320.0|P=1000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.5,
+        0.5
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-Ethane|z=(0.5, 0.5)|T=320.0|P=200000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.5,
+        0.5
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-Ethane|z=(0.5, 0.5)|T=320.0|P=3000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.5,
+        0.5
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-Ethane|z=(0.5, 0.5)|T=320.0|P=8000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.5,
+        0.5
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-Ethane|z=(0.5, 0.5)|T=360.0|P=1000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.5,
+        0.5
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-Ethane|z=(0.5, 0.5)|T=360.0|P=200000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.5,
+        0.5
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-Ethane|z=(0.5, 0.5)|T=360.0|P=3000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.5,
+        0.5
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-Ethane|z=(0.5, 0.5)|T=360.0|P=8000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.5,
+        0.5
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-Propane|z=(0.7, 0.3)|T=170.0|P=1000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.13641417360714092,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 2.330148254903186e-09,
+      "incipient_phase": "vapor",
+      "iterations": 11,
+      "k_max": 2.459557151832498,
+      "k_min": 0.004147820785186352,
+      "k_seed": "stability",
+      "mass_balance_residual": 1.2989609388114332e-14,
+      "max_delta_k": 5.731346952586591e-09,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": -2.3204829015613993e-09,
+      "phase_stability_tpd_min_vapor": -8.894459676915981e-14,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -2.3204829015613993e-09,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -0.40700075139375325
+    },
+    "phase_fractions": {
+      "liquid": 0.5026262301289535,
+      "vapor": 0.49737376987104653
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.40557481351206454,
+        0.5944251864879355
+      ],
+      "vapor": [
+        0.9975344308523268,
+        0.0024655691476731913
+      ]
+    },
+    "vapor_fraction": 0.49737376987104653
+  },
+  "phi-phi-grid|Methane-Propane|z=(0.7, 0.3)|T=170.0|P=200000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.7223807880349652,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 1.9523786060071657e-10,
+      "incipient_phase": "liquid",
+      "iterations": 6,
+      "k_max": 12.342728613566031,
+      "k_min": 0.012941036333445389,
+      "k_seed": "stability",
+      "mass_balance_residual": 1.2156942119645464e-13,
+      "max_delta_k": 2.402142484925207e-09,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": 1.9272167469910987e-10,
+      "phase_stability_tpd_min_vapor": -6.195767485189233e-13,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -6.195767485189233e-13,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -3.120970450286199
+    },
+    "phase_fractions": {
+      "liquid": 0.31727117072568944,
+      "vapor": 0.6827288292743106
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.08005482310956248,
+        0.9199451768904374
+      ],
+      "vapor": [
+        0.9880949560412773,
+        0.011905043958722696
+      ]
+    },
+    "vapor_fraction": 0.6827288292743106
+  },
+  "phi-phi-grid|Methane-Propane|z=(0.7, 0.3)|T=170.0|P=3000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.7,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Methane-Propane|z=(0.7, 0.3)|T=170.0|P=8000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.7,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Methane-Propane|z=(0.7, 0.3)|T=200.0|P=1000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.5091905771224945,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 4.693635757835324e-10,
+      "incipient_phase": "liquid",
+      "iterations": 8,
+      "k_max": 5.239703731980441,
+      "k_min": 0.029354449940102556,
+      "k_seed": "stability",
+      "mass_balance_residual": 4.285460875053104e-14,
+      "max_delta_k": 2.458076409084242e-09,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": 4.555925892925621e-10,
+      "phase_stability_tpd_min_vapor": -2.4956846417992147e-13,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -2.4956846417992147e-13,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -2.2359352335804497
+    },
+    "phase_fractions": {
+      "liquid": 0.349590126226758,
+      "vapor": 0.650409873773242
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.18629183900396906,
+        0.813708160996031
+      ],
+      "vapor": [
+        0.9761140445247486,
+        0.02388595547525142
+      ]
+    },
+    "vapor_fraction": 0.650409873773242
+  },
+  "phi-phi-grid|Methane-Propane|z=(0.7, 0.3)|T=200.0|P=200000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.13996145420952866,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 1.459611598253474e-10,
+      "incipient_phase": "liquid",
+      "iterations": 5,
+      "k_max": 25.583949439989382,
+      "k_min": 0.10962505022338716,
+      "k_seed": "stability",
+      "mass_balance_residual": 1.0047518372857667e-13,
+      "max_delta_k": 3.717168794992176e-09,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": 1.3221239887614826e-10,
+      "phase_stability_tpd_min_vapor": -2.0542046106483444e-11,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -2.0542046106483444e-11,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -1.0059618162342847
+    },
+    "phase_fractions": {
+      "liquid": 0.22601744369057997,
+      "vapor": 0.77398255630942
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.034951857251299595,
+        0.9650481427487003
+      ],
+      "vapor": [
+        0.8942065488814946,
+        0.10579345111850533
+      ]
+    },
+    "vapor_fraction": 0.77398255630942
+  },
+  "phi-phi-grid|Methane-Propane|z=(0.7, 0.3)|T=200.0|P=3000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.03298053331199946,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 5.432741367883409e-09,
+      "incipient_phase": "vapor",
+      "iterations": 15,
+      "k_max": 1.8202826261929912,
+      "k_min": 0.024854426324411722,
+      "k_seed": "stability",
+      "mass_balance_residual": 5.617728504603292e-14,
+      "max_delta_k": 8.319479771756733e-09,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": -4.457389656950461e-09,
+      "phase_stability_tpd_min_vapor": 5.539998305137648e-13,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -4.457389656950461e-09,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -0.15287205934832745
+    },
+    "phase_fractions": {
+      "liquid": 0.6478860685838299,
+      "vapor": 0.3521139314161701
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.543127025744809,
+        0.45687297425519113
+      ],
+      "vapor": [
+        0.9886446842600689,
+        0.011355315739930996
+      ]
+    },
+    "vapor_fraction": 0.3521139314161701
+  },
+  "phi-phi-grid|Methane-Propane|z=(0.7, 0.3)|T=200.0|P=8000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.7,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Methane-Propane|z=(0.7, 0.3)|T=240.0|P=1000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.05201876722529075,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 6.809136587904163e-11,
+      "incipient_phase": "liquid",
+      "iterations": 7,
+      "k_max": 9.410383186489478,
+      "k_min": 0.18275645725178627,
+      "k_seed": "stability",
+      "mass_balance_residual": 1.63202784619898e-14,
+      "max_delta_k": 6.393783280600474e-10,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": 6.499199865944178e-11,
+      "phase_stability_tpd_min_vapor": -5.114551559263749e-11,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -5.114551559263749e-11,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -0.5144809610614429
+    },
+    "phase_fractions": {
+      "liquid": 0.17913237707944063,
+      "vapor": 0.8208676229205594
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.08856486794093944,
+        0.9114351320590607
+      ],
+      "vapor": [
+        0.8334293442418268,
+        0.16657065575817323
+      ]
+    },
+    "vapor_fraction": 0.8208676229205594
+  },
+  "phi-phi-grid|Methane-Propane|z=(0.7, 0.3)|T=240.0|P=200000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.8688976236368007
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.7,
+        0.3
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-Propane|z=(0.7, 0.3)|T=240.0|P=3000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.19252943644194764,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 5.287567605982701e-10,
+      "incipient_phase": "liquid",
+      "iterations": 11,
+      "k_max": 3.2745934166761184,
+      "k_min": 0.10265139135420802,
+      "k_seed": "stability",
+      "mass_balance_residual": 1.1868284133242923e-13,
+      "max_delta_k": 1.7288166453965914e-09,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": 4.746094826779807e-10,
+      "phase_stability_tpd_min_vapor": -1.2695236835430104e-12,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -1.2695236835430104e-12,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -0.9111075811911029
+    },
+    "phase_fractions": {
+      "liquid": 0.3518158293918532,
+      "vapor": 0.6481841706081468
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.2829019575413311,
+        0.7170980424586689
+      ],
+      "vapor": [
+        0.9263888882194637,
+        0.07361111178053625
+      ]
+    },
+    "vapor_fraction": 0.6481841706081468
+  },
+  "phi-phi-grid|Methane-Propane|z=(0.7, 0.3)|T=240.0|P=8000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0081019949250005
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.7,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Methane-Propane|z=(0.7, 0.3)|T=280.0|P=1000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.6089135636384915
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.7,
+        0.3
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-Propane|z=(0.7, 0.3)|T=280.0|P=200000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.7,
+        0.3
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-Propane|z=(0.7, 0.3)|T=280.0|P=3000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.003931212839408227,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 2.1753516765699032e-09,
+      "incipient_phase": "liquid",
+      "iterations": 9,
+      "k_max": 4.319697595892442,
+      "k_min": 0.3108106713894414,
+      "k_seed": "stability",
+      "mass_balance_residual": 7.993605777301127e-15,
+      "max_delta_k": 1.0928431493084645e-09,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": 7.476121713977791e-10,
+      "phase_stability_tpd_min_vapor": -1.8448327723664947e-09,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -1.8448327723664947e-09,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -0.10187655618115352
+    },
+    "phase_fractions": {
+      "liquid": 0.07468360709208355,
+      "vapor": 0.9253163929079165
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.17191538221008518,
+        0.8280846177899148
+      ],
+      "vapor": [
+        0.742622463417561,
+        0.25737753658243906
+      ]
+    },
+    "vapor_fraction": 0.9253163929079165
+  },
+  "phi-phi-grid|Methane-Propane|z=(0.7, 0.3)|T=280.0|P=8000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.007748856035650231,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 6.5070970833858155e-09,
+      "incipient_phase": "liquid",
+      "iterations": 32,
+      "k_max": 1.5859768891671713,
+      "k_min": 0.3920237583183644,
+      "k_seed": "stability",
+      "mass_balance_residual": 8.326672684688674e-16,
+      "max_delta_k": 7.078560848583493e-09,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": -2.3525364063892737e-09,
+      "phase_stability_tpd_min_vapor": -9.208660143539913e-10,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -2.3525364063892737e-09,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -0.019040598715242267
+    },
+    "phase_fractions": {
+      "liquid": 0.3606048046312935,
+      "vapor": 0.6393951953687065
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.5092128227863921,
+        0.4907871772136079
+      ],
+      "vapor": [
+        0.8075997650022934,
+        0.1924002349977067
+      ]
+    },
+    "vapor_fraction": 0.6393951953687065
+  },
+  "phi-phi-grid|Methane-Propane|z=(0.7, 0.3)|T=320.0|P=1000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.7,
+        0.3
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-Propane|z=(0.7, 0.3)|T=320.0|P=200000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.7,
+        0.3
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-Propane|z=(0.7, 0.3)|T=320.0|P=3000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.7,
+        0.3
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-Propane|z=(0.7, 0.3)|T=320.0|P=8000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.7,
+        0.3
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-Propane|z=(0.7, 0.3)|T=360.0|P=1000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.7,
+        0.3
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-Propane|z=(0.7, 0.3)|T=360.0|P=200000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.7,
+        0.3
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-Propane|z=(0.7, 0.3)|T=360.0|P=3000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.7,
+        0.3
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-Propane|z=(0.7, 0.3)|T=360.0|P=8000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.7,
+        0.3
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-n-Pentane|z=(0.6, 0.4)|T=170.0|P=1000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.08382381390415539,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 5.239092354392128e-10,
+      "incipient_phase": "vapor",
+      "iterations": 10,
+      "k_max": 2.6467583737762497,
+      "k_min": 2.0385478173023237e-05,
+      "k_seed": "stability",
+      "mass_balance_residual": 3.574918139293004e-14,
+      "max_delta_k": 1.385997538960737e-09,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": -5.239021924654471e-10,
+      "phase_stability_tpd_min_vapor": 2.461790646562724e-13,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -5.239021924654471e-10,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -0.37456566183288215
+    },
+    "phase_fractions": {
+      "liquid": 0.6428892206176897,
+      "vapor": 0.3571107793823103
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.3778158697486861,
+        0.6221841302513138
+      ],
+      "vapor": [
+        0.9999873164789892,
+        1.2683521010869625e-05
+      ]
+    },
+    "vapor_fraction": 0.3571107793823103
+  },
+  "phi-phi-grid|Methane-n-Pentane|z=(0.6, 0.4)|T=170.0|P=200000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.8340393717487835,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 2.1421625237549868e-10,
+      "incipient_phase": "vapor",
+      "iterations": 6,
+      "k_max": 12.769387945564572,
+      "k_min": 4.799619816436328e-05,
+      "k_seed": "stability",
+      "mass_balance_residual": 1.8918200339612667e-13,
+      "max_delta_k": 2.7247413214581684e-09,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": -2.1420604137810848e-10,
+      "phase_stability_tpd_min_vapor": 8.248674540199029e-13,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -2.1420604137810848e-10,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -1.8688809116187433
+    },
+    "phase_fractions": {
+      "liquid": 0.4339576751272034,
+      "vapor": 0.5660423248727966
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.07830882473026002,
+        0.92169117526974
+      ],
+      "vapor": [
+        0.9999557623277046,
+        4.423767229535647e-05
+      ]
+    },
+    "vapor_fraction": 0.5660423248727966
+  },
+  "phi-phi-grid|Methane-n-Pentane|z=(0.6, 0.4)|T=170.0|P=3000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.6,
+        0.4
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Methane-n-Pentane|z=(0.6, 0.4)|T=170.0|P=8000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.6,
+        0.4
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Methane-n-Pentane|z=(0.6, 0.4)|T=200.0|P=1000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.3950899515595552,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 1.3472294113636707e-10,
+      "incipient_phase": "vapor",
+      "iterations": 8,
+      "k_max": 5.660566337101062,
+      "k_min": 0.00039987361325940905,
+      "k_seed": "stability",
+      "mass_balance_residual": 4.3853809472693683e-14,
+      "max_delta_k": 7.614016084289688e-10,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": -1.346694131158652e-10,
+      "phase_stability_tpd_min_vapor": 2.1679248014689078e-13,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -1.346694131158652e-10,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -1.0477683414211603
+    },
+    "phase_fractions": {
+      "liquid": 0.4855864591131649,
+      "vapor": 0.5144135408868351
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.17660260223255955,
+        0.8233973977674405
+      ],
+      "vapor": [
+        0.9996707451073968,
+        0.0003292548926030889
+      ]
+    },
+    "vapor_fraction": 0.5144135408868351
+  },
+  "phi-phi-grid|Methane-n-Pentane|z=(0.6, 0.4)|T=200.0|P=200000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -1.2526789508707263,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 1.1260669480206431e-11,
+      "incipient_phase": "vapor",
+      "iterations": 6,
+      "k_max": 27.120229875215394,
+      "k_min": 0.001238540135248279,
+      "k_seed": "stability",
+      "mass_balance_residual": 1.9229062786507711e-13,
+      "max_delta_k": 2.830589096447511e-10,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": -1.1247693865182633e-11,
+      "phase_stability_tpd_min_vapor": 8.227735558971055e-13,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -1.1247693865182633e-11,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -2.5763828154354997
+    },
+    "phase_fractions": {
+      "liquid": 0.4145697552976344,
+      "vapor": 0.5854302447023656
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.03682885722169312,
+        0.9631711427783068
+      ],
+      "vapor": [
+        0.9988070738825567,
+        0.0011929261174433781
+      ]
+    },
+    "vapor_fraction": 0.5854302447023656
+  },
+  "phi-phi-grid|Methane-n-Pentane|z=(0.6, 0.4)|T=200.0|P=3000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.020950937203935815,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 3.1352602736234303e-09,
+      "incipient_phase": "vapor",
+      "iterations": 12,
+      "k_max": 2.0769989274904783,
+      "k_min": 0.0005613756266900429,
+      "k_seed": "stability",
+      "mass_balance_residual": 8.459899447643693e-14,
+      "max_delta_k": 6.510011196780852e-09,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": -3.1335010298068416e-09,
+      "phase_stability_tpd_min_vapor": 9.242681835532812e-13,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -3.1335010298068416e-09,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -0.15882086354457464
+    },
+    "phase_fractions": {
+      "liquid": 0.7710654002421506,
+      "vapor": 0.22893459975784936
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.481323710703327,
+        0.518676289296673
+      ],
+      "vapor": [
+        0.9997088277722002,
+        0.00029117222779982487
+      ]
+    },
+    "vapor_fraction": 0.22893459975784936
+  },
+  "phi-phi-grid|Methane-n-Pentane|z=(0.6, 0.4)|T=200.0|P=8000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.6,
+        0.4
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Methane-n-Pentane|z=(0.6, 0.4)|T=240.0|P=1000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.7029991999627596,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 2.0033700393051745e-10,
+      "incipient_phase": "vapor",
+      "iterations": 7,
+      "k_max": 10.57248191765325,
+      "k_min": 0.006383266479525545,
+      "k_seed": "stability",
+      "mass_balance_residual": 1.149080830487037e-13,
+      "max_delta_k": 2.1125838856050905e-09,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": -1.9905991965774936e-10,
+      "phase_stability_tpd_min_vapor": 5.190353805846739e-13,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -1.9905991965774936e-10,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -1.5790560556447575
+    },
+    "phase_fractions": {
+      "liquid": 0.43793188154040763,
+      "vapor": 0.5620681184595924
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.09403818443519465,
+        0.9059618155648053
+      ],
+      "vapor": [
+        0.9942170043108581,
+        0.00578299568914187
+      ]
+    },
+    "vapor_fraction": 0.5620681184595924
+  },
+  "phi-phi-grid|Methane-n-Pentane|z=(0.6, 0.4)|T=240.0|P=200000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.8352437067411658,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 9.277023593767808e-12,
+      "incipient_phase": "liquid",
+      "iterations": 5,
+      "k_max": 51.25514022523871,
+      "k_min": 0.023604560588333563,
+      "k_seed": "stability",
+      "mass_balance_residual": 2.013944566670034e-13,
+      "max_delta_k": 3.4139446825065534e-10,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": -7.153167040072994e-12,
+      "phase_stability_tpd_min_vapor": -8.952940901690659e-12,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -8.952940901690659e-12,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -2.7798432797464323
+    },
+    "phase_fractions": {
+      "liquid": 0.39345426139789197,
+      "vapor": 0.606545738602108
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.019058484715548538,
+        0.9809415152844514
+      ],
+      "vapor": [
+        0.9768453065686417,
+        0.02315469343135837
+      ]
+    },
+    "vapor_fraction": 0.606545738602108
+  },
+  "phi-phi-grid|Methane-n-Pentane|z=(0.6, 0.4)|T=240.0|P=3000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.20299738740977258,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 3.2681460315764355e-10,
+      "incipient_phase": "vapor",
+      "iterations": 10,
+      "k_max": 3.7974864808999444,
+      "k_min": 0.004746369825852325,
+      "k_seed": "stability",
+      "mass_balance_residual": 2.2870594307278225e-14,
+      "max_delta_k": 1.240598290763728e-09,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": -3.252636358601425e-10,
+      "phase_stability_tpd_min_vapor": 1.2934675396825014e-13,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -3.252636358601425e-10,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -0.6280661603773321
+    },
+    "phase_fractions": {
+      "liquid": 0.5401240957407936,
+      "vapor": 0.45987590425920644
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.2624101840232757,
+        0.7375898159767242
+      ],
+      "vapor": [
+        0.9964991259531857,
+        0.003500874046814319
+      ]
+    },
+    "vapor_fraction": 0.45987590425920644
+  },
+  "phi-phi-grid|Methane-n-Pentane|z=(0.6, 0.4)|T=240.0|P=8000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.0001457513711340397,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 5.517133416788056e-09,
+      "incipient_phase": "vapor",
+      "iterations": 17,
+      "k_max": 1.6838637832197008,
+      "k_min": 0.02013580832515565,
+      "k_seed": "stability",
+      "mass_balance_residual": 6.6058269965196814e-15,
+      "max_delta_k": 6.483429570991461e-09,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": -3.772193469608465e-09,
+      "phase_stability_tpd_min_vapor": -4.594119088956076e-13,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -3.772193469608465e-09,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -0.010445717743497953
+    },
+    "phase_fractions": {
+      "liquid": 0.9725820561725413,
+      "vapor": 0.027417943827458657
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.5889569750783005,
+        0.41104302492169936
+      ],
+      "vapor": [
+        0.991723316391121,
+        0.008276683608879084
+      ]
+    },
+    "vapor_fraction": 0.027417943827458657
+  },
+  "phi-phi-grid|Methane-n-Pentane|z=(0.6, 0.4)|T=280.0|P=1000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.5899048826428143,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 1.3981313884414703e-09,
+      "incipient_phase": "liquid",
+      "iterations": 6,
+      "k_max": 15.334728017127986,
+      "k_min": 0.04345360789137582,
+      "k_seed": "stability",
+      "mass_balance_residual": 4.268807529683727e-14,
+      "max_delta_k": 4.683160526042229e-09,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": -2.358118502502155e-10,
+      "phase_stability_tpd_min_vapor": -1.2915847377145515e-09,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -1.2915847377145515e-09,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -2.032269526806221
+    },
+    "phase_fractions": {
+      "liquid": 0.4006477008974798,
+      "vapor": 0.5993522991025202
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.06255504719519253,
+        0.9374449528048074
+      ],
+      "vapor": [
+        0.9592646345441171,
+        0.040735365455882785
+      ]
+    },
+    "vapor_fraction": 0.5993522991025202
+  },
+  "phi-phi-grid|Methane-n-Pentane|z=(0.6, 0.4)|T=280.0|P=200000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.1380626805261861,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 2.089683981409962e-11,
+      "incipient_phase": "liquid",
+      "iterations": 6,
+      "k_max": 74.97703047580072,
+      "k_min": 0.17603894015645477,
+      "k_seed": "stability",
+      "mass_balance_residual": 1.5132339825640884e-13,
+      "max_delta_k": 3.44712702826655e-10,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": -9.238460064440816e-13,
+      "phase_stability_tpd_min_vapor": -2.0610802689235148e-11,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -2.0610802689235148e-11,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -0.8056710524504208
+    },
+    "phase_fractions": {
+      "liquid": 0.27721733154339745,
+      "vapor": 0.7227826684566026
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.011015376172544911,
+        0.9889846238274551
+      ],
+      "vapor": [
+        0.8259001949867466,
+        0.17409980501325345
+      ]
+    },
+    "vapor_fraction": 0.7227826684566026
+  },
+  "phi-phi-grid|Methane-n-Pentane|z=(0.6, 0.4)|T=280.0|P=3000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.3396741275953876,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 9.54350140580651e-10,
+      "incipient_phase": "vapor",
+      "iterations": 9,
+      "k_max": 5.378347077737107,
+      "k_min": 0.02478858613632848,
+      "k_seed": "stability",
+      "mass_balance_residual": 1.3999912340523224e-13,
+      "max_delta_k": 5.129042079943247e-09,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": -9.306821207983411e-10,
+      "phase_stability_tpd_min_vapor": -4.552790731269209e-13,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -9.306821207983411e-10,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -0.8393808578436424
+    },
+    "phase_fractions": {
+      "liquid": 0.47610747035651,
+      "vapor": 0.52389252964349
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.1821613448931896,
+        0.8178386551068103
+      ],
+      "vapor": [
+        0.979726936047945,
+        0.020273063952054853
+      ]
+    },
+    "vapor_fraction": 0.52389252964349
+  },
+  "phi-phi-grid|Methane-n-Pentane|z=(0.6, 0.4)|T=280.0|P=8000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.033734157906602835,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 1.3895881112446773e-09,
+      "incipient_phase": "vapor",
+      "iterations": 16,
+      "k_max": 2.2509499512439977,
+      "k_min": 0.0394003058364038,
+      "k_seed": "stability",
+      "mass_balance_residual": 1.0197398481182063e-13,
+      "max_delta_k": 3.1259004273920254e-09,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": -1.3348722534058997e-09,
+      "phase_stability_tpd_min_vapor": 8.647987253907275e-13,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -1.3348722534058997e-09,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -0.17475040804646721
+    },
+    "phase_fractions": {
+      "liquid": 0.695147180074855,
+      "vapor": 0.304852819925145
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.43435592662059697,
+        0.5656440733794031
+      ],
+      "vapor": [
+        0.9777134504905552,
+        0.022286549509444684
+      ]
+    },
+    "vapor_fraction": 0.304852819925145
+  },
+  "phi-phi-grid|Methane-n-Pentane|z=(0.6, 0.4)|T=320.0|P=1000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.13926519332444875,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 2.2773516406005e-10,
+      "incipient_phase": "liquid",
+      "iterations": 8,
+      "k_max": 18.80397233260744,
+      "k_min": 0.17529419233713736,
+      "k_seed": "stability",
+      "mass_balance_residual": 2.7977620220553945e-14,
+      "max_delta_k": 8.62591775785404e-10,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": -1.7639099968859597e-13,
+      "phase_stability_tpd_min_vapor": -2.1561485657090804e-10,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -2.1561485657090804e-10,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -0.7624939768300947
+    },
+    "phase_fractions": {
+      "liquid": 0.2949347333651531,
+      "vapor": 0.7050652666348469
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.044270763682380775,
+        0.9557292363176192
+      ],
+      "vapor": [
+        0.8324662153885605,
+        0.1675337846114395
+      ]
+    },
+    "vapor_fraction": 0.7050652666348469
+  },
+  "phi-phi-grid|Methane-n-Pentane|z=(0.6, 0.4)|T=320.0|P=200000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.5860332956245021
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.6,
+        0.4
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-n-Pentane|z=(0.6, 0.4)|T=320.0|P=3000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.3165951956463955,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 4.389976826502107e-09,
+      "incipient_phase": "liquid",
+      "iterations": 9,
+      "k_max": 6.496149837195699,
+      "k_min": 0.0873951564067547,
+      "k_seed": "stability",
+      "mass_balance_residual": 1.8030021919912542e-13,
+      "max_delta_k": 3.7980019129690845e-09,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": -2.1092824319667474e-10,
+      "phase_stability_tpd_min_vapor": -3.6817275360490517e-09,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -3.6817275360490517e-09,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -1.0428873229866178
+    },
+    "phase_fractions": {
+      "liquid": 0.41531951292472513,
+      "vapor": 0.5846804870752749
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.14239971558590347,
+        0.8576002844140965
+      ],
+      "vapor": [
+        0.9250498886801235,
+        0.07495011131987654
+      ]
+    },
+    "vapor_fraction": 0.5846804870752749
+  },
+  "phi-phi-grid|Methane-n-Pentane|z=(0.6, 0.4)|T=320.0|P=8000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.06275383268482937,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 2.568705081973377e-09,
+      "incipient_phase": "vapor",
+      "iterations": 16,
+      "k_max": 2.602222841934638,
+      "k_min": 0.09389479700888394,
+      "k_seed": "stability",
+      "mass_balance_residual": 3.630429290524262e-14,
+      "max_delta_k": 6.6836696177574595e-09,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": -2.325490908452952e-09,
+      "phase_stability_tpd_min_vapor": -2.1581633445522487e-11,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -2.325490908452952e-09,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -0.20054805479266058
+    },
+    "phase_fractions": {
+      "liquid": 0.58747839858097,
+      "vapor": 0.41252160141903005
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.36123871722026996,
+        0.63876128277973
+      ],
+      "vapor": [
+        0.9400236389271103,
+        0.05997636107288977
+      ]
+    },
+    "vapor_fraction": 0.41252160141903005
+  },
+  "phi-phi-grid|Methane-n-Pentane|z=(0.6, 0.4)|T=360.0|P=1000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.16310596418732648
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.6,
+        0.4
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-n-Pentane|z=(0.6, 0.4)|T=360.0|P=200000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 4,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.6,
+        0.4
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Methane-n-Pentane|z=(0.6, 0.4)|T=360.0|P=3000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.07389545072031589,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 5.172556161170405e-09,
+      "incipient_phase": "liquid",
+      "iterations": 11,
+      "k_max": 6.8697667766600645,
+      "k_min": 0.23348562992994712,
+      "k_seed": "stability",
+      "mass_balance_residual": 1.268984917146554e-13,
+      "max_delta_k": 9.247449028748633e-09,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": 8.355769407928746e-13,
+      "phase_stability_tpd_min_vapor": -4.419733431921244e-09,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -4.419733431921244e-09,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -0.4283877231089865
+    },
+    "phase_fractions": {
+      "liquid": 0.28538161692813446,
+      "vapor": 0.7146183830718655
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.11550360105627828,
+        0.8844963989437216
+      ],
+      "vapor": [
+        0.7934828000536336,
+        0.20651719994636641
+      ]
+    },
+    "vapor_fraction": 0.7146183830718655
+  },
+  "phi-phi-grid|Methane-n-Pentane|z=(0.6, 0.4)|T=360.0|P=8000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.05141404914465131,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 5.6720885766026186e-09,
+      "incipient_phase": "vapor",
+      "iterations": 20,
+      "k_max": 2.648438302199469,
+      "k_min": 0.20910807671631917,
+      "k_seed": "stability",
+      "mass_balance_residual": 2.120525977034049e-14,
+      "max_delta_k": 8.362904591052711e-09,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": -1.9100773411690513e-09,
+      "phase_stability_tpd_min_vapor": -2.80920668620951e-09,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -2.80920668620951e-09,
+      "stability_status": "unstable",
+      "stability_trials": 4,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -0.06153467688129105
+    },
+    "phase_fractions": {
+      "liquid": 0.4840167536640365,
+      "vapor": 0.5159832463359635
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.32422503395870006,
+        0.6757749660412999
+      ],
+      "vapor": [
+        0.8586899957565449,
+        0.14131000424345502
+      ]
+    },
+    "vapor_fraction": 0.5159832463359635
+  },
+  "phi-phi-grid|Propane-n-Butane-n-Pentane|z=(0.4, 0.3, 0.3)|T=170.0|P=1000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.4,
+        0.3,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Propane-n-Butane-n-Pentane|z=(0.4, 0.3, 0.3)|T=170.0|P=200000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.4,
+        0.3,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Propane-n-Butane-n-Pentane|z=(0.4, 0.3, 0.3)|T=170.0|P=3000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.4,
+        0.3,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Propane-n-Butane-n-Pentane|z=(0.4, 0.3, 0.3)|T=170.0|P=8000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.4,
+        0.3,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Propane-n-Butane-n-Pentane|z=(0.4, 0.3, 0.3)|T=200.0|P=1000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.4,
+        0.3,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Propane-n-Butane-n-Pentane|z=(0.4, 0.3, 0.3)|T=200.0|P=200000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.4,
+        0.3,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Propane-n-Butane-n-Pentane|z=(0.4, 0.3, 0.3)|T=200.0|P=3000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.4,
+        0.3,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Propane-n-Butane-n-Pentane|z=(0.4, 0.3, 0.3)|T=200.0|P=8000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.4,
+        0.3,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Propane-n-Butane-n-Pentane|z=(0.4, 0.3, 0.3)|T=240.0|P=1000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.4,
+        0.3,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Propane-n-Butane-n-Pentane|z=(0.4, 0.3, 0.3)|T=240.0|P=200000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.4,
+        0.3,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Propane-n-Butane-n-Pentane|z=(0.4, 0.3, 0.3)|T=240.0|P=3000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.4,
+        0.3,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Propane-n-Butane-n-Pentane|z=(0.4, 0.3, 0.3)|T=240.0|P=8000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.4,
+        0.3,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Propane-n-Butane-n-Pentane|z=(0.4, 0.3, 0.3)|T=280.0|P=1000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.4,
+        0.3,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Propane-n-Butane-n-Pentane|z=(0.4, 0.3, 0.3)|T=280.0|P=200000.0": {
+    "diagnostics": {
+      "converged": true,
+      "delta_g_split_rt": -0.049024618962359545,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "fugacity_residual": 2.1904442704112626e-09,
+      "incipient_phase": "vapor",
+      "iterations": 4,
+      "k_max": 2.6756138981257016,
+      "k_min": 0.1822920670298364,
+      "k_seed": "stability",
+      "mass_balance_residual": 1.8263168755083825e-14,
+      "max_delta_k": 5.860270047008953e-09,
+      "phase_count": 2,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "VLE",
+      "phase_stability_liquid": "stable",
+      "phase_stability_tpd_min_liquid": -1.4582860417213443e-09,
+      "phase_stability_tpd_min_vapor": 6.206802675952459e-11,
+      "phase_stability_vapor": "stable",
+      "phase_state": "two_phase",
+      "post_split_checked": true,
+      "post_split_stable": true,
+      "post_split_status": "stable",
+      "post_split_tpd_min": -1.4582860417213443e-09,
+      "stability_status": "unstable",
+      "stability_trials": 5,
+      "termination_reason": "tolerance_met",
+      "tpd_min": -0.28386103311241584
+    },
+    "phase_fractions": {
+      "liquid": 0.6786218642755557,
+      "vapor": 0.3213781357244443
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": [
+        0.2599925421714909,
+        0.33306587490228085,
+        0.4069415829262282
+      ],
+      "vapor": [
+        0.6956396577193137,
+        0.23017811986648753,
+        0.07418222241419882
+      ]
+    },
+    "vapor_fraction": 0.3213781357244443
+  },
+  "phi-phi-grid|Propane-n-Butane-n-Pentane|z=(0.4, 0.3, 0.3)|T=280.0|P=3000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.4,
+        0.3,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Propane-n-Butane-n-Pentane|z=(0.4, 0.3, 0.3)|T=280.0|P=8000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.4,
+        0.3,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Propane-n-Butane-n-Pentane|z=(0.4, 0.3, 0.3)|T=320.0|P=1000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.2201452449115259
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.4,
+        0.3,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Propane-n-Butane-n-Pentane|z=(0.4, 0.3, 0.3)|T=320.0|P=200000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.4,
+        0.3,
+        0.3
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Propane-n-Butane-n-Pentane|z=(0.4, 0.3, 0.3)|T=320.0|P=3000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.4,
+        0.3,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Propane-n-Butane-n-Pentane|z=(0.4, 0.3, 0.3)|T=320.0|P=8000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.4,
+        0.3,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Propane-n-Butane-n-Pentane|z=(0.4, 0.3, 0.3)|T=360.0|P=1000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0014404144498556845
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.4,
+        0.3,
+        0.3
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Propane-n-Butane-n-Pentane|z=(0.4, 0.3, 0.3)|T=360.0|P=200000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "vapor",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "vapor",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": [
+        0.4,
+        0.3,
+        0.3
+      ]
+    },
+    "vapor_fraction": 1.0
+  },
+  "phi-phi-grid|Propane-n-Butane-n-Pentane|z=(0.4, 0.3, 0.3)|T=360.0|P=3000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.4,
+        0.3,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  },
+  "phi-phi-grid|Propane-n-Butane-n-Pentane|z=(0.4, 0.3, 0.3)|T=360.0|P=8000000.0": {
+    "diagnostics": {
+      "converged": true,
+      "feed_branch": "liquid",
+      "flash_mode": "phi-phi",
+      "iterations": 0,
+      "phase_count": 1,
+      "phase_detection": "tangent-plane",
+      "phase_label_method": "compressibility",
+      "phase_regime": "single-phase",
+      "phase_state": "liquid",
+      "stability_status": "stable",
+      "stability_trials": 5,
+      "termination_reason": "feed_stable_tangent_plane",
+      "tpd_min": 0.0
+    },
+    "phase_fractions": {
+      "liquid": 1.0
+    },
+    "phase_names": [
+      "liquid"
+    ],
+    "phases": {
+      "liquid": [
+        0.4,
+        0.3,
+        0.3
+      ]
+    },
+    "vapor_fraction": 0.0
+  }
+}

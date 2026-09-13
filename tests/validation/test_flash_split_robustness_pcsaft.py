@@ -106,8 +106,15 @@ def _flash(
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.slow
 def test_the_whole_grid_answers_and_every_answer_is_verified() -> None:
-    """Case F-4: 0 `ConvergenceError`s, and every answer carries its invariants."""
+    """Case F-4: 0 `ConvergenceError`s, and every answer carries its invariants.
+
+    The full 188-state grid; deselected by default (`pyproject.toml`
+    `addopts = "-m 'not slow'"`), run explicitly with `pytest -q -m slow`. A
+    24-state representative subset runs in CI's default `pytest -q` instead -
+    see `tests/validation/test_flash_split_robustness_pcsaft_subset.py`.
+    """
     failures: list[str] = []
     two_phase = 0
     single_phase = 0
