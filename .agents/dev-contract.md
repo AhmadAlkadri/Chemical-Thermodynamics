@@ -30,6 +30,30 @@ pyright
 pytest -q
 ```
 
+## The `slow` marker
+
+`pyproject.toml` registers `slow` and sets `addopts = "-m 'not slow'"`, so a
+plain `pytest -q` (what CI runs) **deselects** slow-marked tests rather than
+running them - currently just the full 188-state PC-SAFT validation grid,
+`tests/validation/test_flash_split_robustness_pcsaft.py::test_the_whole_grid_answers_and_every_answer_is_verified`
+(ADR-0017). A representative 16-state subset of the same grid
+(`tests/validation/test_flash_split_robustness_pcsaft_subset.py`) runs in the
+default `pytest -q`, so CI still exercises the PC-SAFT phi-phi path on every
+run; the exhaustive grid is opt-in:
+
+```bash
+pytest -q -m slow
+```
+
+Command-line `-m` overrides `addopts`' `-m` (standard pytest behavior: the
+last `-m` value wins), so this runs exactly the slow-marked tests and nothing
+else. CI does not run it automatically - the full grid does not fit the
+suite's runtime budget alongside everything else, which is why the trim
+above exists; see validation Case F-5 in `.agents/brain/validation-cases.md`
+for the measured before/after. Mark a new test `@pytest.mark.slow` only for a
+full/exhaustive grid that already has a cheaper representative subset or
+golden-path example covering the same code by default.
+
 ## Installability smoke checks
 
 Run both editable and non-editable install checks:
