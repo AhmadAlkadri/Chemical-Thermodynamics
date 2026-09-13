@@ -46,6 +46,17 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
     are written inline with their citation (Tessier, Brennecke & Stadtherr,
     Chem. Eng. Sci. 55 (2000) 1785, Table 1, pair 2-3) and are **not** the
     packaged synthetic defaults. Needs no optional dependency.
+- `examples/basic/flash_tp_nrtl_lle_demo.py`
+  - Liquid-liquid TP flash with an NRTL activity model and **no** equation of
+    state (`flash_tp(..., activity_model=...)`, mode inferred as
+    `gamma-gamma`) on the partially miscible n-butanol / water binary: two feeds
+    inside the miscibility gap that return the same tie-line with different
+    phase amounts (checked against the lever rule), and one outside it that
+    returns a single liquid. Prints the verification residuals and the
+    post-split stability block. Parameters are written inline with their
+    citation (Tessier, Brennecke & Stadtherr, Chem. Eng. Sci. 55 (2000) 1785,
+    Table 1, pair 2-3) and are **not** the packaged synthetic defaults. Needs no
+    optional dependency. See validation Cases L-3 and L-4.
 - `examples/validation/00_reference_case.py`
   - Deterministic single-case comparison against `thermo` (optional dependency).
     Unchanged by the tangent-plane phase-detection slice: beta 0.46829044 vs
@@ -69,6 +80,19 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
     `tests/fixtures/nrtl/tessier2000_problem1.json` and
     `tests/fixtures/nrtl/tessier2000_problem2.json`. One printed D is reported
     as `KNOWN-TYPO`; see `.agents/brain/validation-cases.md` Cases S-6 and S-7.
+- `examples/validation/09_lle_tessier2000_tie_lines.py`
+  - Runs the liquid-liquid `flash_tp` on every published feed of Tessier,
+    Brennecke & Stadtherr (2000) Problem 1 (Table 2) and Problem 2 (Table 5) and
+    prints, per feed, the tie-line, the phase fractions, the stage-by-stage
+    iteration counts, every verification residual and the post-split stability
+    verdict, with PASS/FAIL. The paper publishes stationary points of the
+    tangent-plane distance, **not** tie-lines, so each result is compared
+    against an independent equal-activity solve written inside the script
+    (its own successive substitution plus a damped Newton on the full
+    `(x^I, x^II, beta)` system). The stable control feed
+    (0.25, 0.25, 0.25, 0.25) must stay one liquid. Needs no optional
+    dependency. Parameters come from the cited fixtures. See validation Cases
+    L-1 and L-2.
 - `examples/validation/*.py`
   - Optional validation sweeps against `thermo` (requires `pip install -e ".[validation]"`).
   - CSV output is disabled by default; pass `--outdir <dir>` or set `CHEMTHERMO_OUTDIR`.

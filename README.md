@@ -132,12 +132,16 @@ python examples/basic/flash_tp_auto_phase_demo.py
   wrong. Over a 175-state Peng-Robinson grid, verdict agreement with `thermo`'s
   `FlashVL` (same `Tc`/`Pc`/`omega`, `kij = 0`) rises from 166/175 to 175/175;
   see validation Cases F-1 and F-2.
-- **Two phases at most.** This release returns `liquid` and/or `vapor` only.
-- **The converged phases are not re-tested for stability.** A three-phase state
-  will still come back as two phases. Phase addition/removal and LLE are the
-  next slice.
+- **Two phases at most.** A state that needs a third phase is now *reported* -
+  the post-split check below raises rather than returning a two-phase answer the
+  package has itself proved wrong - but it is not solved. Multiphase flash is
+  the next slice.
+- **The converged phases are re-tested for stability** (ADR-0009); see
+  "Post-split stability" below.
 - `"stable"` means no negative tangent-plane distance was found from the
   deterministic trial set, not a global proof (same bound as `stability_tp`).
+- **Liquid-liquid splits have their own mode**, `gamma-gamma`; see
+  "Liquid-liquid flash" below.
 - **Gamma-phi is still heuristic.** Its diagnostics say
   `phase_detection == "wilson-heuristic"` and its numbers are unchanged. A
   gamma-phi stability test needs a consistent pure-liquid reference fugacity
@@ -152,6 +156,117 @@ python examples/basic/flash_tp_auto_phase_demo.py
   smallest. `EquationOfState` exposes no molar volume, so no density-based
   identification is available; this decides the *name* only, never the verdict
   or the compositions.
+
+### Liquid-liquid flash (`gamma-gamma`)
+
+Pass `activity_model=` with **no** `eos` to get a liquid-liquid split. Both
+phases are liquids described by the same model, so the pure-liquid reference
+cancels and the equilibrium condition is equality of activities,
+`x_i^I gamma_i^I = x_i^II gamma_i^II`. The mode is inferred from the models you
+supply and reported as `flash_mode == "gamma-gamma"`; you can also name it
+explicitly.
+
+```python
+from chemthermo import Mixture, NRTL, NRTLParameters, flash_tp
+
+# n-butanol / water, NRTL parameters from Tessier, Brennecke & Stadtherr,
+# Chem. Eng. Sci. 55 (2000) 1785, Table 1 (pair 2-3).
+parameters = NRTLParameters.from_pairs(
+    [("n-Butanol", "Water", 0.90047, 3.51307, 0.48, 0.48)]
+)
+mixture = Mixture.from_database(("n-Butanol", "Water"), (0.10, 0.90))
+
+result = flash_tp(
+    mixture,
+    temperature_K=298.15,
+    pressure_Pa=101325.0,
+    activity_model=NRTL(parameters=parameters),
+)
+
+print(result.phase_names())        # ['liquid1', 'liquid2']
+print(result.vapor_fraction)       # None - neither phase is a vapor
+print(result.phase_fractions)      # {'liquid1': 0.7647..., 'liquid2': 0.2352...}
+print(result.phases["liquid1"].composition.fractions)  # (0.019998..., 0.980001...)
+print(result.phases["liquid2"].composition.fractions)  # (0.359999..., 0.640000...)
+print(result.diagnostics["equilibrium_residual"])      # 8.4e-14
+print(result.diagnostics["delta_g_split_rt"])          # -0.01053...
+```
+
+Runnable demos:
+
+```bash
+python examples/basic/flash_tp_nrtl_lle_demo.py
+python examples/validation/09_lle_tessier2000_tie_lines.py
+```
+
+Notes and limits:
+
+- **The number of liquid phases is an output.** The feed is tested with
+  `stability_tp(..., activity_model=...)` first; a stable feed returns a single
+  phase named `"liquid"`. There is no "assume two liquids" mode.
+- **`liquid1` / `liquid2` are roles, not identities.** `liquid1` is the phase
+  the split started from as feed-like, `liquid2` the one started from the
+  tangent-plane minimizer. Nothing distinguishes two liquids the way volatility
+  distinguishes a vapor from a liquid, so no attempt is made to name them by
+  composition: two feeds on the same tie-line can come back with the same two
+  compositions under swapped labels. Compare the phase *set*, not
+  `result.phases["liquid1"]`.
+- `vapor_fraction` is always `None` for a gamma-gamma result; use
+  `result.phase_fractions`.
+- **Verification.** Every split reports `mass_balance_residual`,
+  `equilibrium_residual` (`max_i |ln(x_i^I gamma_i^I) - ln(x_i^II gamma_i^II)|`)
+  and `delta_g_split_rt`, which must be negative.
+- **Two stages.** Successive substitution converges linearly with a ratio close
+  to one near a plait point - 536 to 3922 iterations on the Tessier et al.
+  (2000) Problem 1 feeds - so after `FlashSettings.ssi_iterations` (default 50)
+  the solver switches to a damped Newton *minimization* of the two-phase Gibbs
+  energy, whose gradient is exactly the equal-activity residual.
+  `ssi_iterations`, `second_order_iterations` and `converged_stage` in
+  `diagnostics` record what happened. Measured over the nine validated feeds of
+  Tessier Problems 1 and 2, the final residual is at round-off (worst 1.8e-14).
+- **Not gamma-phi.** Passing both an `eos` and an `activity_model` to
+  `gamma-gamma` is a `ModelError`; combined vapor-liquid equilibrium with an
+  activity liquid is `flash_mode="gamma-phi"`, which is unchanged and still
+  heuristic.
+- The scope is the same as `stability_tp`'s: `"stable"` means no negative
+  tangent-plane distance was found from the deterministic trial set, not a
+  global proof.
+
+### Post-split stability
+
+Every two-phase result from the tangent-plane phi-phi path and from the
+liquid-liquid path is re-tested: each converged phase is fed back into
+`stability_tp` with the same model.
+
+```python
+print(result.diagnostics["post_split_status"])            # 'stable'
+print(result.diagnostics["post_split_tpd_min"])           # 1.3e-14
+print(result.diagnostics["phase_stability_liquid1"])      # 'stable'
+print(result.diagnostics["phase_stability_tpd_min_liquid1"])
+```
+
+- If a phase is genuinely unstable, `flash_tp` raises `ConvergenceError` saying
+  that the two-phase solution is **not a stable phase set and a third phase is
+  required**. It refuses rather than returning an answer it has proved wrong.
+  Multiphase flash is the next slice.
+- `FlashSettings(post_split_stability=False)` returns the result anyway; the
+  flag gates the *raise*, not the computation, so the diagnostics show the
+  failure either way.
+- **Converging onto the partner phase is not an instability.** Two coexisting
+  phases share one tangent plane, so a stability test on either finds the other
+  with `tpd = 0` up to the split's own convergence tolerance. Such a minimizer
+  is reported as `"marginal"`. Measured over the in-repo Peng-Robinson grid, the
+  most negative post-split `tpd_min` is -7.0e-09, inside the default
+  `tpd_tol = 1e-8`.
+- **The check is only as sharp as the split.** With a deliberately loosened
+  `FlashSettings(tol=...)` a genuinely two-phase state can be reported as
+  needing a third phase, because its phases are then too inaccurate for the
+  minimizer to be recognised as the partner.
+- **Two paths cannot run it and say so.** `gamma-phi` has no stability test
+  (ADR-0007) and the legacy `phase_detection="wilson-heuristic"` path exists to
+  reproduce pre-ADR-0008 behavior unchanged; both report
+  `diagnostics["post_split_checked"] == False` with a
+  `post_split_skipped_reason`.
 
 ### Binary interaction parameters (`kij`)
 
@@ -330,9 +445,12 @@ Notes:
   stationarity condition. Near a plait point successive substitution alone does
   not converge at all; `trial.ssi_iterations`, `trial.second_order_iterations`
   and `trial.converged_stage` record what actually happened.
-- `flash_tp` **does** consume this now: in phi-phi mode its single-phase
-  decision is this test (see "Automatic phase detection" above, and ADR-0008).
-  Gamma-phi still uses the K-bound heuristic.
+- `flash_tp` **does** consume this now, twice: in phi-phi and gamma-gamma mode
+  its single-phase decision is this test (see "Automatic phase detection" and
+  "Liquid-liquid flash" above, ADR-0008 and ADR-0009), and every two-phase
+  result is re-tested phase by phase ("Post-split stability"). To get the
+  tie-line rather than only the verdict, call `flash_tp` with the same
+  `activity_model`. Gamma-phi still uses the K-bound heuristic.
 
 ## CLI usage
 

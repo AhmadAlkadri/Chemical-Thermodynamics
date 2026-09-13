@@ -1,6 +1,16 @@
 # Steering Brief
 
 ## What changed since last brief (files + bullets)
+- `src/chemthermo/flash/tp.py`, `src/chemthermo/flash/settings.py` (slice `flash-lle-activity`, ADR-0009)
+  - `flash_tp` accepts `activity_model=` with **no** `eos`. `eos` gained a default of `None` and `flash_mode` a default of `None` = *infer from the models supplied*; an activity model alone resolves to the new `"gamma-gamma"` (liquid-liquid) mode. Naming a mode explicitly still wins, so `flash_mode="phi-phi"` without an `eos` and `"gamma-gamma"` with one are both `ModelError`. Phase count stays an output: the feed goes through `stability_tp(..., activity_model=...)` and a split is attempted only when it is found unstable. Phases are `"liquid1"` (feed-like) / `"liquid2"` (incipient-like) - roles, not identities, and they demonstrably swap between two feeds on one tie-line - with `vapor_fraction=None` and `equilibrium_residual` in place of `fugacity_residual`.
+  - **Second-order stage**: a damped Newton *minimization* of the two-phase reduced Gibbs energy in the phase-II mole numbers, whose gradient is (Gibbs-Duhem) exactly the equal-activity residual; FD Hessian, eigenvalue shift, Armijo/residual backtracking inside `0 < n_i < z_i`. **Design deviation, recorded:** the brief's first option, Newton on the residual system in `(ln K, beta)`, was implemented and rejected on evidence - it walks into the trivial branch (`beta -> -8`) on the near-plait feed `z = (0.12, 0.05, 0.83)` and stalls at residual 1.4e-07 unless given 200+ substitutions first. A residual system cannot distinguish the equilibrium from the trivial solution; a descent method on `g` can. The stage is wired to the liquid-liquid split **only**, so no phi-phi number moved.
+  - **Post-split stability**: every two-phase result on the tangent-plane phi-phi path and the gamma-gamma path re-tests each converged phase with `stability_tp`. A minimizer that *is* the partner phase (in the stability module's own `trivial_tol` metric) is `"marginal"`, not an instability - two coexisting phases share one tangent plane. Anything else negative raises `ConvergenceError` ("a third phase is required"); `FlashSettings(post_split_stability=False)` gates the *raise*, not the computation. `gamma-phi` and the legacy `wilson-heuristic` path cannot run it and report `post_split_checked=False` with a reason.
+  - New `FlashSettings` fields: `post_split_stability`, `second_order`, `ssi_iterations` (50), `second_order_max_iter` (100), `second_order_tol` (1e-12).
+- `tests/test_flash_lle.py` (new), `tests/validation/test_flash_lle_tessier2000.py` (new), `tests/test_flash_phase_detection.py`, `tests/test_cli_tp_flash.py`, `tests/fixtures/cli/*`
+  - Mode contract, verdicts, binary binodal (0.019998419467 / 0.359999661508) and lever rule to 2.8e-12, determinism and permutation invariance of the phase *set*, `FlashResult` invariants, proof that SSI alone cannot solve the near-plait feed in the default budget, failure semantics; Tessier Problem 1 and 2 tie-lines against an independent SSI + damped-Newton solve of the full `(x^I, x^II, beta)` system (agreement <= 1.1e-12); phi-phi post-split grid (47/47 pass, worst post-split `tpd_min` -7.0055e-09); CLI fixtures gained the new diagnostics keys with `cli_schema_version` still 1.
+  - **Two findings, recorded not accommodated:** (1) the binary feed x(n-butanol) = 0.30 is *inside* the miscibility gap and splits - the brief listed it as a single-phase control; 0.45 is used instead and `thermo` independently agrees 0.30 is unstable. (2) `thermo` 0.6.0's `FlashVLN` will not return a liquid-liquid split for two `GibbsExcessLiquid` phases over one NRTL model (`unique_liquid_count == 1`, single phase returned for every in-gap feed), so no flash-level comparison is possible; its own `stability_test_Michelsen` does find the conjugate pair and agrees to 1.0e-06 / 2.5e-05.
+- `examples/basic/flash_tp_nrtl_lle_demo.py` (new), `examples/validation/09_lle_tessier2000_tie_lines.py` (new), `README.md`, `examples/README.md`, `.agents/brain/adr/0009-flash-liquid-liquid-activity.md` (new), `.agents/brain/validation-cases.md`, `.agents/brain/brain.md`
+  - Golden paths for the binary tie-line/lever rule and for both published systems; README sections "Liquid-liquid flash (`gamma-gamma`)" and "Post-split stability" with the limits stated (two phases max, roles not identities, the check is only as sharp as the split, gamma-phi and legacy not checked); validation Cases L-1 (Problem 1 tie-lines), L-2 (Problem 2 + stable control + post-split), L-3 (binary binodal, lever rule, `thermo`), L-4 (phi-phi post-split grid).
 - `src/chemthermo/flash/tp.py`, `src/chemthermo/flash/settings.py`
   - Phi-phi `flash_tp` now decides 1-vs-2 phases from `stability_tp` (ADR-0008): stable feed -> single phase (`termination_reason = "feed_stable_tangent_plane"`, name from the min-Gibbs `feed_branch`), unstable feed -> split seeded from the tangent-plane minimizer with the *unnormalized* mole numbers `W = w exp(-tpd)` (using normalized `w` makes `f_RR(0) = 0` exactly, an unbracketable root), inconclusive -> `ConvergenceError`. Wilson stays as a documented K-seed fallback (`diagnostics["k_seed"]`). Every converged split reports `mass_balance_residual`, `fugacity_residual` and `delta_g_split_rt`. New `FlashSettings.phase_detection` (`"tangent-plane"` default / `"wilson-heuristic"`) and `FlashSettings.stability_settings`. The split loop itself is unchanged and shared by both paths; gamma-phi stays on the heuristic and says so in diagnostics.
   - **Design deviation, recorded:** the brief specified orienting the seed from the stability result's `phase_branch`. That was implemented and rejected on evidence - when the cubic has a single real root both branch calls return identical `phi` and the label is only a tie-break, which returns the mirror-labelled solution (`beta = 0.3255` instead of the pinned `0.67451818` at Methane/Ethane 240 K / 3 MPa). The vapor/liquid *name* is now decided by the Wilson volatility *ranking* only (`ln(w_hi/z_hi) - ln(w_lo/z_lo) >= 0`); it never touches the verdict, the compositions or `beta`. See ADR-0008 decision 3.
@@ -74,13 +84,13 @@
 ## Current architecture (8-12 lines)
 - `NRTL` implements the standard Renon-Prausnitz equation (column sums); it satisfies Gibbs-Duhem to ~2e-10 and matches `thermo` to ~9e-16 with asymmetric parameters. Packaged pair parameters are synthetic placeholders; published sets live in `tests/fixtures/`.
 - `PengRobinsonEOS.kij` is a scalar (off-diagonal only) or a name-keyed per-pair `Mapping`; `flash_tp` and `stability_tp` results for nonzero kij are now trustworthy (ADR-0006).
-- Phase stability (`chemthermo.stability`) is a solver-independent sibling of `chemthermo.flash`, and phi-phi `flash_tp` now consumes it: `flash_tp -> stability_tp -> split` (ADR-0008). It serves both an EOS and an activity model through the internal `_TangentPlaneEvaluator` contract, and each trial runs successive substitution then an optional damped-Newton stage.
+- Phase stability (`chemthermo.stability`) is a solver-independent sibling of `chemthermo.flash`, and `flash_tp` now consumes it twice: `flash_tp -> stability_tp -> split -> post-split stability` (ADR-0008, ADR-0009), for phi-phi (EOS, vapor-liquid) and gamma-gamma (activity model, liquid-liquid) alike. It serves both an EOS and an activity model through the internal `_TangentPlaneEvaluator` contract, and each trial runs successive substitution then an optional damped-Newton stage.
 - Canonical runtime DB path is `src/chemthermo/data/components.json`.
 - Runtime DB loading is package-resource based via `chemthermo.data` helpers.
 - Raw DB source tables stay in `database/organics.txt` and `database/inorganics.txt`.
 - `tools/build_database.py` is the canonical regeneration/check tool for packaged DB sync.
 - Optional mirror output path is `database/components.mirror.json` (non-runtime, generated-only).
-- Core thermodynamic flow is `Component/Composition/Mixture -> models -> flash_tp -> stability_tp -> seeded split -> FlashResult` (phi-phi); gamma-phi still goes straight to the Wilson-seeded split.
+- Core thermodynamic flow is `Component/Composition/Mixture -> models -> flash_tp -> stability_tp -> seeded split (+ second-order stage for LLE) -> post-split stability -> FlashResult` (phi-phi and gamma-gamma); gamma-phi still goes straight to the Wilson-seeded split and is not post-split checked.
 - CLI `tp-flash` maps inputs to `Mixture + PengRobinsonEOS + flash_tp`, with optional `NRTL()` activity model when `--flash-mode gamma-phi`.
 - CLI supports deterministic text/json outputs with schema version and diagnostics.
 - External validation remains optional and script-driven (`examples/validation/00_reference_case.py`).
@@ -90,6 +100,7 @@
   - `chemthermo` Python exports in `src/chemthermo/__init__.py`, including `stability_tp` / `StabilityResult` / `StabilitySettings` / `StabilityTrial` (ADR-0005, ADR-0007). `stability_tp` takes exactly one of `eos=` / `activity_model=`.
   - `PengRobinsonEOS(kij=...)` scalar-or-mapping constructor contract (ADR-0006).
   - `FlashSettings(phase_detection=..., stability_settings=...)` and the `flash_tp` diagnostics keys listed in its docstring (ADR-0008).
+  - `flash_tp(..., eos=None, activity_model=..., flash_mode=None)` liquid-liquid mode, the `liquid1`/`liquid2` role naming, `vapor_fraction=None` for gamma-gamma, the post-split diagnostics keys, and `FlashSettings(post_split_stability=..., second_order=..., ssi_iterations=..., second_order_max_iter=..., second_order_tol=...)` (ADR-0009).
   - `chemthermo.eos` and `chemthermo.vlle` documented public subpackages.
   - CLI script `chemthermo` with `tp-flash` subcommand and defined exit-code contract.
 - Experimental/placeholder:
@@ -97,7 +108,10 @@
   - Validation policy promotion to required CI remains deferred.
 
 ## Risks / unknowns
-- Phi-phi `flash_tp` returns at most two phases and does NOT re-test the converged phases for stability, so a three-phase state still comes back as two. `flash_tp`'s single-phase verdict inherits `stability_tp`'s bound: "stable" means nothing negative was found from the deterministic trial set.
+- `flash_tp` still returns at most two phases. A state needing a third is now *detected* by the post-split check and refused with `ConvergenceError`, not solved. Both the feed verdict and the post-split verdict inherit `stability_tp`'s bound: "stable" means nothing negative was found from the deterministic trial set, so a third phase no trial reaches would still be missed.
+- The post-split check is only as sharp as the split it checks. Measured margin at default settings is large (worst post-split `tpd_min` -7.0e-09 against `tpd_tol` 1e-8 - a factor of 1.4 - with the minimizer matching the partner phase to `sum ln(w/x)^2 <= 4e-16`, twelve orders inside `trivial_tol`), but with a deliberately loosened `FlashSettings(tol=1e-3)` a genuinely two-phase state is reported as needing a third phase. Documented in README and ADR-0009.
+- Every two-phase flash on the tangent-plane paths now pays for two extra stability analyses (measured: 0.9 s for the 47 two-phase states of the in-repo grid, roughly doubling their cost). There is no way to skip the computation, only the raise.
+- `liquid1`/`liquid2` carry no physical identity and can swap between feeds on the same tie-line. Any consumer that indexes `result.phases["liquid1"]` expecting a particular liquid is wrong.
 - The vapor/liquid *name* of a `flash_tp` phase is a convention in two places: a single-root (dense/supercritical) single-phase feed gets whichever branch label wins the min-Gibbs tie-break, and a two-phase result is named by Wilson volatility ranking. `EquationOfState` exposes no molar volume, so nothing better is available without widening that protocol.
 - Every phi-phi flash now pays for a stability analysis (2 Wilson trials + 1 pure trial per component) even for an obviously single-phase feed.
 - 5 states in the 1144-state scan (Methane/Propane/n-Decane 0.7/0.2/0.1 at 1.2e7-2.0e7 Pa) split in chemthermo (`delta_g_split_rt < 0`) while `thermo`'s `FlashVL` returns `VF = 0`. They disagreed with `thermo` before this slice too, so they are not caused by it. Now adjudicated: evaluating `thermo`'s own `lnphis_at_zs(..., most_stable=True)` at chemthermo's `stability_tp` minimizer gives a negative tpd (within 5e-5 abs of chemthermo's `tpd_min`) at all 5 states, so `thermo`'s `VF = 0` is a stability-*search* miss on `thermo`'s side, not a chemthermo error. See Case F-1 in `validation-cases.md` and `tests/validation/test_flash_thermo_disagreements_adjudicated.py`.
@@ -113,9 +127,9 @@
 - (Removed) Unpinned `bibtexparser>=1.4.0` allowed a fresh/non-editable install to resolve `bibtexparser` 2.x, whose removed `bparser`/`customization` modules broke `import chemthermo`; this was invisible locally because the dev venv already had 1.4.4 installed. Now pinned to `>=1.4.0,<2` and covered by `tests/test_packaging_constraints.py`.
 
 ## Next 3 recommended actions
-- `flash-phase-addition-lle`: test each converged phase for stability, add/remove a phase, and let `FlashResult` carry more than two phases (LLE first, then VLLE).
-- Gamma-phi phase detection, once a consistent pure-liquid reference fugacity exists (ADR-0007 explains what is missing).
-- A second-order / accelerated phase split: the one state in 1144 that still raises `ConvergenceError` is weakly unstable and near-critical (`tpd_min = -1.2e-3`), where successive substitution alone is too slow.
+- `flash-phase-addition`: multiphase Rachford-Rice / Michelsen multiphase flash, so `FlashResult` can carry more than two phases and the ADR-0009 post-split failure becomes an answer instead of an error.
+- `vlle`: after phase addition, wire the multiphase split through the `chemthermo.vlle` boundary. Also needs the pure-liquid reference fugacity ADR-0007 records as missing.
+- Wire the existing second-order stage into the **phi-phi** split: the one state in 1144 that still raises `ConvergenceError` is weakly unstable and near-critical (`tpd_min = -1.2e-3`). The machinery exists; it was deliberately kept off that path so no validated phi-phi number moved in `flash-lle-activity`.
 
 ## One simplification / deletion candidate
 - Remove or archive deprecated `database/components.json` once all docs/tooling users are migrated.
@@ -129,7 +143,9 @@
 - `python examples/basic/flash_tp_peng_robinson_demo.py`
 - `python examples/basic/flash_tp_auto_phase_demo.py`
 - `python examples/basic/stability_tp_nrtl_lle_demo.py`
+- `python examples/basic/flash_tp_nrtl_lle_demo.py`
 - `python examples/validation/08_stability_nrtl_tessier2000.py`
+- `python examples/validation/09_lle_tessier2000_tie_lines.py`
 - `python examples/basic/tp_flash_pr_kij_demo.py`
 - `python -m pytest tests/validation/test_pr_kij_vs_thermo.py -q` (with `pip install -e ".[validation]"`)
 - `python examples/basic/stability_tp_peng_robinson_demo.py`
