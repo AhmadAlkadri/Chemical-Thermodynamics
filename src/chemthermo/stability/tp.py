@@ -76,6 +76,34 @@ Combining an activity model for the liquid with an EOS for the vapor
 (gamma-phi stability) is deliberately **not** supported and raises
 ``ModelError``; see ADR-0007 for the reason.
 
+Modified Raoult: an activity liquid against an ideal vapor
+----------------------------------------------------------
+``vapor="ideal"`` (ADR-0010) supplies the pure-liquid reference fugacity that
+ADR-0007 recorded as missing, in the one regime where it is honest to write it
+down: at low pressure, with ``f_i^0 = Psat_i(T)`` (``phi_i^sat = 1``, Poynting
+= 1) and an ideal-gas vapor (``phi_i^V = 1``). The equilibrium condition is then
+modified Raoult's law,
+
+    y_i P = x_i gamma_i(x) Psat_i(T)                                      (9)
+
+and both phases can be put on **one** Gibbs surface because both are measured
+against the same reference ``ln( f_i / (x_i P) )``:
+
+    liquid:  ln gamma_i(w) + ln( Psat_i(T) / P )
+    vapor:   0                                                           (10)
+
+Equations (1)-(7) are then used verbatim with those terms, and at every
+composition the candidate of lower Gibbs energy is the one that counts (the
+same rule that selects the minimum-Gibbs cubic root; see
+:mod:`chemthermo.stability._evaluator`). So a single tangent-plane test detects
+a vapor-liquid split, a liquid-liquid split, or neither, and the *label* of the
+stationary point says which. Antoine coefficients come from the packaged
+databank and are refused outside their stated validity range.
+
+Its limits are exactly the limits of the model: ideal vapor (no ``phi^V``, so
+no high pressure), no Poynting correction, no ``phi^sat``, and a temperature
+range bounded by the Antoine fits.
+
 Root selection (equation-of-state models only)
 ----------------------------------------------
 For a cubic equation of state the fugacity coefficients are multivalued: each
@@ -145,6 +173,7 @@ reaches can hide an instability.
 from __future__ import annotations
 
 import math
+from typing import Literal
 
 import numpy as np
 
@@ -156,6 +185,7 @@ from ._evaluator import (
     _ActivityTangentPlane,
     _EOSTangentPlane,
     _ln_phi_min_gibbs,  # noqa: F401  (re-exported: tests import root selection from here)
+    _ModifiedRaoultTangentPlane,
     _TangentPlaneEvaluator,
 )
 from .results import StabilityResult, StabilityTrial
@@ -165,6 +195,9 @@ _LN_W_MIN = -700.0
 _LN_W_MAX = 700.0
 _JACOBIAN_STEP = 1e-6
 _MIN_LINE_SEARCH_SCALE = 1e-12
+
+#: Admissible values of the ``vapor`` keyword.
+VAPOR_CANDIDATES = ("none", "ideal")
 
 __all__ = ["stability_tp"]
 
@@ -176,6 +209,7 @@ def stability_tp(
     pressure_Pa: float,
     eos: EquationOfState | None = None,
     activity_model: ActivityModel | None = None,
+    vapor: Literal["none", "ideal"] = "none",
     settings: StabilitySettings | None = None,
 ) -> StabilityResult:
     """Test a feed for phase stability at fixed temperature, pressure and composition.
@@ -190,9 +224,25 @@ def stability_tp(
         eos: Equation-of-state model supplying fugacity coefficients. Both the
             ``"vapor"`` and ``"liquid"`` branches are evaluated and the
             minimum-Gibbs branch is used (see the module docstring).
-        activity_model: Activity-coefficient model supplying ``gamma`` for a
-            liquid-liquid stability test. Exactly one of ``eos`` and
-            ``activity_model`` must be given.
+        activity_model: Activity-coefficient model supplying ``gamma``. On its
+            own (``vapor="none"``) the test is liquid-liquid. Exactly one of
+            ``eos`` and ``activity_model`` must be given.
+        vapor: Which vapor phase competes with the activity-model liquid.
+
+            - ``"none"`` (default): no vapor candidate. The test is
+              liquid-liquid and the pure-liquid reference cancels.
+            - ``"ideal"``: an **ideal-gas** vapor competes with the liquid at
+              every trial composition (the modified-Raoult model, ADR-0010).
+              The liquid's term becomes
+              ``ln gamma_i(w) + ln(Psat_i(T) / P)`` with ``Psat`` from the
+              databank Antoine coefficients, the vapor's term is ``0``, and the
+              lower-Gibbs candidate is used at each composition, so one
+              tangent plane covers vapor-liquid *and* liquid-liquid behavior.
+              ``feed_branch`` and ``phase_branch`` then report which candidate
+              won (``"liquid"`` / ``"vapor"``).
+
+            Only valid with ``activity_model``; ``vapor="ideal"`` with ``eos``
+            is a ``ModelError``.
         settings: Iteration controls; defaults to ``StabilitySettings()``.
 
     Returns:
@@ -201,11 +251,17 @@ def stability_tp(
         K-values (``w_i / z_i``) and a per-trial record.
 
     Raises:
-        InputRangeError: If temperature or pressure is non-physical.
+        InputRangeError: If temperature or pressure is non-physical, or if
+            ``vapor="ideal"`` and the temperature is outside the Antoine
+            validity range of a component.
         ModelError: If neither or both of ``eos`` and ``activity_model`` are
-            given (the combined gamma-phi case is not yet supported), if the
-            composition basis is not molar, or if the model returns non-finite
-            or non-positive values at the feed composition.
+            given (the combined *EOS-vapor* gamma-phi case is still not
+            supported), if ``vapor`` is not a supported value or is combined
+            with an ``eos``, if the composition basis is not molar, or if the
+            model returns non-finite or non-positive values at the feed
+            composition.
+        PropertyNotFoundError: If ``vapor="ideal"`` and a component has no
+            Antoine record.
         CompositionError: If the mixture composition is empty or non-positive.
 
     Notes:
@@ -224,11 +280,19 @@ def stability_tp(
     if eos is not None and activity_model is not None:
         raise ModelError(
             "stability_tp accepts exactly one of 'eos' and 'activity_model'. Combined "
-            "gamma-phi stability (activity-coefficient liquid against an equation-of-state "
-            "vapor) is not yet supported."
+            "gamma-phi stability against an equation-of-state vapor is not yet supported; "
+            "for a low-pressure ideal vapor use activity_model=... with vapor='ideal'."
         )
     if eos is None and activity_model is None:
         raise ModelError("stability_tp requires a model: pass either 'eos' or 'activity_model'.")
+    if vapor not in VAPOR_CANDIDATES:
+        raise ModelError(f"vapor must be one of {VAPOR_CANDIDATES}; got {vapor!r}.")
+    if vapor != "none" and eos is not None:
+        raise ModelError(
+            "vapor='ideal' adds an ideal-gas candidate to an activity-coefficient liquid "
+            "(the modified-Raoult model) and is only valid with 'activity_model'. An "
+            "equation of state already supplies its own vapor branch."
+        )
     if mixture.basis != "mole":
         raise ModelError("stability_tp currently requires mole-fraction compositions.")
 
@@ -248,6 +312,11 @@ def stability_tp(
     if eos is not None:
         evaluator = _EOSTangentPlane(
             eos, mixture=mixture, temperature=temperature, pressure=pressure
+        )
+    elif vapor == "ideal":
+        assert activity_model is not None
+        evaluator = _ModifiedRaoultTangentPlane(
+            activity_model, mixture=mixture, temperature=temperature, pressure=pressure
         )
     else:
         assert activity_model is not None
@@ -631,6 +700,7 @@ def _summarize(
         "second_order_enabled": settings.second_order,
         "ssi_iterations_budget": settings.ssi_iterations,
         "second_order_trial_count": sum(1 for trial in trials if trial.second_order_iterations > 0),
+        **evaluator.diagnostics,
     }
     if feed_branch is not None:
         diagnostics["feed_branch"] = feed_branch

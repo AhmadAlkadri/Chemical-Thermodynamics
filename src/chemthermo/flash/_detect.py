@@ -44,6 +44,12 @@ _INERT_SEED_K = 1.0
 _LIQUID_I = "liquid1"
 _LIQUID_II = "liquid2"
 
+#: Phase-candidate labels of the modified-Raoult pair, which are also the phase
+#: names of a vapor-liquid result on that path.
+_LIQUID = "liquid"
+_VAPOR = "vapor"
+_MODIFIED_RAOULT = "modified-raoult"
+
 
 def _flash_tp_tangent_plane(
     mixture: Mixture,
@@ -320,7 +326,7 @@ def _flash_tp_liquid_liquid(
 
     if settings.second_order and residual > settings.second_order_tol:
         refined = _second_order_split(
-            z=z, x_ii=x_ii, beta=beta, ln_gamma=ln_gamma, settings=settings
+            z=z, x_ii=x_ii, beta=beta, terms_i=ln_gamma, settings=settings
         )
         second_order_iterations = refined.iterations
         if refined.residual < residual:
@@ -375,6 +381,238 @@ def _flash_tp_liquid_liquid(
             "phase_state": "two_phase",
             "phase_regime": "LLE",
             "k_seed": "stability",
+            "ssi_iterations": split.iterations,
+            "second_order_iterations": second_order_iterations,
+            "converged_stage": converged_stage or "successive-substitution",
+            "k_min": float(np.min(split.K)),
+            "k_max": float(np.max(split.K)),
+            **checks,
+            **post_split,
+        },
+    )
+
+
+def _flash_tp_modified_raoult(
+    mixture: Mixture,
+    temperature: float,
+    pressure: float,
+    *,
+    activity_model: ActivityModel,
+    settings: FlashSettings,
+    z: np.ndarray,
+) -> FlashResult:
+    """Low-pressure gamma-phi TP flash from one tangent plane (ADR-0010).
+
+    The feed is tested against **two** phase candidates at once - an
+    activity-coefficient liquid with Antoine pure-liquid reference fugacities
+    and an ideal-gas vapor - so the same call returns a vapor-liquid split, a
+    liquid-liquid split, or a single phase, and the *candidate label* of the
+    stationary point is what decides which:
+
+    ========================  ========================  ====================
+    feed candidate            incipient candidate       result
+    ========================  ========================  ====================
+    liquid                    vapor                     VLE, bubble side
+    vapor                     liquid                    VLE, dew side
+    liquid                    liquid                    LLE
+    ========================  ========================  ====================
+
+    The split loop then evaluates each phase with the candidate it was assigned
+    (:func:`chemthermo.flash._split._solve_k_loop`), which makes
+    ``K_i = gamma_i Psat_i / P`` for a vapor-liquid pair and
+    ``K_i = gamma_i^I / gamma_i^II`` for a liquid-liquid pair without the loop
+    knowing the difference. Every converged phase is then re-tested against
+    **both** candidates, so a state that needs all three phases raises rather
+    than being returned (see :func:`chemthermo.flash._verify._post_split_stability`).
+    """
+    from ..stability import stability_tp
+    from ..stability._evaluator import modified_raoult_candidates
+
+    stability = stability_tp(
+        mixture,
+        temperature_K=temperature,
+        pressure_Pa=pressure,
+        activity_model=activity_model,
+        vapor="ideal",
+        settings=settings.stability_settings,
+    )
+
+    base: dict[str, float | int | str | bool] = {
+        "flash_mode": _MODIFIED_RAOULT,
+        "phase_detection": "tangent-plane",
+        "stability_status": stability.status,
+        "tpd_min": float(stability.tpd_min),
+        "stability_trials": len(stability.trials),
+    }
+    for key in ("antoine_valid_Tmin_K", "antoine_valid_Tmax_K"):
+        if key in stability.diagnostics:
+            base[key] = stability.diagnostics[key]
+    if stability.feed_branch is not None:
+        base["feed_branch"] = stability.feed_branch
+
+    if stability.status == "inconclusive":
+        raise ConvergenceError(
+            "Tangent-plane stability analysis was inconclusive (no trial converged), so "
+            "flash_tp cannot decide whether the feed is one phase or two. Loosen "
+            "FlashSettings.stability_settings and try again."
+        )
+
+    feed_label = stability.feed_branch or _LIQUID
+    if stability.status == "stable":
+        return _single_phase_result(
+            mixture,
+            temperature,
+            pressure,
+            phase_name=feed_label,
+            vapor_fraction=1.0 if feed_label == _VAPOR else 0.0,
+            diagnostics={
+                **base,
+                "iterations": 0,
+                "converged": True,
+                "termination_reason": "feed_stable_tangent_plane",
+                "phase_count": 1,
+                "phase_state": feed_label,
+                "phase_regime": "single-phase",
+            },
+        )
+
+    trial = stability.trial_composition
+    if trial is None:
+        raise ConvergenceError(
+            "Tangent-plane stability reported an unstable feed without a minimizing "
+            "trial composition; no phase split can be seeded."
+        )
+    incipient_label = stability.phase_branch or _LIQUID
+    if feed_label == _VAPOR and incipient_label == _VAPOR:
+        raise ConvergenceError(
+            "The tangent-plane minimizer is a second ideal-gas vapor, which cannot "
+            "coexist with the first: an ideal gas has no composition range over which "
+            "it demixes. This indicates a model or numerical failure, not a phase split."
+        )
+
+    liquid, vapor = modified_raoult_candidates(
+        activity_model, mixture=mixture, temperature=temperature, pressure=pressure
+    )
+    candidates = {_LIQUID: liquid, _VAPOR: vapor}
+    terms_x = candidates[feed_label].ln_fugacity_terms
+    terms_y = candidates[incipient_label].ln_fugacity_terms
+
+    # Same seed as the other tangent-plane paths: Michelsen's unnormalized mole
+    # numbers W = w exp(-tpd), with phase x feed-like and phase y incipient, so
+    # K_i = y_i / x_i = W_i / z_i and f_RR(0) = sum_i W_i - 1 > 0 is bracketable.
+    w = np.array(trial, dtype=float)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        ratio = (w * math.exp(-float(stability.tpd_min))) / z
+    usable = np.isfinite(ratio) & (ratio > 0.0)
+    k_seed = np.where(usable, ratio, _INERT_SEED_K)
+
+    beta, _f0, _f1 = _rachford_rice(z, k_seed)
+    if beta is None:
+        raise ConvergenceError(
+            f"Feed is unstable (tpd_min={stability.tpd_min:.6e}) but the stability-seeded "
+            "K-values do not bracket a Rachford-Rice root, so no split can be started."
+        )
+
+    split = _solve_k_loop(
+        mixture,
+        temperature,
+        pressure,
+        eos=None,
+        activity_model=activity_model,
+        mode=_MODIFIED_RAOULT,
+        settings=settings,
+        z=z,
+        K=k_seed,
+        vapor_fraction=beta,
+        max_iter=(
+            min(settings.ssi_iterations, settings.max_iter)
+            if settings.second_order
+            else settings.max_iter
+        ),
+        allow_unconverged=settings.second_order,
+        terms_x=terms_x,
+        terms_y=terms_y,
+    )
+
+    x, y, beta = split.x, split.y, split.vapor_fraction
+    ln_f_x, ln_f_y = split.ln_f_x, split.ln_f_y
+    residual = _equilibrium_residual(x, y, ln_f_x, ln_f_y)
+    second_order_iterations = 0
+    converged_stage = "successive-substitution" if split.converged else None
+
+    if settings.second_order and residual > settings.second_order_tol:
+        refined = _second_order_split(
+            z=z,
+            x_ii=y,
+            beta=beta,
+            terms_i=terms_x,
+            terms_ii=terms_y,
+            settings=settings,
+        )
+        second_order_iterations = refined.iterations
+        if refined.residual < residual:
+            x, y, beta = refined.x_i, refined.x_ii, refined.beta
+            ln_f_x, ln_f_y = terms_x(x), terms_y(y)
+            residual = _equilibrium_residual(x, y, ln_f_x, ln_f_y)
+            converged_stage = "second-order"
+
+    if residual > settings.tol and not split.converged:
+        raise ConvergenceError(
+            "flash_tp did not converge the modified-Raoult split; equilibrium residual="
+            f"{residual:.3e} after {split.iterations} successive-substitution and "
+            f"{second_order_iterations} second-order iterations."
+        )
+
+    checks = _verify_split(
+        z=z,
+        x=x,
+        y=y,
+        beta=beta,
+        ln_f_x=ln_f_x,
+        ln_f_y=ln_f_y,
+        ln_f_feed=terms_x(z / float(np.sum(z))),
+        residual_key="equilibrium_residual",
+    )
+
+    if feed_label == _LIQUID and incipient_label == _LIQUID:
+        names = (_LIQUID_I, _LIQUID_II)
+        regime = "LLE"
+        vapor_fraction: float | None = None
+    else:
+        names = (feed_label, incipient_label)
+        regime = "VLE"
+        vapor_fraction = float(beta) if incipient_label == _VAPOR else 1.0 - float(beta)
+
+    post_split = _post_split_stability(
+        mixture,
+        temperature,
+        pressure,
+        eos=None,
+        activity_model=activity_model,
+        phases=((names[0], x), (names[1], y)),
+        settings=settings,
+        vapor="ideal",
+    )
+
+    return _two_phase_result(
+        mixture,
+        temperature,
+        pressure,
+        x,
+        y,
+        beta,
+        names=names,
+        vapor_fraction=vapor_fraction,
+        diagnostics={
+            **base,
+            "iterations": split.iterations + second_order_iterations,
+            "converged": True,
+            "termination_reason": "tolerance_met",
+            "phase_count": 2,
+            "phase_state": "two_phase",
+            "phase_regime": regime,
+            "k_seed": "stability",
+            "incipient_phase": incipient_label,
             "ssi_iterations": split.iterations,
             "second_order_iterations": second_order_iterations,
             "converged_stage": converged_stage or "successive-substitution",

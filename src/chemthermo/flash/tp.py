@@ -1,21 +1,24 @@
 """TP flash calculations (T,P) in SI units.
 
-Supports phi-phi (vapor-liquid, equation of state), gamma-phi (activity-model
-liquid against an equation-of-state vapor) and gamma-gamma (liquid-liquid, both
-phases described by one activity model). Given the same inputs and settings,
-results are deterministic.
+Supports phi-phi (vapor-liquid, equation of state), modified-raoult
+(low-pressure vapor-liquid *and* liquid-liquid from an activity model with
+Antoine reference fugacities and an ideal vapor), gamma-gamma (liquid-liquid,
+both phases described by one activity model) and the deprecated gamma-phi
+(activity-model liquid against an equation-of-state vapor). Given the same
+inputs and settings, results are deterministic.
 
-Phase detection (phi-phi and gamma-gamma)
------------------------------------------
-Both reference paths decide one phase versus two from Michelsen's tangent-plane
-stability criterion rather than from Wilson K-value bounds (ADR-0008,
-ADR-0009). The flow is
+Phase detection (phi-phi, gamma-gamma and modified-raoult)
+-----------------------------------------------------------
+Every reference path decides one phase versus two from Michelsen's tangent-plane
+stability criterion rather than from Wilson K-value bounds (ADR-0008, ADR-0009,
+ADR-0010). The flow is
 
     flash_tp -> stability_tp(feed) -> single phase | seeded split
              -> post-split stability of every converged phase
 
 1. ``stability_tp`` is run on the feed at the same ``(T, P)`` with the same
-   model (``eos=`` for phi-phi, ``activity_model=`` for gamma-gamma).
+   model (``eos=`` for phi-phi, ``activity_model=`` for gamma-gamma,
+   ``activity_model=`` plus ``vapor="ideal"`` for modified-raoult).
 2. ``status == "stable"``: a single-phase ``FlashResult`` is returned with
    ``termination_reason = "feed_stable_tangent_plane"``. For phi-phi its phase
    name is the minimum-Gibbs root branch the stability test selected
@@ -50,6 +53,27 @@ phase set: a third phase is needed, which this release cannot produce, so
 ``flash_tp`` raises :class:`chemthermo.ConvergenceError` instead of returning
 it. ``FlashSettings(post_split_stability=False)`` returns the result anyway
 with the failure recorded in ``diagnostics``.
+
+Modified Raoult (low-pressure gamma-phi)
+----------------------------------------
+``flash_mode="modified-raoult"`` puts an activity-coefficient liquid and an
+ideal-gas vapor on **one** Gibbs surface, using the pure-liquid reference
+fugacity ``f_i^0 = Psat_i(T)`` from the databank Antoine coefficients
+(``phi_i^sat = 1``, Poynting = 1, ``phi_i^V = 1``). The equilibrium condition is
+modified Raoult's law ``y_i P = x_i gamma_i(x) Psat_i(T)``; in tangent-plane
+form the two candidates contribute
+
+    liquid: ln gamma_i(w) + ln( Psat_i(T) / P )      vapor: 0
+
+against the common reference ``ln( f_i / (x_i P) )``. One stability test
+therefore detects a vapor-liquid split, a liquid-liquid split or neither, and
+the candidate label of the stationary point says which; the split then
+evaluates each phase with the candidate assigned to it, so
+``K_i = gamma_i Psat_i / P`` (VLE) and ``K_i = gamma_i^I / gamma_i^II`` (LLE)
+are the same update rule. See :func:`chemthermo.flash._detect._flash_tp_modified_raoult`.
+
+``flash_mode="gamma-phi"`` is **deprecated** in favour of this mode; see
+:func:`flash_tp`.
 
 The liquid-liquid split
 -----------------------
@@ -98,13 +122,21 @@ from ..core import Mixture
 from ..exceptions import CompositionError, ModelError
 from ..models import ActivityModel, EquationOfState
 from ..validation import validate_pressure, validate_temperature
-from ._detect import _flash_tp_liquid_liquid, _flash_tp_tangent_plane
+from ._detect import (
+    _flash_tp_liquid_liquid,
+    _flash_tp_modified_raoult,
+    _flash_tp_tangent_plane,
+)
 from ._legacy import _flash_tp_wilson_heuristic
 from .results import FlashResult
 from .settings import FlashSettings
 
 #: Supported ``flash_mode`` values.
-FLASH_MODES = ("phi-phi", "gamma-phi", "gamma-gamma")
+#:
+#: ``"gamma-phi"`` is **deprecated** in favour of ``"modified-raoult"``; see the
+#: :func:`flash_tp` docstring and ADR-0010. It is not removed and its numbers
+#: are unchanged.
+FLASH_MODES = ("phi-phi", "gamma-phi", "gamma-gamma", "modified-raoult")
 
 
 def flash_tp(
@@ -125,13 +157,18 @@ def flash_tp(
         pressure_Pa: Pressure in Pa.
         eos: Equation-of-state model used for fugacity coefficients. Required
             for ``"phi-phi"`` and ``"gamma-phi"``, and must be omitted for
-            ``"gamma-gamma"``.
+            ``"gamma-gamma"`` and ``"modified-raoult"``.
         activity_model: Activity model. Required for ``"gamma-phi"`` (liquid
-            phase) and for ``"gamma-gamma"`` (both liquid phases).
-        flash_mode: Case-insensitive mode: ``"phi-phi"``, ``"gamma-phi"`` or
-            ``"gamma-gamma"``. ``None`` (the default) infers the mode from the
-            models supplied: ``"gamma-gamma"`` when only ``activity_model`` is
-            given, ``"phi-phi"`` otherwise.
+            phase), ``"gamma-gamma"`` (both liquid phases) and
+            ``"modified-raoult"`` (the liquid candidate).
+        flash_mode: Case-insensitive mode: ``"phi-phi"``, ``"modified-raoult"``,
+            ``"gamma-gamma"`` or the deprecated ``"gamma-phi"``. ``None`` (the
+            default) infers the mode from the models supplied:
+            ``"gamma-gamma"`` when only ``activity_model`` is given,
+            ``"phi-phi"`` otherwise. ``"modified-raoult"`` and ``"gamma-phi"``
+            are never inferred and must be named: which vapor model applies at
+            a given pressure is the caller's physical judgement, not
+            something the package should guess.
         settings: Iteration controls (tolerance, damping, max iterations,
             phase-detection mode, stability settings, post-split check,
             second-order stage).
@@ -140,8 +177,10 @@ def flash_tp(
         FlashResult with phase compositions and fractions. Phase names follow:
         VLE -> ``"liquid"``/``"vapor"``, LLE -> ``"liquid1"``/``"liquid2"``,
         single phase -> ``"liquid"`` or ``"vapor"``. ``vapor_fraction`` is
-        ``None`` for every gamma-gamma result: neither phase is a vapor, so
-        reporting a number there would be fiction.
+        ``None`` for every gamma-gamma result and for a **liquid-liquid**
+        modified-Raoult result: neither phase is a vapor, so reporting a number
+        there would be fiction. A vapor-liquid modified-Raoult result carries
+        the vapor's mole fraction as usual.
 
     Diagnostics:
         Diagnostics keys are implementation details. Current stable keys:
@@ -149,7 +188,8 @@ def flash_tp(
         - Always: ``flash_mode``, ``phase_detection``, ``iterations``,
           ``converged``, ``termination_reason``, ``phase_count``,
           ``phase_state``, ``phase_regime``.
-        - Tangent-plane paths (phi-phi default and gamma-gamma):
+        - Tangent-plane paths (phi-phi default, gamma-gamma and
+          modified-raoult):
           ``stability_status``, ``tpd_min``, ``stability_trials``, and
           ``feed_branch`` when the model reports one. A single phase adds
           nothing else and uses
@@ -163,7 +203,11 @@ def flash_tp(
           ``phase_stability_tpd_min_<name>``. Phi-phi additionally reports
           ``incipient_phase``, ``max_delta_k``, ``k_min`` and ``k_max``;
           gamma-gamma additionally reports ``ssi_iterations``,
-          ``second_order_iterations`` and ``converged_stage``.
+          ``second_order_iterations`` and ``converged_stage``. Modified-raoult
+          reports ``incipient_phase``, ``k_min``, ``k_max``, the three stage
+          keys, and ``antoine_valid_Tmin_K`` / ``antoine_valid_Tmax_K`` (the
+          intersection of the components' Antoine validity ranges) on every
+          result.
         - Legacy heuristic path: ``k_min``, ``k_max``, ``max_delta_k``,
           ``k_seed`` (``"wilson"``), and, for its single-phase fallbacks,
           ``rr_f0``, ``rr_f1``, ``rr_status``.
@@ -172,6 +216,10 @@ def flash_tp(
         InputRangeError: If temperature or pressure is non-physical.
         ModelError: If required models are missing, if models are combined in an
             unsupported way, or if a model returns invalid values.
+        InputRangeError: (modified-raoult) If the temperature is outside the
+            Antoine validity range of a component.
+        PropertyNotFoundError: (modified-raoult) If a component has no Antoine
+            record.
         CompositionError: If the mixture composition is invalid.
         ConvergenceError: If iteration fails to converge; or (tangent-plane
             modes only) if the stability analysis is inconclusive, if an
@@ -180,9 +228,27 @@ def flash_tp(
             (a third phase is required).
 
     Notes:
+        **``flash_mode="gamma-phi"`` is DEPRECATED** in favour of
+        ``"modified-raoult"``. It is not removed, nothing about it changed, and
+        its removal would need its own ADR. It is deprecated because it is not
+        a consistent model: it sets ``K_i = gamma_i phi_i^L / phi_i^V`` with
+        ``gamma`` from the activity model *and* ``phi^L`` from the equation of
+        state evaluated on the liquid mixture, so the liquid's nonideality is
+        counted twice, and it carries no pure-liquid reference fugacity at all
+        (no ``Psat_i``, no ``phi_i^sat``, no Poynting), so the two phases are
+        not on one Gibbs surface. That is also why it has no stability test and
+        no post-split check (ADR-0007, ADR-0009). ``"modified-raoult"`` is the
+        low-pressure model written down correctly; for high pressure use
+        ``"phi-phi"``.
+
+        **Modified-Raoult limits.** Ideal vapor (no ``phi^V``), so low pressure
+        only; no Poynting correction and no ``phi^sat``; and the temperature
+        must lie inside every component's Antoine validity range, which is
+        enforced rather than extrapolated.
+
         With ``phase_detection="tangent-plane"`` (the default for phi-phi and
-        the only option for gamma-gamma) a single-phase result means the feed
-        was *found stable* by Michelsen's test. With
+        the only option for gamma-gamma and modified-raoult) a single-phase
+        result means the feed was *found stable* by Michelsen's test. With
         ``phase_detection="wilson-heuristic"`` it only means an initial-estimate
         heuristic said so.
 
@@ -230,6 +296,15 @@ def flash_tp(
                 "gamma-gamma flash describes both phases with the activity model, so 'eos' "
                 "must not be given. Combined gamma-phi equilibrium is flash_mode='gamma-phi'."
             )
+    elif mode == "modified-raoult":
+        if activity_model is None:
+            raise ModelError("An activity model is required for modified-Raoult flash.")
+        if eos is not None:
+            raise ModelError(
+                "modified-raoult flash describes the vapor as an ideal gas and the liquid "
+                "with the activity model plus Antoine reference fugacities, so 'eos' must "
+                "not be given."
+            )
     else:
         if eos is None:
             raise ModelError("An equation-of-state model is required for flash_tp.")
@@ -246,6 +321,17 @@ def flash_tp(
     z = np.array(mixture.fractions, dtype=float)
     if z.size == 0:
         raise CompositionError("Mixture composition must be non-empty.")
+
+    if mode == "modified-raoult":
+        assert activity_model is not None
+        return _flash_tp_modified_raoult(
+            mixture,
+            temperature,
+            pressure,
+            activity_model=activity_model,
+            settings=settings,
+            z=z,
+        )
 
     if mode == "gamma-gamma":
         assert activity_model is not None

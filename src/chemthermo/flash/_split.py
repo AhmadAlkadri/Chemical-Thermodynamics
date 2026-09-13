@@ -80,20 +80,29 @@ def _solve_k_loop(
     vapor_fraction: float,
     max_iter: int | None = None,
     allow_unconverged: bool = False,
+    terms_x: Callable[[np.ndarray], np.ndarray] | None = None,
+    terms_y: Callable[[np.ndarray], np.ndarray] | None = None,
 ) -> _SplitSolution:
     """Successive substitution on K with Rachford-Rice updates of ``beta``.
 
-    This is the first-stage phase split, shared by all three modes; only its
+    This is the first-stage phase split, shared by every mode; only its
     initial ``K``, its ``beta`` and the model call that updates ``K`` differ:
 
     - phi-phi: ``K = phi^L / phi^V`` (``x`` is the liquid, ``y`` the vapor);
     - gamma-phi: ``K = gamma^L phi^L / phi^V``;
     - gamma-gamma: ``K = gamma^I / gamma^II`` (``x`` is phase I, ``y`` phase II
-      and ``vapor_fraction`` is the mole fraction of phase II).
+      and ``vapor_fraction`` is the mole fraction of phase II);
+    - modified-raoult: each phase carries the tangent-plane term of the phase
+      *candidate* the stability test assigned to it (``terms_x`` for ``x``,
+      ``terms_y`` for ``y``), and the equal-fugacity condition
+      ``ln x_i + t_i^x(x) = ln y_i + t_i^y(y)`` gives
+      ``K = exp(t^x(x) - t^y(y))``. That is ``gamma_i Psat_i / P`` when ``x``
+      is a liquid and ``y`` an ideal vapor, and ``gamma_i^I / gamma_i^II`` when
+      both are liquids - one update rule, two regimes.
 
     ``allow_unconverged`` returns the last iterate instead of raising when the
-    budget runs out, which is how the liquid-liquid path hands over to its
-    second-order stage.
+    budget runs out, which is how the liquid-liquid and modified-Raoult paths
+    hand over to their second-order stage.
     """
     budget = settings.max_iter if max_iter is None else max_iter
     max_delta = float("inf")
@@ -109,7 +118,16 @@ def _solve_k_loop(
         y = K * x
         y = normalize_composition(y, label="vapor", error_cls=ConvergenceError)
 
-        if mode == "gamma-gamma":
+        if mode == "modified-raoult":
+            assert terms_x is not None and terms_y is not None
+            ln_f_x = terms_x(x)
+            ln_f_y = terms_y(y)
+            if ln_f_x.shape != K.shape or ln_f_y.shape != K.shape:
+                raise ModelError("Phase candidate returned inconsistent term shapes.")
+            K_new = np.exp(ln_f_x - ln_f_y)
+            if np.any(~np.isfinite(K_new)) or np.any(K_new <= 0.0):
+                raise ModelError("Non-finite or non-positive K-values from the phase candidates.")
+        elif mode == "gamma-gamma":
             assert activity_model is not None
             gamma_x = _activity_coefficients(activity_model, mixture, temperature, x)
             gamma_y = _activity_coefficients(activity_model, mixture, temperature, y)

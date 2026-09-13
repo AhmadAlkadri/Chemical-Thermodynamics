@@ -29,9 +29,11 @@ class StabilityTrial:
         trivial: True when the trial collapsed onto the feed composition.
         residual: Final stationarity residual ``max_i |ln W_i + ln phi_i(w) - d_i|``
             (``ln gamma_i`` for an activity model).
-        phase_branch: Minimum-Gibbs root branch selected at the final trial
-            composition (``"vapor"`` or ``"liquid"``), None for an
-            activity-coefficient model (single branch) or if unavailable.
+        phase_branch: Label of the lowest-Gibbs phase candidate selected at the
+            final trial composition: the compressibility root for an EOS, or
+            ``"liquid"`` / ``"vapor"`` for the modified-Raoult candidate pair
+            (``vapor="ideal"``). None for a single-candidate evaluator (an
+            activity-coefficient model on its own) or if unavailable.
         composition: Normalized trial composition ``w`` at the final point.
         termination_reason: Short machine-readable reason string.
         ssi_iterations: Successive-substitution iterations performed.
@@ -84,11 +86,13 @@ class StabilityResult:
             Values > 1 mean the incipient phase is enriched in component ``i``
             relative to the feed; the incipient phase is the *new* phase, so
             ``k_values`` maps feed -> incipient, never the reverse.
-        phase_branch: Minimum-Gibbs root branch of the minimizing trial, None
-            for an activity-coefficient model.
-        feed_branch: Minimum-Gibbs root branch used for the feed fugacity
-            coefficients, None for an activity-coefficient model (there is a
-            single branch, so no root selection is performed).
+        phase_branch: Label of the lowest-Gibbs phase candidate at the
+            minimizing trial composition - the *incipient* phase's identity.
+            None for a single-candidate evaluator.
+        feed_branch: Label of the lowest-Gibbs phase candidate at the feed: the
+            compressibility root for an EOS, ``"liquid"`` / ``"vapor"`` for the
+            modified-Raoult pair. None for an activity-coefficient model on its
+            own (there is a single candidate, so no selection is performed).
         trials: Per-trial records in deterministic order.
         diagnostics: Diagnostic metadata (implementation detail keys).
 

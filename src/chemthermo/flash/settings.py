@@ -38,7 +38,8 @@ class FlashSettings:
               Kept reachable so the old behavior stays testable (ADR-0008).
 
             Gamma-phi always uses ``"wilson-heuristic"`` in this release; see
-            ADR-0007 and ADR-0008 for why gamma-phi stability is not available.
+            ADR-0007 and ADR-0008 for why gamma-phi stability is not available,
+            and prefer ``flash_mode="modified-raoult"``, which does have one.
         stability_settings: Settings forwarded to
             :func:`chemthermo.stability_tp` when ``phase_detection`` is
             ``"tangent-plane"``, for the feed test and for the post-split test
@@ -52,8 +53,10 @@ class FlashSettings:
             required; ``False`` returns the two-phase result anyway, with the
             failure visible in ``diagnostics["post_split_status"]``.
 
-            The check runs on the tangent-plane phi-phi path and on the
-            liquid-liquid (``"gamma-gamma"``) path. It cannot run for
+            The check runs on the tangent-plane phi-phi path, the
+            liquid-liquid (``"gamma-gamma"``) path and the
+            ``"modified-raoult"`` path, where each phase is re-tested against
+            **both** candidates (liquid and ideal vapor). It cannot run for
             ``"gamma-phi"`` (there is no gamma-phi stability test, ADR-0007),
             and it deliberately does not run on the legacy
             ``phase_detection="wilson-heuristic"`` path, whose purpose is to
@@ -61,17 +64,19 @@ class FlashSettings:
             ``diagnostics["post_split_checked"] = False`` and a
             ``post_split_skipped_reason``.
         second_order: Run a second-order stage after successive substitution in
-            the **liquid-liquid** (``"gamma-gamma"``) split. The stage is a
-            damped Newton minimization of the two-phase Gibbs energy whose
-            gradient is the equal-activity residual (ADR-0009). Near a plait
-            point successive substitution needs thousands of iterations, so the
-            stage is what makes those feeds solvable at all. The phi-phi and
-            gamma-phi splits are unchanged by this release and never enter it.
+            the **liquid-liquid** (``"gamma-gamma"``) split and in the
+            ``"modified-raoult"`` split. The stage is a damped Newton
+            minimization of the two-phase Gibbs energy whose gradient is the
+            equal-activity residual (ADR-0009, generalized to two different
+            phase candidates in ADR-0010). Near a plait point successive
+            substitution needs thousands of iterations, so the stage is what
+            makes those feeds solvable at all. The phi-phi and gamma-phi splits
+            are unchanged by this release and never enter it.
         ssi_iterations: Successive-substitution iterations performed in the
-            liquid-liquid split before the second-order stage takes over.
-            Capped by ``max_iter``.
+            liquid-liquid and modified-Raoult splits before the second-order
+            stage takes over. Capped by ``max_iter``.
         second_order_max_iter: Maximum second-order iterations in the
-            liquid-liquid split.
+            liquid-liquid and modified-Raoult splits.
         second_order_tol: Target for the second-order stage, measured on the
             equal-activity residual ``max_i |ln(x_i^I gamma_i^I)
             - ln(x_i^II gamma_i^II)|``. It is tighter than ``tol`` because the
