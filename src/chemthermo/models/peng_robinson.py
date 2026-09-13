@@ -4,12 +4,11 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from typing import Mapping, Sequence
+from typing import Sequence
 
 import numpy as np
 
 from ..core import Mixture
-from ..data import normalize_name
 from ..exceptions import CompositionError, ModelError
 from ..validation import (
     COMPOSITION_SUM_TOL,
@@ -17,57 +16,15 @@ from ..validation import (
     validate_pressure,
     validate_temperature,
 )
+from ._kij import KijInput, KijPairs, canonicalize_kij, kij_matrix
 from .base import EquationOfState
 
 R_J_PER_MOL_K = 8.314462618
 
-#: Canonical stored form of a per-pair kij matrix: a sorted tuple of
-#: ``((name_a, name_b), value)`` entries with ``name_a < name_b`` (both
-#: normalized via ``chemthermo.data.normalize_name``). Kept immutable so the
-#: frozen dataclass stays hashable/comparable and its repr is deterministic.
-KijPairs = tuple[tuple[tuple[str, str], float], ...]
-KijInput = float | Mapping[tuple[str, str], float]
-
-
-def _canonicalize_kij(kij: KijInput | KijPairs) -> float | KijPairs:
-    """Normalize constructor input for ``PengRobinsonEOS.kij``.
-
-    A scalar is returned unchanged (as a ``float``); it is applied to every
-    off-diagonal pair and never to the diagonal. A mapping from unordered
-    component-name pairs to values is normalized (name case/whitespace via
-    ``normalize_name``, pair order) into a sorted tuple. Both orders of a pair
-    must agree if both are given; a pair naming the same component twice is
-    rejected. Values are looked up per-mixture later, so pair names unknown to
-    any particular mixture are simply never used.
-
-    Idempotent: re-running this on an already-canonical tuple (as happens on
-    ``dataclasses.replace``) returns it unchanged rather than re-validating,
-    since it was already validated when first constructed.
-    """
-    if isinstance(kij, tuple):
-        return kij
-    if isinstance(kij, Mapping):
-        canonical: dict[tuple[str, str], float] = {}
-        for (name_a, name_b), value in kij.items():
-            key_a = normalize_name(name_a)
-            key_b = normalize_name(name_b)
-            if not key_a or not key_b:
-                raise ModelError("PengRobinsonEOS kij component names must be non-empty.")
-            if key_a == key_b:
-                raise ModelError(
-                    "PengRobinsonEOS kij pair components must be distinct "
-                    f"(got {name_a!r} paired with itself)."
-                )
-            pair_key = (key_a, key_b) if key_a < key_b else (key_b, key_a)
-            value_f = float(value)
-            if pair_key in canonical and canonical[pair_key] != value_f:
-                raise ModelError(
-                    f"Conflicting kij values given for pair {pair_key!r}: "
-                    f"{canonical[pair_key]!r} vs {value_f!r}."
-                )
-            canonical[pair_key] = value_f
-        return tuple(sorted(canonical.items()))
-    return float(kij)
+# ``KijInput`` / ``KijPairs`` / ``canonicalize_kij`` / ``kij_matrix`` moved to
+# the internal ``chemthermo.models._kij`` in the ``pcsaft-residual-helmholtz``
+# slice so PC-SAFT can reuse the same per-pair contract (ADR-0006, ADR-0014).
+# Nothing about their behavior changed; Peng-Robinson stays bit-identical.
 
 
 @dataclass(frozen=True)
@@ -86,15 +43,15 @@ class PengRobinsonEOS(EquationOfState):
 
     After construction ``kij`` holds the *canonical* form: unchanged if given
     as a scalar, or normalized to a sorted ``KijPairs`` tuple if given as a
-    mapping (see :func:`_canonicalize_kij`); the type annotation below
-    includes that canonical tuple shape for that reason.
+    mapping (see :func:`chemthermo.models._kij.canonicalize_kij`); the type
+    annotation below includes that canonical tuple shape for that reason.
     """
 
     kij: KijInput | KijPairs = 0.0
     name: str = "Peng-Robinson"
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "kij", _canonicalize_kij(self.kij))
+        object.__setattr__(self, "kij", canonicalize_kij(self.kij, model="PengRobinsonEOS"))
 
     def fugacity_coefficients(
         self,
@@ -219,8 +176,8 @@ class PengRobinsonEOS(EquationOfState):
         resolved per-pair (or scalar) kij for this mixture's component order.
         """
         a_i, b_i = self._component_parameters(mixture, temperature)
-        kij_matrix = self._kij_matrix(mixture)
-        aij = np.sqrt(np.outer(a_i, a_i)) * (1.0 - kij_matrix)
+        kij_mat = self._kij_matrix(mixture)
+        aij = np.sqrt(np.outer(a_i, a_i)) * (1.0 - kij_mat)
 
         a_mix = float(np.sum(y[:, None] * y[None, :] * aij))
         b_mix = float(np.sum(y * b_i))
@@ -229,37 +186,10 @@ class PengRobinsonEOS(EquationOfState):
     def _kij_matrix(self, mixture: Mixture) -> np.ndarray:
         """Build the dense n x n kij matrix for ``mixture``'s component order.
 
-        The diagonal is always zero. A scalar ``kij`` fills every off-diagonal
-        entry; a per-pair mapping fills only the pairs it names (by
-        normalized component name) and defaults missing pairs to zero.
+        Thin wrapper over the shared helper in ``chemthermo.models._kij``; see
+        that module for the (unchanged) rules.
         """
-        n = len(mixture.components)
-        matrix = np.zeros((n, n), dtype=float)
-
-        if isinstance(self.kij, (int, float)):
-            if self.kij != 0.0:
-                matrix[:, :] = self.kij
-                np.fill_diagonal(matrix, 0.0)
-            return matrix
-
-        # self.kij is always the canonical KijPairs tuple here (never a raw
-        # Mapping at runtime; __post_init__ already converted it). Both
-        # branches call the same dict(...) constructor -- the isinstance
-        # split exists only so pyright resolves a single dict() overload per
-        # branch instead of over-widening a `Mapping | KijPairs` union.
-        pairs: dict[tuple[str, str], float]
-        if isinstance(self.kij, Mapping):
-            pairs = dict(self.kij)
-        else:
-            pairs = dict(self.kij)
-        names = [normalize_name(name) for name in mixture.component_names]
-        for i in range(n):
-            for j in range(i + 1, n):
-                key = (names[i], names[j]) if names[i] < names[j] else (names[j], names[i])
-                value = pairs.get(key, 0.0)
-                matrix[i, j] = value
-                matrix[j, i] = value
-        return matrix
+        return kij_matrix(self.kij, mixture.component_names)
 
     @staticmethod
     def _component_parameters(
