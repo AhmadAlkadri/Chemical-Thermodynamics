@@ -52,8 +52,9 @@ def _second_order_split(
     z: np.ndarray,
     x_ii: np.ndarray,
     beta: float,
-    ln_gamma: Callable[[np.ndarray], np.ndarray],
+    terms_i: Callable[[np.ndarray], np.ndarray],
     settings: FlashSettings,
+    terms_ii: Callable[[np.ndarray], np.ndarray] | None = None,
 ) -> _SecondOrderSplit:
     """Damped Newton *minimization* of the two-phase Gibbs energy.
 
@@ -122,14 +123,26 @@ def _second_order_split(
         z: Feed mole fractions (normalized).
         x_ii: Phase-II composition of the starting iterate.
         beta: Phase-II mole fraction of the starting iterate.
-        ln_gamma: Callable returning ``ln gamma`` at a normalized composition.
+        terms_i: Callable returning phase I's tangent-plane fugacity terms at a
+            normalized composition (``ln gamma`` for a liquid-liquid split,
+            ``ln gamma + ln(Psat/P)`` for a modified-Raoult liquid, ``0`` for a
+            modified-Raoult ideal vapor).
         settings: Flash settings (``second_order_tol``,
             ``second_order_max_iter``).
+        terms_ii: Phase II's terms; defaults to ``terms_i``, which is the
+            liquid-liquid case where one model describes both phases. A
+            vapor-liquid split passes the two different candidates. The
+            derivation is unchanged: equation (2) holds phase by phase, and an
+            additive composition-independent reference (``ln(Psat_i/P)``) is a
+            constant of the split and drops out of (3) as well.
 
     Returns:
         The refined split; the caller keeps it only if it improved on the
         starting iterate.
     """
+    if terms_ii is None:
+        terms_ii = terms_i
+
     active = z > 0.0
     index = np.flatnonzero(active)
 
@@ -147,8 +160,8 @@ def _second_order_split(
         composition_ii = n / total_ii
         activity_i = np.zeros_like(z)
         activity_ii = np.zeros_like(z)
-        activity_i[active] = np.log(composition_i[active]) + ln_gamma(composition_i)[active]
-        activity_ii[active] = np.log(composition_ii[active]) + ln_gamma(composition_ii)[active]
+        activity_i[active] = np.log(composition_i[active]) + terms_i(composition_i)[active]
+        activity_ii[active] = np.log(composition_ii[active]) + terms_ii(composition_ii)[active]
         value = float(
             np.sum(liquid_i[active] * activity_i[active]) + np.sum(n[active] * activity_ii[active])
         )

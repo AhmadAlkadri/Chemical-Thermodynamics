@@ -1,20 +1,19 @@
 """Internal tangent-plane evaluator contract for :mod:`chemthermo.stability`.
 
-This module is private (ADR-0007). Nothing here is exported from
+This module is private (ADR-0007, ADR-0010). Nothing here is exported from
 ``chemthermo`` or from ``chemthermo.stability``.
 
 Why it exists
 -------------
 Michelsen's tangent-plane machinery -- the successive-substitution map, the
 second-order stage, trivial-solution detection, the trial summary and the
-result types -- is identical for an equation of state and for an
-activity-coefficient model. Only two things differ:
+result types -- is identical for an equation of state, for an
+activity-coefficient model, and for a set of *competing candidate phases*. Only
+two things differ:
 
-1. what the "fugacity term" of component ``i`` at a trial composition ``w`` is
-   (``ln phi_i(w)`` on the minimum-Gibbs compressibility root for an EOS,
-   ``ln gamma_i(w)`` for an activity model), and
-2. which deterministic initial estimates make sense (Wilson K-value estimates
-   are a vapor-liquid device and are meaningless for an activity-only model).
+1. what the "fugacity term" of component ``i`` at a trial composition ``w`` is,
+   and
+2. which deterministic initial estimates make sense.
 
 Those two differences are the whole contract:
 
@@ -23,12 +22,50 @@ Those two differences are the whole contract:
 
 The solver in :mod:`chemthermo.stability.tp` sees nothing else, so it does not
 know which model family it is serving.
+
+Phase candidates (ADR-0010)
+---------------------------
+An evaluator holds one or more **phase candidates**. A candidate is a
+thermodynamic description of what the mixture could be at a composition ``w``,
+and it contributes the term ``ln( f_i(w) / (x_i P) )`` of the shared reference:
+
+===========================  ==========================  ======================
+family                       candidates                  term of candidate
+===========================  ==========================  ======================
+``"eos"``                    the cubic's vapor and        ``ln phi_i(w)``
+                             liquid compressibility
+                             roots
+``"activity"``               one activity-model liquid    ``ln gamma_i(w)``
+``"modified-raoult"``        an activity-model liquid     ``ln gamma_i(w)
+                             and an ideal gas             + ln(Psat_i/P)``
+                                                          and ``0``
+===========================  ==========================  ======================
+
+``ln_fugacity_terms(w)`` returns the terms of the candidate with the **lowest
+Gibbs energy** at ``w`` together with that candidate's label. At fixed
+``(T, P, w)``
+
+    G/RT = sum_i w_i [ g_i^0/RT + ln(w_i P / P^0) ] + sum_i w_i term_i(w)
+
+and only the last sum depends on the candidate (the ideal-mixing part is
+candidate independent), so minimizing ``sum_i w_i term_i(w)`` selects the
+lowest-Gibbs candidate. That is one rule, not three: for a cubic EOS it is the
+minimum-Gibbs root selection of ADR-0005, for a single activity-model liquid it
+is a no-op, and for the modified-Raoult pair it decides whether ``w`` is a
+liquid or a vapor.
+
+The one-candidate case reports ``None`` as its label: there was no choice to
+make, so there is nothing to report.
+
+A future PC-SAFT model (several density roots) or a user-supplied Gibbs-energy
+phase model would enter as further candidates behind the same two methods,
+without a solver change.
 """
 
 from __future__ import annotations
 
 import math
-from typing import Protocol, Sequence
+from typing import Mapping, Protocol, Sequence
 
 import numpy as np
 
@@ -36,39 +73,75 @@ from ..core import Mixture
 from ..exceptions import ModelError
 from ..flash._common import as_float_array, wilson_k
 from ..models import ActivityModel, EquationOfState
+from ..models._antoine import antoine_saturation_pressures, antoine_temperature_range
 
 # Trace amount kept on the non-dominant components of a pure-component-dominant
 # initial estimate. A hard zero would pin those components at W_i = 0 forever.
 _PURE_TRIAL_TRACE = 1e-3
+
+#: Candidate labels used by the modified-Raoult pair and by the cubic roots.
+_LIQUID = "liquid"
+_VAPOR = "vapor"
+
+
+class _PhaseCandidate(Protocol):
+    """One thermodynamic description the mixture could take at a composition.
+
+    Attributes:
+        label: Reported as the branch / candidate label of a stationary point.
+        optional: True when the candidate may legitimately be absent at some
+            compositions (a cubic root that does not exist there), so the
+            selector should record the failure and carry on. False when a
+            failure is a real error that must reach the caller: silently
+            answering with the *other* candidate would be a wrong phase, not a
+            missing one.
+    """
+
+    label: str
+    optional: bool
+
+    def ln_fugacity_terms(self, composition: np.ndarray) -> np.ndarray:
+        """Return ``ln( f_i(w) / (w_i P) )`` for this candidate at ``w``.
+
+        Raises:
+            ModelError: If the candidate is not evaluable at ``w`` (an absent
+                compressibility root, a model failure, unusable values). The
+                selector records the reason and tries the other candidates.
+        """
+        ...
 
 
 class _TangentPlaneEvaluator(Protocol):
     """What the tangent-plane solver needs from a thermodynamic model.
 
     Attributes:
-        model_family: ``"eos"`` or ``"activity"``; recorded in diagnostics.
+        model_family: ``"eos"``, ``"activity"`` or ``"modified-raoult"``;
+            recorded in diagnostics.
         pressure_dependent: True when the returned terms depend on pressure.
             False for an activity-only model, where ``pressure_Pa`` is still
             validated for API uniformity but does not affect the result.
+        diagnostics: Extra diagnostics keys contributed by the evaluator
+            (empty for the EOS and activity-only families).
     """
 
     model_family: str
     pressure_dependent: bool
+    diagnostics: Mapping[str, float | int | str | bool]
 
     def ln_fugacity_terms(self, composition: np.ndarray) -> tuple[np.ndarray, str | None]:
-        """Return the tangent-plane fugacity terms and an optional branch label.
+        """Return the tangent-plane fugacity terms and the candidate label.
 
         Args:
             composition: Normalized mole fractions ``w``.
 
         Returns:
-            ``(terms, branch)`` where ``terms[i]`` is ``ln phi_i(w)`` (EOS, on
-            the minimum-Gibbs root) or ``ln gamma_i(w)`` (activity model), and
-            ``branch`` names the selected compressibility root for an EOS or is
-            None when the model has a single branch.
+            ``(terms, label)`` where ``terms[i]`` is the term of the
+            lowest-Gibbs candidate at ``w`` and ``label`` names that candidate.
+            ``label`` is None when the evaluator holds a single candidate, so
+            no selection was made.
 
         Raises:
-            ModelError: If the model returns unusable values.
+            ModelError: If no candidate is usable at ``w``.
         """
         ...
 
@@ -77,15 +150,175 @@ class _TangentPlaneEvaluator(Protocol):
         ...
 
 
+# ---------------------------------------------------------------------------
+# Candidates
+# ---------------------------------------------------------------------------
+
+
+class _CubicRootCandidate:
+    """One compressibility branch of an equation of state (``ln phi_i``)."""
+
+    optional = True
+
+    def __init__(
+        self,
+        eos: EquationOfState,
+        *,
+        label: str,
+        mixture: Mixture,
+        temperature: float,
+        pressure: float,
+    ) -> None:
+        self.label = label
+        self._eos = eos
+        self._mixture = mixture
+        self._temperature = temperature
+        self._pressure = pressure
+
+    def ln_fugacity_terms(self, composition: np.ndarray) -> np.ndarray:
+        try:
+            values = as_float_array(
+                self._eos.fugacity_coefficients(
+                    mixture=self._mixture,
+                    temperature_K=self._temperature,
+                    pressure_Pa=self._pressure,
+                    composition=composition.tolist(),
+                    phase=self.label,
+                )
+            )
+        except Exception as exc:  # noqa: BLE001 - branch may be unavailable
+            raise ModelError(str(exc)) from exc
+
+        if values.shape != composition.shape:
+            raise ModelError("inconsistent fugacity coefficient shape")
+        if np.any(~np.isfinite(values)) or np.any(values <= 0.0):
+            raise ModelError("non-finite or non-positive fugacity coefficients")
+        return np.log(values)
+
+
+class _ActivityLiquidCandidate:
+    """An activity-coefficient liquid (``ln gamma_i``, plus an optional offset).
+
+    The offset is the reduced pure-liquid reference fugacity
+    ``ln(f_i^0 / P)``. It is None for a liquid-liquid problem, where both
+    phases share the reference and it cancels, and
+    ``ln(Psat_i(T) / P)`` for the modified-Raoult pair, where the liquid has to
+    be compared against a vapor and the reference cannot cancel.
+    """
+
+    optional = False
+
+    def __init__(
+        self,
+        activity_model: ActivityModel,
+        *,
+        label: str,
+        mixture: Mixture,
+        temperature: float,
+        reference_offset: np.ndarray | None = None,
+    ) -> None:
+        self.label = label
+        self._model = activity_model
+        self._mixture = mixture
+        self._temperature = temperature
+        self._offset = reference_offset
+
+    def ln_fugacity_terms(self, composition: np.ndarray) -> np.ndarray:
+        try:
+            values = as_float_array(
+                self._model.activity_coefficients(
+                    mixture=self._mixture,
+                    temperature_K=self._temperature,
+                    composition=composition.tolist(),
+                )
+            )
+        except ModelError:
+            raise
+        except Exception as exc:  # noqa: BLE001 - surfaced as a ModelError below
+            raise ModelError(f"Activity model failed during stability analysis: {exc}") from exc
+
+        if values.shape != composition.shape:
+            raise ModelError("Activity model returned an inconsistent number of coefficients.")
+        if np.any(~np.isfinite(values)) or np.any(values <= 0.0):
+            raise ModelError("Non-finite or non-positive activity coefficients.")
+        if self._offset is None:
+            return np.log(values)
+        return np.log(values) + self._offset
+
+
+class _IdealVaporCandidate:
+    """An ideal gas: ``phi_i = 1`` and the reference is ``P`` itself, so the term is 0."""
+
+    optional = False
+
+    def __init__(self, *, label: str) -> None:
+        self.label = label
+
+    def ln_fugacity_terms(self, composition: np.ndarray) -> np.ndarray:
+        return np.zeros_like(composition)
+
+
+def _select_min_gibbs(
+    candidates: Sequence[_PhaseCandidate],
+    composition: np.ndarray,
+    *,
+    failure_message: str,
+) -> tuple[np.ndarray, str]:
+    """Return the terms and label of the lowest-Gibbs candidate at ``composition``.
+
+    The candidate minimizing ``sum_i w_i term_i(w)`` minimizes the molar Gibbs
+    energy at fixed ``(T, P, w)``: that sum is the only candidate-dependent part
+    of ``G/RT`` (see the module docstring). Candidates are tried in order and
+    ties keep the earlier one, so the selection is deterministic.
+
+    A candidate that raises while ``optional`` is False re-raises: answering
+    with the surviving candidate would report the wrong *phase*, not a missing
+    branch.
+    """
+    best_terms: np.ndarray | None = None
+    best_label = ""
+    best_g = math.inf
+    failures: list[str] = []
+
+    for candidate in candidates:
+        try:
+            terms = candidate.ln_fugacity_terms(composition)
+        except ModelError as exc:
+            if not candidate.optional:
+                raise
+            failures.append(f"{candidate.label}: {exc}")
+            continue
+
+        g_res = float(np.sum(composition * terms))
+        if not math.isfinite(g_res):
+            failures.append(f"{candidate.label}: non-finite reduced residual Gibbs energy")
+            continue
+        if g_res < best_g:
+            best_g = g_res
+            best_terms = terms
+            best_label = candidate.label
+
+    if best_terms is None:
+        raise ModelError(failure_message + " (" + "; ".join(failures) + ").")
+    return best_terms, best_label
+
+
+# ---------------------------------------------------------------------------
+# Evaluators
+# ---------------------------------------------------------------------------
+
+
 class _EOSTangentPlane:
     """Evaluator backed by an equation of state.
 
-    ``ln phi`` is taken from the minimum-Gibbs compressibility root, selected
+    The candidates are the ``"vapor"`` and ``"liquid"`` compressibility branches
+    of the cubic; ``ln phi`` is taken from the minimum-Gibbs one, selected
     generically over the existing ``EquationOfState`` interface (ADR-0005).
     """
 
     model_family = "eos"
     pressure_dependent = True
+    diagnostics: Mapping[str, float | int | str | bool] = {}
 
     def __init__(
         self,
@@ -99,14 +332,15 @@ class _EOSTangentPlane:
         self._mixture = mixture
         self._temperature = temperature
         self._pressure = pressure
+        self._candidates = _cubic_root_candidates(
+            eos, mixture=mixture, temperature=temperature, pressure=pressure
+        )
 
     def ln_fugacity_terms(self, composition: np.ndarray) -> tuple[np.ndarray, str | None]:
-        return _ln_phi_min_gibbs(
-            self._eos,
-            mixture=self._mixture,
-            temperature=self._temperature,
-            pressure=self._pressure,
-            composition=composition,
+        return _select_min_gibbs(
+            self._candidates,
+            composition,
+            failure_message="No usable fugacity-coefficient branch for stability analysis",
         )
 
     def initial_estimates(self, z: np.ndarray, active: np.ndarray) -> list[tuple[str, np.ndarray]]:
@@ -126,12 +360,13 @@ class _ActivityTangentPlane:
     Both phases are liquids with the same pure-liquid reference state, so the
     reference fugacities cancel from the tangent-plane distance and
     ``ln gamma_i`` takes the place of ``ln phi_i`` exactly (see the module
-    docstring of :mod:`chemthermo.stability.tp`). There is a single branch, so
-    no root selection is needed and the branch label is None.
+    docstring of :mod:`chemthermo.stability.tp`). There is a single candidate,
+    so no selection is needed and the label is None.
     """
 
     model_family = "activity"
     pressure_dependent = False
+    diagnostics: Mapping[str, float | int | str | bool] = {}
 
     def __init__(
         self,
@@ -143,26 +378,12 @@ class _ActivityTangentPlane:
         self._model = activity_model
         self._mixture = mixture
         self._temperature = temperature
+        self._candidate = _ActivityLiquidCandidate(
+            activity_model, label=_LIQUID, mixture=mixture, temperature=temperature
+        )
 
     def ln_fugacity_terms(self, composition: np.ndarray) -> tuple[np.ndarray, str | None]:
-        try:
-            values = as_float_array(
-                self._model.activity_coefficients(
-                    mixture=self._mixture,
-                    temperature_K=self._temperature,
-                    composition=composition.tolist(),
-                )
-            )
-        except ModelError:
-            raise
-        except Exception as exc:  # noqa: BLE001 - surfaced as a ModelError below
-            raise ModelError(f"Activity model failed during stability analysis: {exc}") from exc
-
-        if values.shape != composition.shape:
-            raise ModelError("Activity model returned an inconsistent number of coefficients.")
-        if np.any(~np.isfinite(values)) or np.any(values <= 0.0):
-            raise ModelError("Non-finite or non-positive activity coefficients.")
-        return np.log(values), None
+        return self._candidate.ln_fugacity_terms(composition), None
 
     def initial_estimates(self, z: np.ndarray, active: np.ndarray) -> list[tuple[str, np.ndarray]]:
         """Pure-component-dominant estimates only.
@@ -182,6 +403,124 @@ class _ActivityTangentPlane:
         return _pure_component_estimates(self._mixture, z, active)
 
 
+class _ModifiedRaoultTangentPlane:
+    """Evaluator holding a modified-Raoult liquid and an ideal-gas vapor (ADR-0010).
+
+    Both candidates are expressed against the same reference ``ln(f_i / (x_i P))``:
+
+        liquid: ln gamma_i(w) + ln( Psat_i(T) / P )
+        vapor:  0
+
+    so one tangent plane covers vapor-liquid *and* liquid-liquid behavior. The
+    candidate label of a stationary point is what tells the flash whether the
+    incipient phase is a vapor or a second liquid.
+    """
+
+    model_family = "modified-raoult"
+    pressure_dependent = True
+
+    def __init__(
+        self,
+        activity_model: ActivityModel,
+        *,
+        mixture: Mixture,
+        temperature: float,
+        pressure: float,
+    ) -> None:
+        self._mixture = mixture
+        self._temperature = temperature
+        self._pressure = pressure
+        self._psat = antoine_saturation_pressures(mixture, temperature)
+        self._k_raoult = self._psat / pressure
+        lower, upper = antoine_temperature_range(mixture)
+        self.diagnostics: Mapping[str, float | int | str | bool] = {
+            "antoine_valid_Tmin_K": lower,
+            "antoine_valid_Tmax_K": upper,
+        }
+        self._candidates: tuple[_PhaseCandidate, ...] = modified_raoult_candidates(
+            activity_model,
+            mixture=mixture,
+            temperature=temperature,
+            pressure=pressure,
+            saturation_pressures=self._psat,
+        )
+
+    def ln_fugacity_terms(self, composition: np.ndarray) -> tuple[np.ndarray, str | None]:
+        return _select_min_gibbs(
+            self._candidates,
+            composition,
+            failure_message="No usable phase candidate for modified-Raoult stability analysis",
+        )
+
+    def initial_estimates(self, z: np.ndarray, active: np.ndarray) -> list[tuple[str, np.ndarray]]:
+        """Raoult vapor-like and liquid-like estimates plus pure-component ones.
+
+        ``K_i^Raoult = Psat_i / P`` is the ideal K-value of the same model with
+        ``gamma = 1``, so ``W = z K^Raoult`` is a vapor-like estimate and
+        ``W = z / K^Raoult`` a liquid-like one (the estimate a vapor feed needs
+        in order to find its incipient liquid). The pure-component-dominant
+        estimates are what finds a liquid-liquid split, exactly as for the
+        activity-only evaluator. Every estimate is then iterated on **both**
+        candidates: the lowest-Gibbs one is re-selected at each iterate.
+        """
+        estimates: list[tuple[str, np.ndarray]] = []
+        if int(np.count_nonzero(active)) > 1:
+            estimates.append(("raoult-vapor", _normalized(self._k_raoult * z, active)))
+            estimates.append(("raoult-liquid", _normalized(z / self._k_raoult, active)))
+            estimates.extend(_pure_component_estimates(self._mixture, z, active))
+        else:
+            names = self._mixture.component_names
+            index = int(np.argmax(active))
+            estimates.append((f"pure-{names[index]}", _normalized(z, active)))
+        return estimates
+
+
+def _cubic_root_candidates(
+    eos: EquationOfState,
+    *,
+    mixture: Mixture,
+    temperature: float,
+    pressure: float,
+) -> tuple[_PhaseCandidate, ...]:
+    """The two compressibility branches of a cubic, in the ADR-0005 order."""
+    return tuple(
+        _CubicRootCandidate(
+            eos, label=label, mixture=mixture, temperature=temperature, pressure=pressure
+        )
+        for label in (_VAPOR, _LIQUID)
+    )
+
+
+def modified_raoult_candidates(
+    activity_model: ActivityModel,
+    *,
+    mixture: Mixture,
+    temperature: float,
+    pressure: float,
+    saturation_pressures: np.ndarray | None = None,
+) -> tuple[_PhaseCandidate, _PhaseCandidate]:
+    """Return the ``(liquid, vapor)`` candidates of the modified-Raoult model.
+
+    Exposed to :mod:`chemthermo.flash` (internal, not public) so that the split
+    can evaluate each converged phase with the candidate the stability test
+    assigned to it.
+    """
+    psat = (
+        antoine_saturation_pressures(mixture, temperature)
+        if saturation_pressures is None
+        else saturation_pressures
+    )
+    liquid = _ActivityLiquidCandidate(
+        activity_model,
+        label=_LIQUID,
+        mixture=mixture,
+        temperature=temperature,
+        reference_offset=np.log(psat / pressure),
+    )
+    vapor = _IdealVaporCandidate(label=_VAPOR)
+    return liquid, vapor
+
+
 def _ln_phi_min_gibbs(
     eos: EquationOfState,
     *,
@@ -194,52 +533,14 @@ def _ln_phi_min_gibbs(
 
     The branch minimizing ``sum_i w_i ln phi_i(w)`` minimizes the molar Gibbs
     energy at fixed ``(T, P, w)`` because that sum is the reduced residual Gibbs
-    energy and the ideal-mixing contribution is root independent.
+    energy and the ideal-mixing contribution is root independent. This is the
+    two-candidate case of :func:`_select_min_gibbs`.
     """
-    best_ln_phi: np.ndarray | None = None
-    best_branch = ""
-    best_g = math.inf
-    failures: list[str] = []
-
-    for branch in ("vapor", "liquid"):
-        try:
-            values = as_float_array(
-                eos.fugacity_coefficients(
-                    mixture=mixture,
-                    temperature_K=temperature,
-                    pressure_Pa=pressure,
-                    composition=composition.tolist(),
-                    phase=branch,
-                )
-            )
-        except Exception as exc:  # noqa: BLE001 - branch may be unavailable
-            failures.append(f"{branch}: {exc}")
-            continue
-
-        if values.shape != composition.shape:
-            failures.append(f"{branch}: inconsistent fugacity coefficient shape")
-            continue
-        if np.any(~np.isfinite(values)) or np.any(values <= 0.0):
-            failures.append(f"{branch}: non-finite or non-positive fugacity coefficients")
-            continue
-
-        ln_phi = np.log(values)
-        g_res = float(np.sum(composition * ln_phi))
-        if not math.isfinite(g_res):
-            failures.append(f"{branch}: non-finite reduced residual Gibbs energy")
-            continue
-        if g_res < best_g:
-            best_g = g_res
-            best_ln_phi = ln_phi
-            best_branch = branch
-
-    if best_ln_phi is None:
-        raise ModelError(
-            "No usable fugacity-coefficient branch for stability analysis ("
-            + "; ".join(failures)
-            + ")."
-        )
-    return best_ln_phi, best_branch
+    return _select_min_gibbs(
+        _cubic_root_candidates(eos, mixture=mixture, temperature=temperature, pressure=pressure),
+        composition,
+        failure_message="No usable fugacity-coefficient branch for stability analysis",
+    )
 
 
 def _pure_component_estimates(

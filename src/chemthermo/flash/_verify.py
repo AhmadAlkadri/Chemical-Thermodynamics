@@ -8,7 +8,7 @@ post-split stability re-test of every converged phase (ADR-0009 decision 4).
 from __future__ import annotations
 
 import math
-from typing import Sequence
+from typing import Literal, Sequence
 
 import numpy as np
 
@@ -91,6 +91,7 @@ def _post_split_stability(
     activity_model: ActivityModel | None,
     phases: Sequence[tuple[str, np.ndarray]],
     settings: FlashSettings,
+    vapor: Literal["none", "ideal"] = "none",
 ) -> dict[str, float | int | str | bool]:
     """Test every converged phase for stability and adjudicate the phase set.
 
@@ -107,6 +108,13 @@ def _post_split_stability(
 
     Anything else negative means the two-phase answer is not a stable phase set
     and a third phase is required, which this release cannot produce.
+
+    ``vapor`` is forwarded to :func:`chemthermo.stability_tp`, so a
+    modified-Raoult result has **both** of its phases re-tested against **both**
+    candidates (liquid and ideal vapor). That is what turns a vapor-liquid
+    answer whose liquid is inside a miscibility gap - or a liquid-liquid answer
+    that should be boiling - into a reported three-phase state instead of a
+    plausible-looking wrong one.
 
     The check always runs on the paths that can run it;
     ``settings.post_split_stability`` decides whether a *failure* raises or is
@@ -142,6 +150,7 @@ def _post_split_stability(
             pressure_Pa=pressure,
             eos=eos,
             activity_model=activity_model,
+            vapor=vapor,
             settings=stability_settings,
         )
 
