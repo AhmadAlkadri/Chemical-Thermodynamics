@@ -27,6 +27,22 @@ class NRTLParameters:
         model: "NRTL"
         pairs: list of objects with components, tau_12, tau_21, alpha_12, alpha_21
 
+    Any additional keys (top level or inside a pair entry) are ignored, so
+    documentation such as a ``provenance`` block or a per-pair ``source`` field
+    can be recorded without a schema bump.
+
+    Index convention: for a pair entry ``components: [A, B]``, ``tau_12`` is
+    ``tau_AB`` and ``tau_21`` is ``tau_BA``; `for_components` places them at
+    ``tau[index(A), index(B)]`` and ``tau[index(B), index(A)]`` respectively,
+    so ``tau[i, j] == tau_ij``. The same holds for ``alpha``, which is
+    physically symmetric (``alpha_ij == alpha_ji``) but is stored per ordered
+    pair so that asymmetric inputs are representable and detectable.
+    `chemthermo.models.nrtl` consumes these arrays with
+    ``G_ij = exp(-alpha_ij * tau_ij)``.
+
+    Note on provenance: the packaged default pairs are synthetic placeholders
+    (see the ``provenance`` block in ``nrtl.json``), not fitted data.
+
     Component names are normalized for lookup. Missing pairs raise ModelError
     when building arrays for a mixture.
     """

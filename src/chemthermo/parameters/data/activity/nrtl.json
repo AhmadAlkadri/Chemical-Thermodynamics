@@ -1,20 +1,32 @@
 {
   "schema_version": 1,
   "model": "NRTL",
+  "provenance": {
+    "status": "synthetic-demo",
+    "fitted_to_data": false,
+    "summary": "Illustrative placeholder parameters, NOT fitted to experimental data and NOT taken from any publication. They exist only so that the gamma-phi flash path, the CLI --flash-mode gamma-phi option and the examples have a runnable default. Do not use them for engineering work or cite them as physical parameters.",
+    "history": "Added ad hoc in commits e5ccd8f (Methane/Ethane) and ecd476e (Benzene/Water); no source was recorded at the time and none has been identified since.",
+    "how_to_use_real_parameters": "Build NRTLParameters.from_pairs(...) with your own fitted or literature values and pass it as NRTL(parameters=...). For a citation-backed published example see tests/fixtures/nrtl/tessier2000_problem1.json.",
+    "note": "Keys outside 'schema_version', 'model' and 'pairs' (and extra keys inside a pair entry) are documentation only; the loader ignores them, so recording provenance does not require a schema bump."
+  },
   "pairs": [
     {
       "components": ["Methane", "Ethane"],
       "tau_12": 0.2,
       "tau_21": 0.1,
       "alpha_12": 0.3,
-      "alpha_21": 0.3
+      "alpha_21": 0.3,
+      "source": "synthetic-demo",
+      "source_note": "Illustrative placeholder, not fitted data. A near-ideal light-alkane pair would in practice have gamma very close to 1."
     },
     {
       "components": ["Benzene", "Water"],
       "tau_12": 3.0,
       "tau_21": 2.0,
       "alpha_12": 0.3,
-      "alpha_21": 0.3
+      "alpha_21": 0.3,
+      "source": "synthetic-demo",
+      "source_note": "Illustrative placeholder, not fitted data. Chosen only to give a strongly non-ideal pair for demonstrations."
     }
   ]
 }
