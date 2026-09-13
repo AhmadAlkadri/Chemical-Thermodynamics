@@ -819,10 +819,11 @@ Notes:
 
 ## PC-SAFT (`chemthermo.eos`)
 
-`chemthermo.eos.PCSAFTEOS` implements the **non-associating** PC-SAFT equation
-of state of Gross & Sadowski, *Ind. Eng. Chem. Res.* **40** (2001) 1244-1260
-(hard-chain plus dispersion), with the packaged pure-component parameters of
-that paper's Table 1 (ADR-0014).
+`chemthermo.eos.PCSAFTEOS` implements the PC-SAFT equation of state of
+Gross & Sadowski, *Ind. Eng. Chem. Res.* **40** (2001) 1244-1260 (hard chain
+plus dispersion, ADR-0014), **plus the association term** of Gross & Sadowski,
+*Ind. Eng. Chem. Res.* **41** (2002) 5510-5515 (ADR-0018), with the packaged
+pure-component parameters of both papers' tables.
 
 ```python
 from chemthermo.eos import PCSAFTEOS
@@ -918,6 +919,11 @@ file was written - the values were transcribed from two independent secondary
 sources that cite it and agree digit for digit (FeOs' `gross2001.json` and
 Clapeyron.jl's `PCSAFT_like.csv`), and the 42 universal constants were taken
 from teqp's source and Wikipedia's PC-SAFT article, which likewise agree.
+The five associating records (below) come from the 2002 paper, which is
+paywalled too and was likewise **not read directly** (`pubs.acs.org` returns
+HTTP 403); they were transcribed from FeOs' `gross2002.json` and Clapeyron.jl's
+`PCSAFT_like.csv` / `PCSAFT_assoc.csv`, whose `source` column is that paper's
+DOI, and the two agree digit for digit.
 
 Supply your own with `PCSAFTParameters.from_records(...)`:
 
@@ -933,12 +939,86 @@ eos = PCSAFTEOS(components=("My fluid",), parameters=parameters)
 
 A component with no record raises `PCSAFTParameterError`.
 
+### Association (ADR-0018)
+
+Five more compounds ship with association parameters from Gross & Sadowski,
+*IECR* **41** (2002) 5510, all in the **2B** scheme (one proton-donor site and
+one proton-acceptor site per molecule, bonding A-B only): **Water, Methanol,
+Ethanol, 1-Propanol and n-Butanol**. Nothing about the call signatures changes
+- a mixture containing one of them simply gets the extra term:
+
+```python
+from chemthermo.eos import PCSAFTEOS
+
+eos = PCSAFTEOS(components=("Water",))
+eos.associates()
+# True
+
+eos.residual_helmholtz_terms(
+    temperature_K=300.0, volume_m3=1 / 55000.0, composition=[1.0]
+)
+# {'hard-chain': 5.0793036678, 'dispersion': -8.8028886238,
+#  'association': -5.7039482251, 'total': -9.4275331811}
+
+eos.site_fractions(temperature_K=300.0, density_mol_m3=55000.0, composition=[1.0])
+# [0.0356448106, 0.0356448106]    fraction of sites NOT hydrogen bonded
+```
+
+`residual_helmholtz_terms` and `site_fractions` are the two new methods; both
+are inspection helpers, and `site_fractions` returns `[]` for a non-associating
+mixture (where `residual_helmholtz_terms` reports `'association': 0.0`).
+
+Cross-association between two associating components is computed from the pure
+parameters by the Wolbach-Sandler rules (arithmetic mean in
+`epsilon^AB`, geometric mean in `kappa^AB` scaled by
+`[sqrt(sigma_i sigma_j) / (0.5 (sigma_i + sigma_j))]^3`), so a water/ethanol
+mixture needs no extra data. `k_ij` still defaults to 0 and still only enters
+the dispersion term.
+
+Supply your own sites with an `association` block:
+
+```python
+from chemthermo import PCSAFTParameters
+
+parameters = PCSAFTParameters.from_records(
+    [
+        {
+            "name": "My alcohol", "m": 2.5, "sigma_A": 3.6, "epsilon_k_K": 210.0,
+            "association": {"scheme": "2B", "kappa_ab": 0.03, "epsilon_ab_k_K": 2500.0},
+        }
+    ]
+)
+```
+
+`na` / `nb` default to `1` / `1`; `scheme` is a label and is checked against
+them for the names `2B`, `3B` and `4C`. `PCSAFTAssociationRecord` is exported
+from `chemthermo` if you prefer to build the block as an object.
+
 ### Limits, stated plainly
 
-- **Non-associating only.** The association term (Gross & Sadowski, *IECR* **41**
-  (2002) 5510) and the polar terms are not implemented. Do not use this for
-  water, alcohols, acids or amines: nothing in the code stops you, and the
-  answer will be wrong.
+- **The 2B scheme is what is validated.** Other site counts (`na`, `nb`) are
+  implemented by the same general equations and will run, but nothing
+  cross-checks them, and **induced association** (a non-associating component
+  solvating with an associating one) is not modelled at all. The **polar**
+  (dipolar / quadrupolar) terms are still not implemented, so a strongly polar
+  non-associating compound is still out of scope.
+- **`kij = 0` is a poor model for water with a hydrocarbon.** The packaged set
+  has no binary parameters at all, and PC-SAFT without a fitted one is known to
+  get water / hydrocarbon mutual solubilities wrong by an order of magnitude.
+  The cross-checks below are code checks against another implementation, not
+  evidence about the model.
+- **A liquid-liquid EOS split is only reachable where the vapour root is
+  gone.** The phi-phi split pairs one vapour-root phase with one liquid-root
+  phase, so at a pressure where both roots exist it cannot represent two
+  liquids: water / n-hexane at 298.15 K and 1 atm converges on a spurious
+  vapour-liquid pair and `flash_tp` raises `ConvergenceError` (the post-split
+  stability test catches it). Above about 0.6 MPa the vapour root no longer
+  exists, both phases sit on the single liquid root, and the same machinery
+  returns the real tie line. When it does, ADR-0017 measures both phases as
+  liquids but the phi-phi path has no `liquid1` / `liquid2` naming, so it falls
+  back to the Wilson ranking, calls them `"liquid"` / `"vapor"`, and
+  `vapor_fraction` is really the second liquid's fraction. Both are recorded
+  limitations, not bugs; the fix is the `flash-phase-addition-eos` slice.
 - **Two phases at most.** The phi-phi flash decides one phase versus two and
   stops there, whatever `FlashSettings(max_phases=...)` says (ADR-0009,
   ADR-0011). Automatic phase *addition* exists only on the `modified-raoult`
@@ -956,7 +1036,7 @@ A component with no record raises `PCSAFTParameterError`.
   **illustrative**, not a literature-validated value.
 - **No temperature derivative**, so no residual enthalpy or entropy, and no
   phase densities in `FlashResult` (compute them with `density_roots` at the
-  converged composition).
+  converged composition). That includes the association term.
 - Validated against [teqp](https://github.com/usnistgov/teqp) (NIST, MIT,
   automatic differentiation) to better than 3e-14 in `A^res/RT`, `Z` and
   `ln phi` over fourteen states; against its `pure_VLE_T` saturation solver for
@@ -969,6 +1049,21 @@ A component with no record raises `PCSAFTParameterError`.
   `mix_VLE_Tx` to 1.4e-8 relative. See validation Cases P-0 to P-5,
   `examples/validation/13_pcsaft_vs_teqp.py` and
   `examples/validation/14_pcsaft_flash_vs_teqp.py`.
+- The **association** term is validated against
+  [FeOs](https://github.com/feos-org/feos) (MIT OR Apache-2.0, automatic
+  differentiation), which teqp cannot serve because its PC-SAFT has no
+  association. Over eighteen states - pure water and pure ethanol at four each,
+  plus water/ethanol, water/n-hexane and a ternary - the association
+  contribution agrees to **3.1e-15** and, once FeOs's own universal constants
+  are substituted in, `A^res/RT`, `Z` and `ln phi` agree to **1.3e-11**. (FeOs
+  hard-codes the 2001 paper's 42 universal constants to fourteen figures where
+  the paper prints ten; as shipped that floors the comparison at 3.9e-09 in `Z`
+  and 1.7e-06 in `ln phi`, which is an input difference, not a model
+  difference.) Pure-water saturation at 373.15 K matches FeOs's own solver to
+  3.7e-10 relative, and FeOs's fugacities evaluated at chemthermo's converged
+  phases give equal fugacities to 6.1e-10 (water/ethanol VLE) and 1.2e-11
+  (water/n-hexane LLE). See validation Cases P-6 and P-7 and
+  `examples/validation/16_pcsaft_association_vs_feos.py`.
 
 ## EOS extension points
 

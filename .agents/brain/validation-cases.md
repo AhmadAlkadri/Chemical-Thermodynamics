@@ -2457,3 +2457,300 @@ regression this slice fixes.
 - **Script:** `examples/basic/flash_tp_pcsaft_demo.py`,
   `examples/validation/15_flash_split_robustness.py` (`--full` for the
   complete grid).
+
+---
+
+## Case P-6: PC-SAFT association term by term against FeOs 0.10.1
+
+- **Source:** FeOs (feos-org/feos), https://github.com/feos-org/feos, MIT OR
+  Apache-2.0 - an independent Rust implementation of Gross & Sadowski (2001)
+  **and** (2002) whose derivatives are all obtained by automatic
+  differentiation (`num-dual`), where chemthermo writes them analytically.
+  **teqp cannot serve here**: its `PCSAFT` kind implements no association term.
+  FeOs reproduces teqp on non-associating n-hexane (`A^res/RT` at 300 K /
+  7700 mol/m^3: teqp `-5.783742760059240`, chemthermo `-5.783742760059239`,
+  FeOs `-5.783742760694397`; see the universal-constants note below), so the
+  two external references corroborate each other where they overlap.
+- **Location:** `PureRecord.from_json_str` with an `association_sites` entry,
+  `Parameters.new_pure` / `Parameters.from_records` (an empty binary-record
+  list, i.e. `k_ij = 0`), `EquationOfState.pcsaft`, `State(eos, temperature=,
+  density=, composition=)`, then
+  `State.residual_molar_helmholtz_energy_contributions()` (per-term J/mol,
+  keys `Hard Sphere`, `Hard Chain`, `Dispersion`, `Association`),
+  `State.pressure()` and `State.chemical_potential(Contributions.Residual)`.
+- **Assumptions:** 2B association (`na = nb = 1`) for every associating
+  component; `k_ij = 0` throughout; the state is fixed by `(T, rho, x)` on both
+  sides, so no root selection is involved.
+- **Components / units:** 18 states. Pure water at (300 K, 55000), (350 K,
+  50000), (373.15 K, 100), (550 K, 41241.19) and (550 K, 1250.01) mol/m^3;
+  pure ethanol at (300 K, 17000), (350 K, 15928.62), (450 K, 691.11) and
+  (500 K, 9929.27); water/ethanol at 0.2/0.8, 0.5/0.5 and 0.8/0.2 (320 K,
+  liquid-like), at 0.5/0.5 (400 K, 94.62, gas-like) and at 0.2/0.8 (351 K,
+  18574.96); water/n-hexane at 0.3/0.7 and 0.9/0.1 (298.15 K, liquid-like) and
+  0.5/0.5 (400 K, 93.93, gas-like); and the ternary methanol/water/n-hexane
+  0.3/0.4/0.3 at (320 K, 16684.84). Every state has `Z > 0`.
+- **Parameters and provenance:** Gross & Sadowski, *Ind. Eng. Chem. Res.* **41**
+  (2002) 5510-5515 (DOI 10.1021/ie010954d), Table 1, for the associating five -
+  Water 1.0656 / 3.0007 / 366.51 / 0.034868 / 2500.7; Methanol 1.5255 / 3.2300
+  / 188.90 / 0.035176 / 2899.5; Ethanol 2.3827 / 3.1771 / 198.24 / 0.032384 /
+  2653.4; 1-Propanol 2.9997 / 3.2522 / 233.40 / 0.015268 / 2276.8; n-Butanol
+  (the paper's "1-butanol") 2.7515 / 3.6139 / 259.59 / 0.006692 / 2544.6
+  (`m`, `sigma`/A, `eps/k` in K, `kappa^AB`, `eps^AB/k` in K) - and the 2001
+  Table 1 record for n-hexane. **The 2002 paper was not read**:
+  `https://pubs.acs.org/doi/10.1021/ie010954d` returned HTTP 403 from the
+  environment that produced this entry, exactly as the 2001 paper did. The
+  values were transcribed from two independent secondary sources that both
+  cite that DOI and agree digit for digit: FeOs's
+  `parameters/pcsaft/gross2002.json` and Clapeyron.jl's
+  `database/SAFT/PCSAFT/PCSAFT_like.csv` + `PCSAFT_assoc.csv` (whose `source`
+  column is the DOI, and whose `n_H = n_e = 1` confirms the 2B scheme). The
+  reference model in the test is built from values written **in the test
+  file**, not read from the package under test.
+- **Expected outcome:** every term of `A^res/(R T)` separately, plus the total,
+  `Z` and `ln phi_i`, equal FeOs's.
+- **The one shared input that is not shared - and what it costs.** chemthermo
+  packages the 2001 paper's 42 universal constants **as printed**, to ten
+  significant figures, which is also what teqp uses (the two agree on
+  `A^res/RT` to 4.4e-15, Case P-1). FeOs hard-codes the same constants to
+  **fourteen** figures (`crates/feos/src/pcsaft/eos/dispersion.rs`); the two
+  tables differ by up to **4.8e-09** termwise. That is a difference in an
+  *input*, not in the model or the derivatives, and it floors any comparison
+  of the dispersion term. Every dispersion-dependent quantity is therefore
+  compared twice. **Achieved worst |difference| over all 18 states:**
+
+  | quantity | as shipped | with FeOs's constants |
+  |---|---:|---:|
+  | hard chain (`a_hs + a_hc`) | 7.11e-15 | 7.11e-15 |
+  | dispersion | 7.13e-10 | 8.88e-15 |
+  | **association** | **3.11e-15** | **3.11e-15** |
+  | `A^res/RT` | 7.13e-10 | 7.11e-15 |
+  | `Z` | 3.86e-09 | 3.40e-14 |
+  | `ln phi_i` | 1.74e-06 | 1.31e-11 |
+
+  The association term does **not** depend on those constants and matches to
+  round-off either way, which is the comparison this case exists for. The
+  `ln phi` figure as shipped is the largest because a dilute component's
+  `ln phi` amplifies the difference (worst state: water/n-hexane 0.9/0.1 at
+  298 K). Substituting FeOs's own constants is done by monkeypatching
+  `chemthermo.eos.pcsaft.A_UNIVERSAL` / `B_UNIVERSAL` in the test; the shipped
+  package is **not** changed, because its stated provenance is the paper's
+  table as printed and Cases P-0 to P-5 are pinned against it.
+- **Tolerance:** asserted 1e-10 for the association and hard-chain terms with
+  either table, and for *every* quantity with FeOs's table; 1e-8 for
+  `A^res/RT` and `Z` as shipped; 1e-5 for `ln phi` as shipped. All achieved
+  values are in the table above.
+- **The `sigma^3` versus `d^3` question, settled numerically.** The
+  association strength is
+  `Delta = sigma_ij^3 g_ij^hs(d_ij) kappa^{AB}_ij [exp(eps^{AB}_ij/kT) - 1]`.
+  Both `sigma_ij^3` and `d_ij^3` appear in the literature for this prefactor,
+  and at 300 K water's `d` is 2.9915 A against `sigma = 3.0007` A, so the
+  choice moves the cube by 0.93 % and `a_assoc` by 0.16 % of itself at a liquid
+  density. Since the paper could not be read, the
+  test recomputes the pure-water 2B term from scratch, in the test file, both
+  ways, at (300 K, 55000 mol/m^3): **`sigma^3` reproduces FeOs's
+  `-5.703948225068` to 0.0 (exactly, in double precision) and `d^3` is
+  8.9e-03 away.** `sigma_ij^3` is what is implemented. Since the parameters
+  and the convention were regressed together, the other spelling would be
+  wrong with these parameters whatever the paper prints.
+- **The cross-association rules, confirmed against a third source.** The
+  Wolbach-Sandler rules (*IECR* **37** (1998) 2917) -
+  `eps^{AB}_ij = (eps_ii + eps_jj)/2` and
+  `kappa^{AB}_ij = sqrt(kappa_ii kappa_jj) [sqrt(sigma_i sigma_j) /
+  (0.5(sigma_i + sigma_j))]^3` - reproduce Clapeyron.jl's **explicitly stored**
+  water/ethanol cross pair (`epsilon_assoc = 2577.05` K,
+  `bondvol = 0.03356196748232913`, source DOI 10.1021/ie010954d) digit for
+  digit from the two pure records. The plain geometric mean
+  (`sqrt(kappa_ii kappa_jj) = 0.03360305509920192`) does not, and using it
+  moves `a_assoc` for a 0.5/0.5 water/ethanol liquid by 5.8e-04 - so the
+  sigma-ratio factor is not decorative.
+- **Derivative discipline (internal invariants, no external dependency),
+  ten states** covering pure water, pure ethanol, water/ethanol,
+  water/n-hexane and the ternary: `Z` against a central difference of
+  `A^res/RT` in the density, `ln phi_i` against a central difference of
+  `n A^res/RT` in the mole numbers at fixed `(T, V)`, the Euler identity
+  `sum_i x_i ln phi_i = A^res/RT + Z - 1 - ln Z`, the packing-fraction path's
+  `a'` and `a''` against central differences, `dP/drho` against a central
+  difference of the public `pressure_Pa`, the mass-action residual
+  `X_a (1 + rho (Delta W X)_a) - 1`, and Michelsen-Hendriks stationarity
+  `dQ/dX = 0` with `Q` written out in the test file from its definition (both
+  analytically and by central difference). **Achieved:** `|dZ| <= 4.13e-09`,
+  `max_i |d ln phi_i| <= 7.26e-09`, Euler `<= 1.78e-15`, `a'` `<= 4.94e-09`,
+  `a''` `<= 4.76e-09`, `dP/drho` `<= 3.72e-10`, mass action `<= 4.44e-16`
+  (and `<= 4.44e-16` over the whole 1599-point density scan grid),
+  stationarity `< 1e-12` analytically and `< 1e-6` by finite difference at a
+  1e-7 relative step. Asserted: 1e-8 for `Z`, 1e-7 for `ln phi`, 1e-13 for
+  Euler, 1e-7 for `a'`/`a''`, 1e-13 for mass action, 1e-12 for stationarity.
+  The finite-difference figures are step-limited, not accuracy-limited.
+- **Negative control:** a 1 % change in water's `kappa^AB` moves `a_assoc` by
+  9.60e-03, and a 1 % change in `sigma` moves `A^res/RT` by 4.15e-03
+  (Case P-1's control, still asserted), so neither agreement is vacuous.
+- **Why the site solve is damped substitution + Newton and not substitution
+  alone** (measured, to a 1e-14 mass-action residual): plain undamped
+  substitution needs **926** steps for pure water at 300 K / 55 kmol/m^3 and
+  **does not converge within 200,000 steps** for a 0.2/0.8 water/ethanol
+  liquid at 300 K / 40 kmol/m^3, where the map oscillates (500 plain steps
+  there leave `a_assoc` 4.2e-02 wrong). Damping to 0.5 needs 14 and 52 steps.
+  The shipped solver takes 12 damped steps and then Newton: 0 further steps for
+  pure water, 2 for the water/ethanol state, and over the whole 1599-point
+  density scan grid the 12 damped steps already leave a worst residual of
+  4.4e-16.
+- **Robustness sweep (internal):** five associating systems (pure water,
+  water/ethanol, water/n-hexane, methanol/water/n-hexane,
+  1-propanol/n-butanol/water) at 250 / 298.15 / 350 / 500 / 800 K over 40
+  geometrically spaced densities from 1e-6 to 60,000 mol/m^3 - 1000 states.
+  Every state either returns finite `A^res/RT`, `Z` and site fractions in
+  `(0, 1]`, or raises the pre-existing `eta` out-of-range `ModelError`. Zero
+  `nan`s, zero unexpected exceptions.
+- **Bit-identity of the non-associating path:** n-hexane at 300 K and
+  7700 mol/m^3 still gives exactly `A^res/RT = -5.783742760059239`,
+  `Z = 0.661534529144653`, `ln phi = -5.709015132378622`, and its density
+  roots at `Psat(300 K)` are still exactly
+  `(8.868596301913758, 7518.498733715524)` - asserted with `==`, not a
+  tolerance, because the association code does not run when no component has
+  sites.
+- **Permutation invariance:** reordering methanol/water/n-hexane reproduces
+  `A^res/RT` to 1.1e-16 and `ln phi_i` to **3.8e-13** relative. That is looser
+  than the non-associating path's round-off because the site sums are
+  accumulated in component order; recorded rather than asserted tightly.
+- **Not compared:** any temperature derivative (FeOs has them, chemthermo has
+  none - recorded as a gap, not skipped silently); any association scheme other
+  than 2B; induced association (not implemented).
+- **Independent route:** FeOs (external, autodiff, Rust), plus Clapeyron.jl's
+  stored cross-association pair for the combining rules and finite differences
+  written in the test for the derivatives.
+- **Test path:** `tests/validation/test_pcsaft_association_vs_feos.py`,
+  `tests/test_pcsaft_association.py`
+- **Script:** `examples/validation/16_pcsaft_association_vs_feos.py`.
+
+---
+
+## Case P-7: Phase equilibrium with associating PC-SAFT
+
+- **Source:** FeOs 0.10.1, as Case P-6: `PhaseEquilibrium.pure(eos, T)` (its
+  own Newton solve of the pure saturation condition), `State.tp_flash()` (its
+  own two-phase flash) and `State.chemical_potential(Contributions.Residual)`
+  evaluated at **chemthermo's** converged phases and densities.
+- **Location:** `stability_tp(mixture, ..., eos=PCSAFTEOS())` and
+  `flash_tp(mixture, ..., eos=PCSAFTEOS())`. **No solver changed** in the
+  `pcsaft-association` slice: `stability/`, `flash/` and `models/` are
+  untouched by it.
+- **Assumptions:** 2B association; `k_ij = 0`; the packaged 2002 parameters.
+  The equilibrium comparisons against FeOs run with **FeOs's** universal
+  constants substituted into chemthermo (see Case P-6), because FeOs evaluates
+  fugacities at chemthermo's own densities and the table difference otherwise
+  floors the residual; the tie lines are the same to eight decimal places
+  either way, and the pure-water saturation comparison below is run on the
+  **shipped** constants.
+- **Components / units:** water at 373.15 K; water/ethanol at 351 K and
+  80 kPa, `z = (0.7, 0.3)`; water/n-hexane at 298.15 K, `z = (0.5, 0.5)`, at
+  101,325 Pa and at 1 MPa. Pressures in Pa, densities in mol/m^3.
+
+### (i) Pure-water saturation at 373.15 K
+
+- **Route:** bisection (90 steps) on
+  `ln phi(liquid root) - ln phi(vapour root) = 0`, with chemthermo's own
+  `density_roots` supplying the two branches - the Case P-2 route updated to
+  use the ADR-0015 root solver. FeOs reaches the same state by a Newton
+  iteration of its own, so only the model is shared.
+- **Expected outcome (FeOs):** `Psat = 100,890.27301264 Pa`,
+  `rho_L = 48,755.50956363`, `rho_V = 33.12715221` mol/m^3.
+- **Achieved (chemthermo, shipped constants):** `100,890.27305023 Pa`,
+  `48,755.50956045`, `33.12715222` - relative **3.73e-10**, **6.52e-11** and
+  **3.36e-10** against an asserted 1e-6. The residual difference is the
+  universal-constants table, not the solvers. The saturation condition
+  restated on chemthermo's own numbers gives
+  `|ln phi_L - ln phi_V| < 1e-9`.
+- **Model versus experiment (remark, not an assertion):** 373.15 K *is*
+  water's normal boiling point, so the experimental saturation pressure there
+  is 101,325 Pa by definition. PC-SAFT with the 2002 parameters is **0.43 %
+  low**. Nothing asserts that; this case validates one implementation against
+  another.
+
+### (ii) Water / ethanol vapour-liquid flash at 351 K and 80 kPa
+
+- **Expected outcome:** `stability_tp` unstable, `flash_tp` returns a verified
+  two-phase VLE result, and FeOs agrees the two phases are in equilibrium.
+- **Achieved:** `stability_tp` -> `unstable`, `tpd_min = -2.582408e-01`.
+  `flash_tp` -> `vapor_fraction = 0.60468054`,
+  liquid `x = (0.95844408, 0.04155592)` at 45,864.1053 mol/m^3,
+  vapour `y = (0.53103810, 0.46896190)` at 28.2488 mol/m^3,
+  `phase_regime = "VLE"`, `phase_label_method = "compressibility"`,
+  `delta_g_split_rt = -5.928e-02`, `mass_balance_residual = 8.8e-14`,
+  `fugacity_residual = 6.58e-10`, `post_split_status = "stable"`.
+  **FeOs's own fugacities at chemthermo's phases and densities give
+  `max_i |ln(x_i phi_i)^I - ln(x_i phi_i)^II| = 6.12e-10`** against an
+  asserted 1e-8. (With the shipped universal constants the same residual is
+  2.53e-06 and the compositions are unchanged to eight decimal places.)
+- The two-phase window at 351 K is narrow with these parameters: the same feed
+  is a single stable liquid at 1 atm, and at `z = (0.5, 0.5)` the unstable
+  band found on a 5 kPa scan is 85-95 kPa.
+
+### (iii) Water / n-hexane at 298.15 K - what the phi-phi path can and cannot do
+
+- **At 1 atm, the documented failure.** `stability_tp` is **right**: the feed
+  is `unstable` with `tpd_min = -9.281926e-01`. `flash_tp` then **raises
+  `ConvergenceError`** ("a third phase is required"). With
+  `FlashSettings(post_split_stability=False)` the converged pair is a
+  water-rich liquid `(0.99992175, 0.00007826)` on the liquid root against a
+  hexane-rich phase `(0.03206195, 0.96793805)` on the **vapour** root
+  (43.3 mol/m^3), with `delta_g_split_rt = +0.2594` - i.e. a "split" whose
+  Gibbs energy is *above* the feed's - and both phases individually unstable
+  (`tpd = -1.53` and `-0.78`). The post-split test catches it. **The cause is
+  structural, not numerical**: `_split._ln_phi_function` evaluates one phase
+  with `phase="liquid"` and the other with `phase="vapor"`, so the phi-phi
+  path cannot put both phases on the liquid density branch, and at 1 atm a
+  vapour root still exists. The true answer at that state is two liquids -
+  water's and n-hexane's vapour pressures sum to about 23 kPa, far below
+  1 atm - and **FeOs's own `State.tp_flash()` at the same state returns
+  exactly that**: `x = (0.00631, 0.99369)` at 7578.0 mol/m^3 and
+  `(0.99998, 0.00002)` at 51,174.6 mol/m^3, both liquid densities. Recorded as
+  a limitation of the flash path, not worked around; the brief for this slice
+  forbade touching the solvers and the fix belongs to
+  `flash-phase-addition-eos`.
+- **At 1 MPa, the liquid-liquid split is reachable and correct.** Above about
+  0.6 MPa the isotherm has a **single** density root at every composition
+  checked (0.5/0.5, 0.999/0.001, 0.001/0.999), so `"vapor"` and `"liquid"`
+  name the same root and the unchanged machinery expresses a genuine
+  liquid-liquid split. Achieved: `stability_tp` -> `unstable`; `flash_tp` ->
+  water-rich `(0.99998318, 0.00001682)` at 51,185.85 mol/m^3 and hexane-rich
+  `(0.00630483, 0.99369517)` at 7,591.86 mol/m^3,
+  `delta_g_split_rt = -5.079e-01`, `fugacity_residual = 2.56e-13`,
+  `post_split_status = "stable"`. `PCSAFTEOS.phase_identity` measures **both**
+  phases as `"liquid"`. FeOs's fugacities at those phases give an
+  equal-fugacity residual of **1.22e-11** against an asserted 1e-8 (2.62e-07
+  with the shipped constants). The compositions agree with FeOs's own 1 atm
+  `tp_flash` to the printed five decimal places, as they should - a liquid
+  tie line barely moves between 1 atm and 1 MPa.
+- **The labels actually produced, recorded as fact.** Both phases are liquids
+  by the ADR-0017 compressibility criterion, so the two-phase orientation rule
+  falls through to its documented fallback: the phases come back named
+  `"liquid"` and `"vapor"`, `diagnostics["phase_label_method"] ==
+  "wilson-ranking"`, and `vapor_fraction = 0.503164` is really the hexane-rich
+  **liquid**'s fraction. ADR-0017 anticipated the near-critical version of
+  this; a liquid-liquid EOS split is a second, more common way in. Naming them
+  `liquid1` / `liquid2` requires `_detect` to grow that vocabulary for
+  phi-phi, which is a flash-module change and out of this slice's scope.
+- **Model versus experiment (remark, not an assertion):** this model gives
+  **1.68e-05** mole fraction hexane in the water-rich phase and **6.30e-03**
+  water in the hexane-rich phase. Commonly tabulated experimental values are
+  about **2e-6** and **5e-4** at 298 K - figures that were **not verified
+  against a primary source here**. The model is an order of magnitude out on
+  both, which is the expected behaviour of PC-SAFT with `k_ij = 0` for a
+  water/hydrocarbon pair. **This case is a check of the code against another
+  implementation, not of the model against measurement.**
+- **Tolerance:** asserted 1e-6 relative on the three saturation numbers
+  (achieved <= 3.73e-10) and 1e-8 on both equal-fugacity residuals (achieved
+  6.12e-10 and 1.22e-11).
+- **Not covered:** a three-phase (vapour + two liquids) EOS state, which this
+  system has at 1 atm and which no path in this package can return; any
+  liquid-liquid EOS split at a pressure where a vapour root still exists.
+- **Independent route:** FeOs's own saturation Newton solve, its own two-phase
+  flash, and its own chemical potentials evaluated at chemthermo's converged
+  states.
+- **Test path:** `tests/validation/test_pcsaft_association_vs_feos.py`
+  (`test_pure_water_saturation_matches_feos`,
+  `test_water_ethanol_vapor_liquid_flash_matches_feos`,
+  `test_water_hexane_is_unstable_and_the_phi_phi_split_cannot_express_two_liquids`,
+  `test_water_hexane_liquid_liquid_split_above_the_vapour_root`)
+- **Script:** `examples/validation/16_pcsaft_association_vs_feos.py`,
+  `examples/basic/pcsaft_association_demo.py`.
