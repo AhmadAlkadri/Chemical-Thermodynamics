@@ -2064,8 +2064,154 @@ Rules:
 - **Two-phase limit:** phi-phi stops at two phases whatever
   `FlashSettings.max_phases` says (ADR-0009, ADR-0011), and the test asserts
   that a `max_phases=3` run returns two phases and no `phase_set_history`.
+- **Amendment (ADR-0016, Case F-4):** the phi-phi split gained an extended
+  (negative-flash) Rachford-Rice and a second-order stage after this case was
+  recorded. **Every number in this entry is unchanged**: all seven tie lines,
+  the three bubble pressures and the `kij` state converge in the first stage,
+  where the extended solver returns the in-window solver's `float` bit for
+  bit, so none of them enters the new code path. Re-measured, not assumed -
+  `tests/validation/test_pcsaft_flash_vs_teqp.py` passes unchanged.
 - **Independent route:** teqp's continuation + Newton equilibrium solver, and
   teqp's own fugacity coefficients evaluated at chemthermo's answer.
 - **Test path:** `tests/validation/test_pcsaft_flash_vs_teqp.py`,
   `tests/test_pcsaft_flash.py` (flash section).
 - **Script:** `examples/validation/14_pcsaft_flash_vs_teqp.py`.
+
+---
+
+## Case F-4: phi-phi split robustness - the negative flash and the second-order stage
+
+- **Source:** The defect and the fix are internal (ADR-0016). The *method* is
+  published: the negative flash is C. H. Whitson and M. L. Michelsen, "The
+  negative flash", *Fluid Phase Equilibria* **53** (1989) 51-71, and the
+  admissible window is the two-phase case of the `t_i > 0` region of
+  C. F. Leibovici and J. Neoschil, *Fluid Phase Equilibria* **112** (1995)
+  217-221. The reference equilibrium at the reference state is produced by an
+  **independent route**, not read from a source: a damped Newton on the
+  equal-fugacity system in vapor mole numbers, written in the test and in the
+  script, with a finite-difference Jacobian of that residual.
+- **Location:** `tests/test_flash_phi_phi_second_order.py`,
+  `tests/validation/test_flash_split_robustness_pcsaft.py`,
+  `tests/test_rachford_rice_extended.py`.
+- **Assumptions:** PC-SAFT (Gross & Sadowski 2001) hard chain + dispersion, no
+  association, `kij = 0`. Mole fractions; T in K, P in Pa, densities in
+  mol/m^3; `tpd`, `beta` and `dG/RT` dimensionless.
+- **Components / units:** carbon dioxide / n-decane and methane / n-hexane.
+  Grid: CO2/n-decane `z1` in {0.6, 0.8, 0.9} x T in {230, 240, 250, 260} K x
+  P in {1.0, 1.5, 2.0, 2.5} MPa (48 states); methane/n-hexane `z1` in
+  {0.5, 0.8, 0.9, 0.95} x T in {170, 180, 190, 195, 200} K x P in
+  {0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5} MPa (140 states). 188 in total.
+- **Parameters and provenance:** packaged PC-SAFT records (Gross & Sadowski
+  2001 Table 1, `src/chemthermo/parameters/data/eos/pcsaft.json`); the
+  validation test rebuilds teqp's model from the same four records written out
+  in that file. No `kij`.
+
+- **The defect (measured at commit `cf846fe`, before ADR-0016).** Four of the
+  188 states raised `ConvergenceError("Rachford-Rice failed to bracket a vapor
+  fraction.")` on the tangent-plane path - all four also on the legacy path:
+
+  | binary | z1 | T / K | P / MPa |
+  |---|---|---|---|
+  | CO2 / n-decane | 0.8 | 250 | 1.0 |
+  | CO2 / n-decane | 0.9 | 240 | 1.0 |
+  | CO2 / n-decane | 0.9 | 250 | 1.0 |
+  | CO2 / n-decane | 0.9 | 260 | 1.5 |
+
+  At 240 K / 1.0 MPa the stability test is unambiguous (`tpd_min =
+  -5.668015362e-02`, feed branch liquid, minimizer `w = (1 - 4.24e-08,
+  4.24e-08)`), the seeded K-values bracket (`f(0) = +0.058`, `f(1) = -2.2e+05`)
+  and successive substitution then oscillates: `K_CO2` = 1.176, 1.095, 1.196,
+  1.073, 1.225, 1.042, 1.258, 1.009, 0.991, with the Rachford-Rice root
+  negative at iterations 1, 3, 5 and 7 and **no root at all** at iteration 9.
+
+- **The reference equilibrium at 240 K / 1.0 MPa** (independent damped Newton,
+  two different starting vapor fractions, residual `<= 7.3e-14`):
+
+  | quantity | value |
+  |---|---|
+  | `beta` | 0.1835824343 |
+  | `x` (CO2, n-decane) | (0.87751368, 0.12248632) |
+  | `y` (CO2, n-decane) | (1 - 7.0725e-08, 7.0725e-08) |
+  | `dG_split/RT` | -5.5909263161e-03 |
+  | `rho` at `x` / mol m^-3 | 699.97874 (vapor-like), 17250.70876 (liquid-like) |
+  | `rho` at `y` / mol m^-3 | 557.81918 (vapor-like), 24161.93786 (liquid-like) |
+
+  `flash_tp` after ADR-0016 agrees to **worst `|d beta| = 7.8e-13`** and
+  **worst `|d composition| = 1.2e-13`** (asserted 1e-8), with
+  `mass_balance_residual = 0.0`, `fugacity_residual = 6.7e-13`,
+  `post_split_status = "stable"`, and the reported `delta_g_split_rt`
+  reproduced from the public API to `< 1e-12`. The split converges in
+  **9 successive-substitution + 9 second-order iterations**, using
+  **4 negative-flash steps**.
+
+- **teqp cross-check at the reference state.** teqp 0.23.2's own
+  `get_fugacity_coefficients`, evaluated at chemthermo's converged
+  compositions and at the densities `PCSAFTEOS.density_roots` returns for them,
+  makes the two phases' fugacities equal to **5.5e-13** relative (asserted
+  1e-8). No reference tie line is used. Negative control: perturbing CO2's
+  `sigma` by 1 % breaks the agreement past 1e-3.
+
+- **The grid, after ADR-0016** (tangent-plane path, default `FlashSettings`):
+
+  | quantity | before (`cf846fe`) | after |
+  |---|---|---|
+  | states | 188 | 188 |
+  | `ConvergenceError` | **4** | **0** |
+  | two-phase answers | 119 | 123 |
+  | single-phase answers | 65 | 65 |
+  | states needing the second-order stage | - | 4 |
+  | states using a negative flash | - | 4 |
+
+  Worst invariants over the 123 two-phase answers: `mass_balance_residual`
+  **1.86e-13**, `fugacity_residual` **3.58e-08** (a state converged by
+  successive substitution at `tol = 1e-8` on the K-update; the four rescued
+  states are at `<= 6.7e-13`), least negative `delta_g_split_rt`
+  **-3.95e-04**, worst post-split `tpd_min` **-8.13e-09** - inside the default
+  `tpd_tol = 1e-8` by a factor of 1.2, which is a *tighter* margin than the
+  -7.0e-09 recorded for the Peng-Robinson grid in Case L-4 and is worth
+  watching. Every single-phase answer is a `"stable"` stability verdict, never
+  a fallback.
+
+- **Bit-identity (the load-bearing claim).** All **184** states that converged
+  before ADR-0016 return the same phase fractions, compositions and residuals
+  afterwards, compared with `==`. Independently, over a **1248-state**
+  Peng-Robinson grid (the 6 mixtures of Case F-3, T 150-400 K in 10 K steps,
+  8 pressures from 0.1 to 8 MPa) **1247 states are unchanged** and the single
+  changed state is the weakly unstable near-critical
+  methane/ethane/propane (0.5, 0.3, 0.2) at 290 K and 8 MPa, which previously
+  exhausted the iteration limit (`max_delta_k = 3.578e-04`) and now converges
+  through the second-order stage to `beta = 0.44737586`,
+  `fugacity_residual = 1.8e-15`, `delta_g_split_rt = -1.487e-05`, post-split
+  stable. That was the open item recorded in `brain.md` as "an accelerated /
+  second-order phi-phi split"; it is discharged.
+- **The extended Rachford-Rice itself** is checked separately in
+  `tests/test_rachford_rice_extended.py`: the window is exactly the set where
+  every phase mole fraction is non-negative (scanned); `f` is strictly
+  decreasing on it (scanned, 5000 points); a root below 0 and a root above 1
+  are each found to a residual `< 1e-14` and, for a binary, agree with the
+  closed form `beta = -(z1 a1 + z2 a2) / (a1 a2)` derived in the test to 1e-12;
+  all-`K`-on-one-side gives no window and no root; and **every in-window root
+  is the pre-ADR-0016 solver's `float` compared with `==`** - on 400 random
+  `(z, K)` draws and on 60 K-vectors taken from real Peng-Robinson iterations.
+- **Error semantics.** A converged vapor fraction outside `(0, 1)` while the
+  feed is unstable raises `ConvergenceError` naming `beta` and `tpd_min`. **No
+  state in this repository reaches that path**, so it is exercised by a
+  **synthetic** fixture (the converged split is replaced; the feed, the model
+  and the stability verdict are real), and the test says so.
+- **Not covered:** the legacy `phase_detection="wilson-heuristic"` path, which
+  still raises on all four states **by design** (ADR-0016 decision 8) and is
+  asserted to; gamma-phi, gamma-gamma and modified-Raoult, whose Rachford-Rice
+  is unchanged; and any claim that the second-order stage always succeeds -
+  what is measured is that it succeeds on these four states and on the one
+  Peng-Robinson state above.
+- **Tolerance:** asserted `|d beta| <= 1e-8` and `|d composition| <= 1e-8`
+  against the independent Newton (achieved 7.8e-13 / 1.2e-13); teqp
+  equal-fugacity `< 1e-8` (achieved 5.5e-13); grid `mass_balance < 1e-12`,
+  `fugacity_residual < 1e-6`, `delta_g_split_rt < 0` on every two-phase state.
+- **Independent route:** a damped Newton on the equal-fugacity system written
+  in the test and in the script (a different formulation from the solver's
+  Gibbs minimization), plus teqp 0.23.2's own fugacity coefficients.
+- **Test path:** `tests/test_flash_phi_phi_second_order.py`,
+  `tests/validation/test_flash_split_robustness_pcsaft.py`,
+  `tests/test_rachford_rice_extended.py`.
+- **Script:** `examples/validation/15_flash_split_robustness.py`.

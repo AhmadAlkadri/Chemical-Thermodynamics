@@ -91,8 +91,8 @@ flash_tp -> stability_tp(feed) -> single phase | split seeded from the minimizer
   `diagnostics["tpd_min"]` records the smallest tangent-plane distance found.
 - An **unstable** feed seeds the K-values from the converged stationary point
   (`diagnostics["k_seed"] == "stability"`; the Wilson estimate stays as a
-  fallback and is reported as `"wilson"` when it is used), and the existing
-  Rachford-Rice / successive-substitution split runs unchanged.
+  fallback and is reported as `"wilson"` when it is used), and the
+  Rachford-Rice / successive-substitution split runs from there.
 - An **inconclusive** stability analysis raises `ConvergenceError` rather than
   quietly returning one phase.
 - Every converged two-phase result reports its own verification residuals:
@@ -141,6 +141,9 @@ python examples/basic/flash_tp_auto_phase_demo.py
   the next slice.
 - **The converged phases are re-tested for stability** (ADR-0009); see
   "Post-split stability" below.
+- **A split that successive substitution cannot finish is finished by a
+  second-order stage** (ADR-0016); see "When successive substitution
+  oscillates" below.
 - `"stable"` means no negative tangent-plane distance was found from the
   deterministic trial set, not a global proof (same bound as `stability_tp`).
 - **Liquid-liquid splits have their own mode**, `gamma-gamma`; see
@@ -160,6 +163,48 @@ python examples/basic/flash_tp_auto_phase_demo.py
   smallest. `EquationOfState` exposes no molar volume, so no density-based
   identification is available; this decides the *name* only, never the verdict
   or the compositions.
+
+### When successive substitution oscillates
+
+Successive substitution on the K-values is only linearly convergent, and on
+some feeds it oscillates instead: the K-values cross 1 back and forth and the
+implied vapor fraction leaves `[0, 1]`, or there is momentarily no vapor
+fraction at all. Before ADR-0016 that ended the flash with
+`ConvergenceError("Rachford-Rice failed to bracket a vapor fraction.")`, for
+feeds the tangent-plane test had already *proved* to be two-phase.
+
+Two things now keep it going, and neither changes any answer that converged
+before:
+
+- the vapor fraction may leave `[0, 1]` **during** iteration (the "negative
+  flash" of Whitson & Michelsen 1989), solved on the window
+  `1 / (1 - K_max) < beta < 1 / (1 - K_min)` - precisely the range over which
+  every phase mole fraction is non-negative. The in-window solver is called
+  first and its answer is returned unchanged when it has one, so an iterate
+  that worked before is bit-for-bit unchanged;
+- the second-order Gibbs-energy minimization already used by the liquid-liquid
+  split finishes the job when successive substitution has spent its whole
+  `max_iter` budget.
+
+A result that needed the second stage says so, and **only then** carries the
+extra keys `converged_stage`, `ssi_iterations`, `second_order_iterations` and
+`negative_flash_steps` - read them with `.get()`. A converged vapor fraction
+outside `(0, 1)` is still an error: it contradicts the stability verdict that
+started the split.
+
+`FlashSettings(second_order=False)` turns the stage off;
+`phase_detection="wilson-heuristic"` is the full pre-ADR-0016 behavior and
+still fails on these feeds, deliberately.
+
+Measured (validation Case F-4): over a 188-state PC-SAFT grid (CO2 / n-decane
+and methane / n-hexane) the `ConvergenceError` count goes **4 to 0**, all 184
+states that converged before are bit-identical, and over a 1248-state
+Peng-Robinson grid 1247 states are unchanged while the one near-critical state
+that used to exhaust the iteration limit now converges.
+
+```bash
+python examples/validation/15_flash_split_robustness.py
+```
 
 ### Liquid-liquid flash (`gamma-gamma`)
 
@@ -962,7 +1007,8 @@ python examples/validation/14_pcsaft_flash_vs_teqp.py
 ```
 
 Every validation test and script skips cleanly when its optional dependency is
-missing.
+missing. `examples/validation/15_flash_split_robustness.py` (phi-phi split
+robustness, validation Case F-4) needs no optional dependency at all.
 
 ## Database source of truth
 
