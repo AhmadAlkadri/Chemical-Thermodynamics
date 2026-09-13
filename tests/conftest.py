@@ -1,10 +1,13 @@
 """Shared pytest fixtures.
 
-Currently only the published NRTL validation fixture (Tessier, Brennecke and
-Stadtherr 2000, Problem 1). It is deliberately kept out of the packaged
-parameter data (`src/chemthermo/parameters/data/activity/nrtl.json`): it is a
-citation-backed validation anchor, not a default the library should silently
-apply to user mixtures.
+The published NRTL validation fixtures (Tessier, Brennecke and Stadtherr 2000,
+Problem 1 and Problem 2). Both are deliberately kept out of the packaged
+parameter data (`src/chemthermo/parameters/data/activity/nrtl.json`): they are
+citation-backed validation anchors, not defaults the library should silently
+apply to user mixtures. The Problem 2 parameters were regressed from the
+DECHEMA Chemistry Data Series (Gmehling et al., 1977-1990) and are reproduced
+here only as a test anchor for the cited paper; see the fixture's
+`redistribution_note`.
 """
 
 from __future__ import annotations
@@ -20,13 +23,23 @@ import chemthermo as ct
 
 FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 TESSIER_FIXTURE_PATH = FIXTURES_DIR / "nrtl" / "tessier2000_problem1.json"
+TESSIER_PROBLEM2_FIXTURE_PATH = FIXTURES_DIR / "nrtl" / "tessier2000_problem2.json"
+
+
+def _load_json(path: Path) -> dict[str, Any]:
+    with path.open("r", encoding="utf-8") as handle:
+        payload: dict[str, Any] = json.load(handle)
+    return payload
 
 
 def load_tessier2000_problem1() -> dict[str, Any]:
     """Return the raw Tessier (2000) Problem 1 fixture payload."""
-    with TESSIER_FIXTURE_PATH.open("r", encoding="utf-8") as handle:
-        payload: dict[str, Any] = json.load(handle)
-    return payload
+    return _load_json(TESSIER_FIXTURE_PATH)
+
+
+def load_tessier2000_problem2() -> dict[str, Any]:
+    """Return the raw Tessier (2000) Problem 2 fixture payload."""
+    return _load_json(TESSIER_PROBLEM2_FIXTURE_PATH)
 
 
 def tessier_component_names(payload: dict[str, Any]) -> list[str]:
@@ -102,3 +115,27 @@ def tessier2000_ln_gamma(
         return np.log(np.asarray(gamma, dtype=float))
 
     return ln_gamma
+
+
+@pytest.fixture(scope="session")
+def tessier2000_problem2_payload() -> dict[str, Any]:
+    return load_tessier2000_problem2()
+
+
+@pytest.fixture(scope="session")
+def tessier2000_problem2_names(tessier2000_problem2_payload: dict[str, Any]) -> list[str]:
+    return tessier_component_names(tessier2000_problem2_payload)
+
+
+@pytest.fixture(scope="session")
+def tessier2000_problem2_parameters(
+    tessier2000_problem2_payload: dict[str, Any],
+) -> ct.NRTLParameters:
+    return tessier_nrtl_parameters(tessier2000_problem2_payload)
+
+
+@pytest.fixture(scope="session")
+def tessier2000_problem2_model(
+    tessier2000_problem2_parameters: ct.NRTLParameters,
+) -> ct.NRTL:
+    return ct.NRTL(parameters=tessier2000_problem2_parameters)
