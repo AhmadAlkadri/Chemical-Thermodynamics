@@ -1862,3 +1862,210 @@ Rules:
   another, not PC-SAFT against measurement.
 - **Test path:** `tests/validation/test_pcsaft_vs_teqp.py::test_pure_hexane_saturation_matches_teqp_pure_vle`
 - **Script:** `examples/validation/13_pcsaft_vs_teqp.py`.
+
+---
+
+## Case P-3: PC-SAFT density roots at a specified (T, P, x)
+
+- **Source:** teqp 0.23.2 (`pure_VLE_T`) for the saturation state; the model is
+  Gross & Sadowski (2001). The `dP/drho` check is an internal invariant
+  (central difference of the *other* module's pressure).
+- **Location:** `chemthermo.eos._pcsaft_density.solve_density_roots`, reached
+  publicly through `PCSAFTEOS.density_roots` and
+  `PCSAFTEOS.fugacity_coefficients`. ADR-0015.
+- **Assumptions:** Fixed `(T, x)`; the model is a function of the packing
+  fraction `eta` alone, so the roots of `P_model(T, rho, x) = P` are the sign
+  changes of one scalar function on `0 < eta < 0.7405`. A root is *admissible*
+  only if `dP/drho > 0`.
+- **Components / units:** n-hexane at 300 K and 400 K; methane at 300 K;
+  methane / n-hexane 0.3 / 0.7 at 300 K. Pressures in Pa, densities in
+  mol/m^3.
+- **Parameters and provenance:** as Case P-0 (packaged
+  `src/chemthermo/parameters/data/eos/pcsaft.json`, Gross & Sadowski 2001
+  Table 1); `kij = 0`.
+- **Expected outcome and achieved values:**
+  - n-hexane, 300 K, `P = Psat = 21858.084278856164 Pa` (teqp): **exactly two**
+    admissible roots, `rho_V = 8.868596301913758`,
+    `rho_L = 7518.498733715524`. teqp gives `8.868596301925571` and
+    `7518.498733715526`; relative deviation **1.33e-12** (vapour) and
+    **2.22e-16** (liquid), against an asserted 1e-8. Three brackets were found
+    and one - the spinodal branch, `dP/drho < 0` - was discarded.
+  - n-hexane, 400 K, `P = Psat = 463846.2753046097 Pa` (teqp): two roots,
+    `158.9327710580466` and `6367.988627933045`; relative deviation
+    **2.41e-13** and **1.11e-16**. Three brackets, one discarded.
+  - n-hexane, 300 K, 10 MPa: **one** root, `7663.9424167785` (liquid only).
+  - n-hexane, 300 K, 600 kPa: **one** root, `7527.542618141328`. 600 kPa is
+    above the vapour spinodal maximum of this isotherm (524.4 kPa), which is
+    where the vapour branch ceases to exist.
+  - Methane, 300 K, 5 MPa (supercritical): **one** root,
+    `2197.6188798617954`.
+  - Methane / n-hexane 0.3 / 0.7, 300 K, 8 MPa: **one** root.
+  - `dP/drho > 0` at every returned root, by construction and by assertion.
+- **Deviation from the slice brief, recorded rather than hidden:** the brief
+  expected "at `P = 0.5 Psat` only the vapour root". That is **wrong for this
+  fluid**, and chemthermo returns **two** roots there
+  (`4.407635978116232` and `7518.326944709169`). The liquid spinodal of
+  PC-SAFT n-hexane at 300 K sits at **-39.99 MPa**, so the stretched
+  (metastable) liquid root exists at every positive pressure below saturation;
+  a cubic behaves identically. A root set is a *mechanical* statement. Which
+  root is the phase is a Gibbs-energy question, answered by
+  `_ln_phi_min_gibbs`, and below saturation it answers "vapour" - which is what
+  the test asserts instead.
+- **Residual note:** `|P_model - P| / P` at a returned root is limited by
+  cancellation in `Z = 1 + eta a'(eta)`, not by the iteration. Achieved
+  **2.2e-14** at 10 MPa, **1.6e-13** at 600 kPa, **6.5e-12** at 21.9 kPa (the
+  dense liquid root, where `Z = 1.17e-3`) and **1.4e-11** at 0.5 Psat. The
+  density is unaffected (see the 2.2e-16 above) and is what is pinned.
+  `DensityRoots.max_relative_residual` reports the number.
+- **Analytic `dP/drho` versus central finite difference** of
+  `PCSAFTEOS.pressure_Pa` (step `1e-6 rho`): n-hexane 300 K at rho = 10,
+  **4.9e-11**; at rho = 7518.5, **2.4e-10**; methane / n-hexane 0.3 / 0.7 at
+  rho = 9000, **5.1e-11**; methane / n-decane 0.4 / 0.6 at 350 K, rho = 5000
+  (inside the spinodal, `dP/drho = -3096.44`), **8.9e-11**.
+- **The one-variable rewrite versus the original module:** `a`, `Z` and `P` from
+  `_pcsaft_density` against `residual_helmholtz`, `compressibility_factor` and
+  `pressure_Pa` at eight `eta` per state over five states - asserted 1e-12
+  relative, achieved at round-off.
+- **Fugacity interface:** `fugacity_coefficients(..., phase=)` equals
+  `exp(ln_fugacity_coefficients)` at the corresponding root to 1e-14; a
+  single-root state returns identical values for both labels; at `Psat` the two
+  roots of pure n-hexane tie to `|phi_L - phi_V| = 5.6e-12`, and bisecting on
+  that difference recovers `Psat` to 1e-10 relative.
+- **Tolerance:** as stated per item above.
+- **Independent route:** teqp for the saturation densities; central finite
+  differences and the other in-tree derivation for the derivatives.
+- **Test path:** `tests/test_pcsaft_density.py`,
+  `tests/validation/test_pcsaft_flash_vs_teqp.py::test_pure_hexane_saturation_roots_match_teqp`
+- **Script:** `examples/basic/flash_tp_pcsaft_demo.py`,
+  `examples/validation/14_pcsaft_flash_vs_teqp.py`.
+
+---
+
+## Case P-4: Tangent-plane stability with PC-SAFT
+
+- **Source:** the two-phase boundary of the PC-SAFT methane / n-hexane isotherm
+  at 300 K, established against teqp in Case P-5. The identities are internal
+  invariants (Michelsen 1982, equations (1)-(7) of
+  `src/chemthermo/stability/tp.py`).
+- **Location:** `stability_tp(mixture, temperature_K=300, pressure_Pa=...,
+  eos=PCSAFTEOS())`. The stability solver is **unchanged** by ADR-0015;
+  PC-SAFT enters through `EquationOfState.fugacity_coefficients`.
+- **Assumptions:** Non-associating PC-SAFT, `kij = 0`; the Wilson trial
+  estimates use Tc, Pc and omega from the packaged databank, which are
+  *starting points* for the trials and not a model statement.
+- **Components / units:** Methane / n-hexane at 300 K; `z1` is the methane mole
+  fraction; pressures in Pa.
+- **Expected outcome and achieved values** (four trials each: `wilson-vapor`,
+  `wilson-liquid`, `pure-Methane`, `pure-n-Hexane`):
+
+  | z1 | P | verdict | tpd_min |
+  |---|---|---|---|
+  | 0.30 | 3 MPa | unstable | -5.588192e-01 |
+  | 0.50 | 5 MPa | unstable | -5.213477e-01 |
+  | 0.95 | 1 MPa | unstable | -5.927738e-01 |
+  | 0.30 | 8 MPa | stable | +1.982012e-01 |
+  | 0.99 | 1 MPa | stable | +8.753476e-01 |
+  | 0.02 | 0.5 MPa | stable | +2.996219e-01 |
+
+- **Deviation from the slice brief, recorded rather than hidden:** the brief
+  expected `z1 = 0.95` at 1 MPa to be "a vapour -> stable". It is **unstable**:
+  the 1 MPa tie line runs from `x1 = 0.055615` to `y1 = 0.973473` (Case P-5),
+  so `z1 = 0.95` is inside the two-phase region. `z1 = 0.99` is the stable
+  vapour, and is what the test uses.
+- **Identities:** `tpd(w = z) = 0` to 1e-12; every converged non-trivial trial
+  satisfies `|ln W_i + ln phi_i(w) - d_i| < 1e-9` (achieved, asserted 1e-9) and
+  `tpd = -ln(sum W)` to 1e-10, with the directly recomputed `tpd` agreeing to
+  1e-12.
+- **Direction:** at `z1 = 0.30`, 3 MPa the minimizing stationary point is a
+  methane-rich vapour (`w1 > 0.9`) with `K_methane > 1 > K_hexane`, which is the
+  direction of the tie line the flash then finds.
+- **Permutation invariance:** reversing the component order reverses the
+  stationary composition to 1e-10 and leaves `tpd_min` unchanged to 1e-10.
+- **Determinism:** repeated calls return bit-identical `tpd_min` and trial
+  composition.
+- **Naming note:** `feed_branch` is `"vapor"` for the stable compressed liquid
+  at 8 MPa. Only one density root exists there, so both phase labels evaluate
+  the same state and the min-Gibbs tie-break keeps the first candidate. That is
+  the documented convention (brain.md, "Vapor/liquid naming is a convention
+  where the model cannot tell"), not a misclassification.
+- **Tolerance:** as stated per item.
+- **Independent route:** the verdicts are adjudicated by Case P-5's teqp tie
+  lines; the identities are internal invariants recomputed from the
+  definitions.
+- **Test path:** `tests/test_pcsaft_flash.py` (stability section).
+- **Script:** `examples/validation/14_pcsaft_flash_vs_teqp.py` section 3.
+
+---
+
+## Case P-5: PC-SAFT phi-phi flash against teqp's 300 K isotherm
+
+- **Source:** teqp 0.23.2. Reference tie lines from
+  `trace_VLE_isotherm_binary` (numerical continuation along the isotherm,
+  `polish=True`, `integration_order=5`, `max_steps=10000`) polished at each
+  target pressure by `mix_VLE_Tp`; bubble pressures from `mix_VLE_Tx` at a
+  specified liquid composition. The model is Gross & Sadowski (2001).
+- **Location:** `flash_tp(mixture, temperature_K=300, pressure_Pa=...,
+  eos=PCSAFTEOS())`. The flash solver is **unchanged** by ADR-0015.
+- **Assumptions:** Non-associating PC-SAFT; `kij = 0` for methane / n-hexane.
+  teqp and chemthermo share the model and its 42 universal constants and
+  nothing else: teqp differentiates by autodiff and continues along the
+  isotherm, chemthermo differentiates analytically and reaches the tie line
+  through Michelsen's tangent-plane test plus a Rachford-Rice /
+  successive-substitution split.
+- **Components / units:** Methane / n-hexane at 300 K, feeds taken as the
+  midpoint of teqp's tie line at each pressure; densities in mol/m^3.
+- **Expected outcome and achieved values** (`d` = chemthermo minus teqp;
+  "teqp f" is the worst relative difference between the two phases' fugacities
+  computed by **teqp's own** `get_fugacity_coefficients` at chemthermo's
+  compositions and densities):
+
+  | P / MPa | x1 (teqp) | dx1 | y1 (teqp) | dy1 | d rho_L | d rho_V | teqp f | dG/RT |
+  |---|---|---|---|---|---|---|---|---|
+  | 0.50 | 0.027547 | +5.8e-14 | 0.951840 | -3.6e-12 | +3.2e-14 | +3.8e-13 | 7.5e-11 | -0.8415 |
+  | 1.00 | 0.055615 | +1.9e-11 | 0.973473 | -3.6e-12 | +1.1e-11 | +7.2e-13 | 3.4e-10 | -0.7602 |
+  | 2.00 | 0.109597 | +6.7e-11 | 0.983863 | -2.0e-13 | +3.9e-11 | +7.9e-14 | 5.9e-10 | -0.5079 |
+  | 3.00 | 0.160870 | +9.9e-11 | 0.986862 | -2.4e-14 | +5.9e-11 | +1.4e-14 | 5.8e-10 | -0.3746 |
+  | 5.00 | 0.255990 | +1.6e-10 | 0.988103 | -9.9e-15 | +1.0e-10 | +1.1e-14 | 5.6e-10 | -0.2280 |
+  | 7.00 | 0.342234 | +3.6e-10 | 0.986961 | -1.4e-14 | +2.3e-10 | +2.1e-14 | 8.8e-10 | -0.1464 |
+  | 8.50 | 0.401747 | +1.97e-9 | 0.985041 | -1.7e-14 | +1.3e-9 | +3.4e-14 | 3.8e-9 | -0.1054 |
+
+- **Tolerance:** asserted `|dx1|, |dy1| <= 1e-6`, densities `<= 1e-5` relative,
+  teqp equal-fugacity `< 1e-8` relative. Achieved as tabulated: worst
+  `|dx1| = 2.0e-9`, worst `|dy1| = 3.7e-12`, worst density deviation
+  `1.3e-9`, worst teqp fugacity mismatch `3.8e-9` (all at 8.5 MPa, the state
+  nearest the mixture critical region).
+- **Split verification (every row):** `mass_balance_residual < 1e-12`,
+  `fugacity_residual < 1e-8`, `delta_g_split_rt < 0` (tabulated above), and
+  every converged phase passes the post-split stability test.
+- **Bubble pressures from the stability *verdict* alone** (chemthermo solves no
+  bubble-point equation: the pressure is where `stability_tp` flips from
+  `unstable` to `stable` at a fixed feed, located by 40 bisections):
+
+  | x1 | teqp `mix_VLE_Tx` / Pa | chemthermo verdict flip / Pa | relative |
+  |---|---|---|---|
+  | 0.10 | 1818388.518385 | 1818388.498552 | 1.09e-08 |
+  | 0.20 | 3798775.343023 | 3798775.297263 | 1.20e-08 |
+  | 0.30 | 5996498.051410 | 5996497.969490 | 1.37e-08 |
+
+  Asserted 1e-6 relative; achieved 1.4e-8 worst.
+- **One `kij` case:** methane / n-decane at 350 K, 5 MPa, feed `z1 = 0.4`, with
+  `kij = 0.03`. **That value is illustrative** - it is the nonzero value used
+  in the ADR-0014 cross-check states, **not** a literature-validated binary
+  parameter for this pair; the check is that two independent codes agree once
+  both are given it. Achieved: vapour fraction 0.26321712,
+  `x1 = 0.18642106`, `y1 = 0.99783844`, `rho_L = 5548.0481`,
+  `rho_V = 1805.7640` mol/m^3; teqp equal-fugacity mismatch **1.94e-10**
+  relative; `delta_g_split_rt = -0.113917`; `fugacity_residual = 1.94e-10`.
+  teqp's own `mix_VLE_Tp`, seeded from chemthermo's answer, does not move it
+  (within 1e-6 mole fraction).
+- **Negative control:** perturbing n-hexane's `sigma` by 1 % in the reference
+  moves the saturation liquid density by more than 1e-3 relative, so the
+  agreement above is not vacuous.
+- **Two-phase limit:** phi-phi stops at two phases whatever
+  `FlashSettings.max_phases` says (ADR-0009, ADR-0011), and the test asserts
+  that a `max_phases=3` run returns two phases and no `phase_set_history`.
+- **Independent route:** teqp's continuation + Newton equilibrium solver, and
+  teqp's own fugacity coefficients evaluated at chemthermo's answer.
+- **Test path:** `tests/validation/test_pcsaft_flash_vs_teqp.py`,
+  `tests/test_pcsaft_flash.py` (flash section).
+- **Script:** `examples/validation/14_pcsaft_flash_vs_teqp.py`.
