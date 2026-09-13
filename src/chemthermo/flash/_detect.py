@@ -28,9 +28,16 @@ from ..exceptions import ConvergenceError
 from ..models import ActivityModel, EquationOfState
 from ._assemble import _single_phase_result, _two_phase_result
 from ._common import wilson_k
+from ._multiphase import _flash_tp_phase_addition, _phase_set_label
 from ._second_order import _second_order_split
 from ._split import _ln_gamma_function, _rachford_rice, _solve_k_loop
-from ._verify import _equilibrium_residual, _post_split_stability, _verify_split
+from ._verify import (
+    _equilibrium_residual,
+    _post_split_report,
+    _post_split_stability,
+    _reduced_g,
+    _verify_split,
+)
 from .results import FlashResult
 from .settings import FlashSettings
 
@@ -583,7 +590,7 @@ def _flash_tp_modified_raoult(
         regime = "VLE"
         vapor_fraction = float(beta) if incipient_label == _VAPOR else 1.0 - float(beta)
 
-    post_split = _post_split_stability(
+    report = _post_split_report(
         mixture,
         temperature,
         pressure,
@@ -593,6 +600,58 @@ def _flash_tp_modified_raoult(
         settings=settings,
         vapor="ideal",
     )
+
+    if report.status != "stable" and settings.post_split_stability:
+        if settings.max_phases < 3:
+            detail = ", ".join(
+                [failure.phase_name for failure in report.instabilities] or report.inconclusive
+            )
+            raise ConvergenceError(
+                "The converged two-phase solution is not a stable phase set: the "
+                f"post-split stability test reports '{report.status}' for phase(s) "
+                f"{detail} (most negative post-split tpd = {report.tpd_min:.6e}). A third "
+                "phase is required, and FlashSettings.max_phases = "
+                f"{settings.max_phases} forbids it. Raise max_phases (the default 3 "
+                "resolves this state), or pass FlashSettings(post_split_stability=False) "
+                "to receive the two-phase result anyway, with this failure recorded in "
+                "diagnostics."
+            )
+        if report.status == "inconclusive":
+            raise ConvergenceError(
+                "A post-split stability test was inconclusive for phase(s) "
+                f"{', '.join(report.inconclusive)}, so flash_tp cannot decide whether the "
+                "two-phase set is the answer."
+            )
+        # The phase set is provably not the answer, and the stability minimizer
+        # found on the failing phase is the incipient third phase. Hand over to
+        # the phase addition / removal search (ADR-0011).
+        failure = report.instabilities[0]
+        history = [_phase_set_label((feed_label,)), _phase_set_label(names)]
+        history.append(_phase_set_label((*names, failure.branch or _LIQUID)))
+        two_phase_g_rt = (1.0 - float(beta)) * _reduced_g(x, ln_f_x) + float(beta) * _reduced_g(
+            y, ln_f_y
+        )
+        return _flash_tp_phase_addition(
+            mixture,
+            temperature,
+            pressure,
+            z=z,
+            candidates={
+                _LIQUID: candidates[_LIQUID].ln_fugacity_terms,
+                _VAPOR: candidates[_VAPOR].ln_fugacity_terms,
+            },
+            labels=(feed_label, incipient_label, failure.branch or _LIQUID),
+            compositions=(x, y, failure.composition),
+            history=history,
+            ln_f_feed=terms_x(z / float(np.sum(z))),
+            two_phase_g_rt=two_phase_g_rt,
+            activity_model=activity_model,
+            vapor="ideal",
+            settings=settings,
+            base=base,
+        )
+
+    post_split = report.diagnostics
 
     return _two_phase_result(
         mixture,

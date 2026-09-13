@@ -40,19 +40,29 @@ The converged split is then verified (material balance, phase fractions, equal
 fugacities or equal activities, and a negative Gibbs-energy change against the
 single-phase feed) and every residual is reported in ``diagnostics``.
 
-Post-split stability
---------------------
-Every converged two-phase result on these two paths is re-tested: each phase is
-fed back into ``stability_tp`` with the same model. Two coexisting phases share
-one tangent plane, so each of them is *marginally* stable with respect to the
-other - a trial that converges onto the partner phase has ``tpd = 0`` up to the
-split's own convergence tolerance and is classified ``"marginal"`` here, not as
-an instability (validation Case S-3). A phase whose tangent-plane minimum is
-genuinely negative somewhere else means the two-phase answer is not a stable
-phase set: a third phase is needed, which this release cannot produce, so
-``flash_tp`` raises :class:`chemthermo.ConvergenceError` instead of returning
-it. ``FlashSettings(post_split_stability=False)`` returns the result anyway
-with the failure recorded in ``diagnostics``.
+Post-split stability, and phase addition / removal
+--------------------------------------------------
+Every converged result on these paths is re-tested: each phase is fed back into
+``stability_tp`` with the same model. Coexisting phases share one tangent
+plane, so each of them is *marginally* stable with respect to the others - a
+trial that converges onto a partner phase has ``tpd = 0`` up to the split's own
+convergence tolerance and is classified ``"marginal"`` here, not as an
+instability (validation Case S-3). A phase whose tangent-plane minimum is
+genuinely negative somewhere else means the phase set is not the answer.
+
+On the ``modified-raoult`` path that failure is now *resolved* rather than
+refused (ADR-0011): the minimizer found on the failing phase is the incipient
+new phase, it is added, and the enlarged set is re-solved with the multiphase
+Rachford-Rice of :mod:`chemthermo.flash._multiphase_rr`; a phase whose fraction
+converges to zero or below is removed again. The search is bounded by
+``FlashSettings.max_phases`` (default 3) and the sets it visited are reported
+in ``diagnostics["phase_set_history"]``. ``max_phases=2`` reproduces the
+pre-ADR-0011 behavior, which raises
+:class:`chemthermo.ConvergenceError`; so does the phi-phi and gamma-gamma path
+at any ``max_phases``, because no state in this repository exercises a third
+phase there (ADR-0011 "What remains").
+``FlashSettings(post_split_stability=False)`` returns the two-phase result
+anyway with the failure recorded in ``diagnostics``, without searching.
 
 Modified Raoult (low-pressure gamma-phi)
 ----------------------------------------
@@ -96,21 +106,25 @@ near a plait point - hundreds to thousands of iterations on the Tessier et al.
 (2000) Problem 1 feeds - so a second-order stage is required; see
 :func:`chemthermo.flash._second_order._second_order_split` for the derivation.
 
-Limits of this slice
---------------------
-At most two phases are returned. A feed that needs three is now *reported*
-(``ConvergenceError`` from the post-split check) rather than silently returned
-as two, but it is still not solved; multiphase flash is the next slice. A
-negative ``tpd_min`` proves a feed is not one phase; ``"stable"`` only means no
-negative tangent-plane distance was found from the deterministic trial set.
+Limits
+------
+Up to ``FlashSettings.max_phases`` phases are returned on the
+``modified-raoult`` path; the phi-phi and gamma-gamma paths still stop at two
+and raise when a third is needed. A negative ``tpd_min`` proves a feed is not
+one phase; ``"stable"`` only means no negative tangent-plane distance was found
+from the deterministic trial set - so a phase count is never more reliable than
+the stability test that produced it, and near a plait point the deterministic
+trial set can miss a thin three-phase region (validation Case V-2).
 
 Module layout
 -------------
 This module is the thin public orchestrator: it validates inputs, resolves the
 mode, and dispatches to the internal module that implements it - ``_detect``
 (phase detection and split seeding), ``_split`` (the shared K-loop), ``_second_order``
-(the liquid-liquid Newton stage), ``_verify`` (residuals and post-split
-stability), ``_assemble`` (``FlashResult`` construction) and ``_legacy`` (the
+(the liquid-liquid Newton stage), ``_multiphase_rr`` (the multiphase
+Rachford-Rice), ``_multiphase`` (the multiphase split and the phase
+addition/removal loop), ``_verify`` (residuals and post-split stability),
+``_assemble`` (``FlashResult`` construction) and ``_legacy`` (the
 ``wilson-heuristic`` path). All are internal (ADR-0001): none is re-exported.
 """
 
@@ -176,11 +190,11 @@ def flash_tp(
     Returns:
         FlashResult with phase compositions and fractions. Phase names follow:
         VLE -> ``"liquid"``/``"vapor"``, LLE -> ``"liquid1"``/``"liquid2"``,
-        single phase -> ``"liquid"`` or ``"vapor"``. ``vapor_fraction`` is
-        ``None`` for every gamma-gamma result and for a **liquid-liquid**
-        modified-Raoult result: neither phase is a vapor, so reporting a number
-        there would be fiction. A vapor-liquid modified-Raoult result carries
-        the vapor's mole fraction as usual.
+        VLLE -> ``"liquid1"``/``"liquid2"``/``"vapor"``, single phase ->
+        ``"liquid"`` or ``"vapor"``. ``vapor_fraction`` is ``None`` for every
+        gamma-gamma result and for any result with no ``"vapor"`` phase in it:
+        reporting a number there would be fiction. A result that does contain a
+        vapor carries that phase's mole fraction.
 
     Diagnostics:
         Diagnostics keys are implementation details. Current stable keys:
@@ -188,6 +202,14 @@ def flash_tp(
         - Always: ``flash_mode``, ``phase_detection``, ``iterations``,
           ``converged``, ``termination_reason``, ``phase_count``,
           ``phase_state``, ``phase_regime``.
+        - Results that went through the phase addition/removal search
+          (``modified-raoult`` only, and only when a converged phase set failed
+          its post-split test) add ``phase_set_history``, ``phases_added``,
+          ``phases_removed``, ``rachford_rice_iterations`` and, when the search
+          started from a converged two-phase set, ``delta_g_vs_two_phase_rt``.
+          Those keys are **absent** from every other result, deliberately: the
+          two-phase numbers of the earlier slices are unchanged down to the
+          last bit, diagnostics included.
         - Tangent-plane paths (phi-phi default, gamma-gamma and
           modified-raoult):
           ``stability_status``, ``tpd_min``, ``stability_trials``, and
@@ -224,8 +246,9 @@ def flash_tp(
         ConvergenceError: If iteration fails to converge; or (tangent-plane
             modes only) if the stability analysis is inconclusive, if an
             unstable feed admits no Rachford-Rice root from either seed, or if
-            the converged two-phase result fails the post-split stability check
-            (a third phase is required).
+            a converged phase set fails the post-split stability check and no
+            further phase may be added (phi-phi and gamma-gamma always, or
+            ``FlashSettings.max_phases`` reached on the modified-Raoult path).
 
     Notes:
         **``flash_mode="gamma-phi"`` is DEPRECATED** in favour of
@@ -271,7 +294,11 @@ def flash_tp(
         two liquids the way volatility distinguishes a vapor from a liquid, so
         no attempt is made to name them by composition: two feeds on the same
         tie-line can come back with the same pair of compositions under swapped
-        labels. Compare the phase *set*, not ``result.phases["liquid1"]``.
+        labels. Compare the phase *set*, not ``result.phases["liquid1"]``. The
+        same holds for the two liquids of a three-phase result, whose ordering
+        follows the order in which the search happened to create them; only the
+        ``"vapor"`` name carries a model-level meaning (it is the phase the
+        ideal-gas candidate describes).
     """
 
     temperature = validate_temperature(temperature_K)

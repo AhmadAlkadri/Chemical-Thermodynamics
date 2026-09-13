@@ -7,18 +7,21 @@ which three phases coexist (Gibbs' phase rule: F = 2 - 3 + 2 = 1, so at fixed
 pressure the three-phase state is one temperature, not a range). Below it the
 equilibrium is two liquids; above it, vapor-liquid; at it, all three.
 
-`flash_tp(..., flash_mode="modified-raoult")` returns **at most two phases**, so
-this script exists to show that it does not lie about the third:
+This script walks the neighbourhood of T3 and checks every verdict:
 
   * below T3 it returns the liquid-liquid tie-line and reports both phases
     stable against the ideal-vapor candidate;
   * above T3 the feed used here has fully evaporated, and that single vapor is
     checked against the dew-point equation;
   * in a narrow window just below T3 the tangent-plane minimizer is a *vapor*,
-    the converged vapor-liquid pair is then found unstable towards the second
-    liquid, and `flash_tp` **raises** `ConvergenceError` saying a third phase is
-    required. That refusal is the point: a two-phase answer the package has
-    itself proved wrong is never returned.
+    so the search starts from a vapor-liquid pair that is **not** the
+    equilibrium. Since ADR-0011 that is resolved rather than refused: the pair
+    is unstable towards a second liquid, the liquid is added, and the
+    three-phase solve then drives the vapor fraction to zero, so the vapor is
+    removed again and the two-liquid answer comes back
+    (`phase_set_history = "L -> LV -> LLV -> LL"`). With
+    `FlashSettings(max_phases=2)` the same call still raises, which is the
+    pre-ADR-0011 behavior and is checked here too.
 
 Everything printed is checked against an independent route written in this
 file - a Newton solve of the equal-activity condition for the binodal, and
@@ -314,14 +317,40 @@ def main() -> None:
 
     raised = False
     try:
-        _flash(t3 - 0.01)
+        _flash(t3 - 0.01, ct.FlashSettings(max_phases=2))
     except ct.ConvergenceError as error:
         raised = "third phase is required" in str(error)
         print(
-            f"   at T3-0.01 K: ConvergenceError - a third phase is required "
+            f"   at T3-0.01 K, max_phases=2: ConvergenceError - a third phase is required "
             f"({'message matched' if raised else 'unexpected message'})"
         )
-    record("just below T3 the two-phase answer is refused", raised)
+    record("just below T3, max_phases=2 refuses the two-phase answer", raised)
+
+    resolved = _flash(t3 - 0.01)
+    tie_line = sorted(
+        float(resolved.phases[name].composition.fractions[0]) for name in resolved.phase_names()
+    )
+    print(
+        f"   at T3-0.01 K, max_phases=3 (default): phases = {resolved.phase_names()}, "
+        f"regime = {resolved.diagnostics['phase_regime']}"
+    )
+    print(f"                 phase_set_history = {resolved.diagnostics['phase_set_history']}")
+    print(
+        f"                 x1 = ({tie_line[0]:.12f}, {tie_line[1]:.12f})"
+        f"   (independent binodal: ({x_i[0]:.12f}, {x_ii[0]:.12f}))"
+    )
+    record(
+        "the addition/removal search returns the two liquids",
+        sorted(resolved.phase_names()) == ["liquid1", "liquid2"],
+    )
+    record(
+        "and its tie-line is the independent binodal to 1e-8",
+        abs(tie_line[0] - x_i[0]) < 1e-8 and abs(tie_line[1] - x_ii[0]) < 1e-8,
+    )
+    record(
+        "and the history records the vapor being added and removed",
+        str(resolved.diagnostics["phase_set_history"]) == "V -> LV -> LLV -> LL",
+    )
 
     unchecked = _flash(t3 - 0.01, ct.FlashSettings(post_split_stability=False))
     diagnostics = unchecked.diagnostics
@@ -345,12 +374,10 @@ def main() -> None:
     print(
         "   Two coexisting phases share one tangent plane, so a third stationary point\n"
         "   below it has the SAME tpd measured from either - which is why both rows agree.\n"
-        "   Honest reading of this window: below T3 the correct answer is the two-liquid\n"
-        "   pair, and the solver seeded its split from the deepest tangent-plane minimum,\n"
-        "   which is the vapor. The pair it converged is genuinely not the equilibrium, so\n"
-        "   refusing is right; resolving it needs phase addition AND removal (the vapor\n"
-        "   amount would go to zero), which is the next slice, flash-vlle-phase-addition.\n"
-        "   Measured width of this refusal window for this feed: about 0.135 K below T3."
+        "   Below T3 the correct answer is the two-liquid pair, and the search reaches it\n"
+        "   by adding the second liquid and then removing the vapor, whose amount goes to\n"
+        "   zero. Measured width of the window in which the first two-phase iterate is the\n"
+        "   wrong one: about 0.135 K below T3."
     )
 
     print("\n" + "=" * 78)
