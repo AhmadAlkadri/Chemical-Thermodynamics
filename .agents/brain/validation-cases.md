@@ -1339,11 +1339,31 @@ Rules:
   2.2e-14 and 1.6e-13); 1e-10 on the equilibrium residual (achieved 1.8e-15);
   1e-12 on mass balance (achieved 6.9e-18); 1e-9 on permutation invariance
   (achieved 1.5e-14).
+  - **External cross-check: attempted, and it does not exist.** Case L-2 had
+    found `thermo` 0.6.0 collapsing two `GibbsExcessLiquid` phases into one for
+    a *binary*; that was re-checked here directly for the three-phase state,
+    with identical NRTL parameters and chemthermo's own Antoine records pushed
+    into `thermo` so `Psat` is shared.
+    `FlashVLN(..., liquids=[liquid])` reports `unique_liquid_count == 1` and
+    returns a **two-phase** answer at the 364 K centroid feed, which is inside
+    the tie-triangle: vapor (0.21027032, 0.09978016, 0.68994952), liquid
+    (0.09928882, 0.07716435, 0.82354683), betas (0.31446284, 0.68553716). That
+    liquid is neither conjugate liquid. `FlashVLN(..., liquids=[liquid, liquid])`
+    still reports `unique_liquid_count == 1` and raises
+    `TypeError: 'NoneType' object is not subscriptable`.
+    **Adjudicated by Gibbs energy**, computed in the test file: chemthermo's
+    three-phase answer **-0.693912758** against `thermo`'s two-phase
+    **-0.693543321**. And the *intermediate* is externally confirmed:
+    `thermo`'s two-phase answer has the same Gibbs energy as the two-phase
+    candidate chemthermo converged before adding the third phase, to
+    **2.4e-09** - so the disagreement is about the phase count, not about the
+    two-phase thermodynamics. The failure is asserted
+    (`::test_thermo_cannot_hold_two_distinct_excess_gibbs_liquids`) so a future
+    `thermo` that fixes it is noticed.
 - **Independent route:** the six-equation Newton solve written in the test file
   and again in the script, sharing no code with `chemthermo.flash`; plus the
-  Gibbs-energy ordering computed there. No external package: `thermo` 0.6.0
-  cannot split two liquids over one excess-Gibbs model (Case L-2), so **no
-  external VLLE reference is available for this system** and none is claimed.
+  Gibbs-energy ordering computed there. **No external VLLE reference is
+  available for this system** (see the bullet above) and none is claimed.
 - **Test path:** `tests/validation/test_vlle_water_propanol_butanol.py`,
   `tests/test_flash_vlle.py`.
 - **Script:** `examples/validation/11_vlle_water_propanol_butanol.py`,

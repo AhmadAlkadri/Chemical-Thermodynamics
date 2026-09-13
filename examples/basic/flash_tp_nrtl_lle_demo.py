@@ -172,8 +172,11 @@ def main() -> None:
     print(
         "\nNote: 'stable' means no negative tangent-plane distance was found from\n"
         "      the deterministic trial set (one pure-component-dominant estimate\n"
-        "      per component). It is not a global proof. flash_tp returns at most\n"
-        "      two phases; a state needing a third is reported, not solved."
+        "      per component). It is not a global proof. This gamma-gamma path\n"
+        "      returns at most two phases; a state needing a third is reported,\n"
+        "      not solved (ADR-0011 wires phase addition to modified-raoult only,\n"
+        "      because no state in this repository exercises a third liquid here).\n"
+        "      For a three-phase answer see examples/basic/flash_tp_vlle_demo.py."
     )
 
 
