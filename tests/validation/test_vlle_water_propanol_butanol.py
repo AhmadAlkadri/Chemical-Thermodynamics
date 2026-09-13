@@ -119,15 +119,16 @@ def system() -> tuple[list[str], ct.NRTL, LnGamma, Callable[[float], np.ndarray]
             ]
         )
 
-    components = [ct.Component.from_database(name) for name in names]
+    antoine = []
+    for name in names:
+        record = ct.Component.from_database(name).antoine
+        assert record is not None, name
+        antoine.append(record)
 
     def psat(temperature_K: float) -> np.ndarray:
         """``ln(P^sat / bar) = A - B / (T + C)`` from the packaged databank."""
         return np.array(
-            [
-                np.exp(c.antoine.A - c.antoine.B / (temperature_K + c.antoine.C)) * 1.0e5
-                for c in components
-            ],
+            [np.exp(a.A - a.B / (temperature_K + a.C)) * 1.0e5 for a in antoine],
             dtype=float,
         )
 

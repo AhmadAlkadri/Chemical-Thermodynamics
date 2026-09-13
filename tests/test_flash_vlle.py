@@ -113,14 +113,12 @@ def _ln_gamma(model: ct.NRTL):
 
 
 def _psat(temperature_K: float) -> np.ndarray:
-    components = [ct.Component.from_database(name) for name in NAMES]
-    return np.array(
-        [
-            np.exp(c.antoine.A - c.antoine.B / (temperature_K + c.antoine.C)) * 1.0e5
-            for c in components
-        ],
-        dtype=float,
-    )
+    values = []
+    for name in NAMES:
+        antoine = ct.Component.from_database(name).antoine
+        assert antoine is not None, name
+        values.append(np.exp(antoine.A - antoine.B / (temperature_K + antoine.C)) * 1.0e5)
+    return np.array(values, dtype=float)
 
 
 # --------------------------------------------------------------------------
