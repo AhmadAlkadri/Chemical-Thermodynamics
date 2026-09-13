@@ -2,6 +2,8 @@
 
 Status: accepted
 Date: 2026-02-03
+Amended by: ADR-0013 (2026-09-13) - `chemthermo.vlle` is now DEPRECATED, not
+merely "documented public"; see decision 2 below and ADR-0013.
 
 ## Context
 Agents and contributors need a stable definition of "public API" to avoid
@@ -12,7 +14,12 @@ couple of explicitly documented subpackages, and it has no CLI entry points.
 Public API is defined by the following sources (in order):
 1) `src/chemthermo/__init__.py` and its `__all__` list.
 2) Subpackages explicitly documented in `README.md` and their `__all__` lists
-   (currently `chemthermo.eos` and `chemthermo.vlle`).
+   (currently `chemthermo.eos` and `chemthermo.vlle`). **`chemthermo.vlle` is
+   DEPRECATED as of ADR-0013 (2026-09-13)**: it remains a public, importable
+   subpackage for one deprecation cycle, but importing it or calling
+   `get_vlle_engine()` emits `DeprecationWarning`, and it is no longer the
+   documented way to reach multiphase equilibrium - see ADR-0011 and
+   ADR-0013.
 3) CLI entry points only if they are declared in `[project.scripts]` in
    `pyproject.toml` (none today).
 

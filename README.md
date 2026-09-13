@@ -504,9 +504,13 @@ Notes and limits:
 - **No performance work was done.** A three-phase solve costs a two-phase solve
   plus several stability tests plus roughly 50 successive substitutions, a
   handful of Newton steps and ~100-150 Rachford-Rice Newton iterations.
-- **`chemthermo.vlle` is untouched.** That public plugin boundary predates this
-  work and `flash_mode="vlle"` still raises a `ModelError` pointing at it; a
-  follow-up ADR will decide its disposition now that VLLE is in-tree.
+- **Multiphase equilibrium is in-tree.** `chemthermo.vlle` - a public plugin
+  boundary (`get_vlle_engine`, `VLLEEngine`, `VLLEResult`) added before any of
+  this existed - is now **deprecated** (ADR-0013): importing it, or calling
+  `get_vlle_engine()`, emits a `DeprecationWarning` pointing here, and
+  `flash_mode="vlle"` raises `ModelError` with the same pointer. The exported
+  names are unchanged and stay importable for one deprecation cycle; nothing
+  is removed yet.
 
 ### Binary interaction parameters (`kij`)
 
