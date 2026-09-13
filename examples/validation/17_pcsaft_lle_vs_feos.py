@@ -61,6 +61,7 @@ The script prints a message and exits 0 when it is missing.
 
 from __future__ import annotations
 
+import argparse
 import json
 import math
 from typing import Sequence
@@ -409,6 +410,17 @@ def negative_control() -> None:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--full",
+        action="store_true",
+        help="also run the 1 MPa tie line, the three-feed lever rule and the negative "
+        "control; the default runs the 1 atm state only, which is the Case P-8 headline",
+    )
+    # `parse_known_args`, not `parse_args`: `tests/test_examples.py` runs this
+    # script via `runpy.run_path` with pytest's own `sys.argv` still in place.
+    args, _unknown = parser.parse_known_args()
+
     if si is None:
         print("feos is not installed; skipping. Install with: pip install -e '.[validation]'")
         return
@@ -417,10 +429,14 @@ def main() -> None:
     the_state()
     the_tie_line(2, ATMOSPHERE_PA, "1 atm")
     the_chemical_potentials(3, ATMOSPHERE_PA, "1 atm")
-    the_tie_line(4, HIGH_PRESSURE_PA, "1 MPa")
-    the_chemical_potentials(5, HIGH_PRESSURE_PA, "1 MPa")
-    three_feeds()
-    negative_control()
+    if args.full:
+        the_tie_line(4, HIGH_PRESSURE_PA, "1 MPa")
+        the_chemical_potentials(5, HIGH_PRESSURE_PA, "1 MPa")
+        three_feeds()
+        negative_control()
+    else:
+        print("\n  (pass --full for the 1 MPa tie line, the three feeds and the")
+        print("   negative control; they are all covered by tests/validation/)")
 
     print("\n" + "=" * 78)
     print(

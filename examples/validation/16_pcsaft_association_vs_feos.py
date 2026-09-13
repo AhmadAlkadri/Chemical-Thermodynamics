@@ -68,6 +68,7 @@ The script prints a message and exits 0 when it is missing.
 
 from __future__ import annotations
 
+import argparse
 import json
 import math
 
@@ -653,6 +654,14 @@ def negative_control() -> None:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--full", action="store_true", help="also run the two flashes and the negative control"
+    )
+    # `parse_known_args`, not `parse_args`: `tests/test_examples.py` runs this
+    # script via `runpy.run_path` with pytest's own `sys.argv` still in place.
+    args, _unknown = parser.parse_known_args()
+
     if si is None:
         print("feos is not installed; skipping. Install with: pip install -e '.[validation]'")
         return
@@ -662,9 +671,12 @@ def main() -> None:
     sigma_versus_d()
     non_associating_unchanged()
     saturation()
-    vapor_liquid_flash()
-    liquid_liquid_split()
-    negative_control()
+    if args.full:
+        vapor_liquid_flash()
+        liquid_liquid_split()
+        negative_control()
+    else:
+        print("\n  (pass --full for the two flashes and the negative control)")
 
     print("\n" + "=" * 78)
     if failures:

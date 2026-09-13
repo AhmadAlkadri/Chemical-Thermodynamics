@@ -56,6 +56,8 @@ fractions.
 
 from __future__ import annotations
 
+import argparse
+
 import chemthermo as ct
 from chemthermo.eos import PCSAFTEOS
 
@@ -260,12 +262,21 @@ def _liquid_liquid_split() -> None:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--full", action="store_true", help="also run the same system at 1 MPa")
+    # `parse_known_args`, not `parse_args`: `tests/test_examples.py` runs this
+    # script via `runpy.run_path` with pytest's own `sys.argv` still in place.
+    args, _unknown = parser.parse_known_args()
+
     print("PC-SAFT with association (Gross & Sadowski 2002), ADR-0018")
     print("=" * 78)
     _pure_water_properties()
     _water_saturation()
     _atmospheric_attempt()
-    _liquid_liquid_split()
+    if args.full:
+        _liquid_liquid_split()
+    else:
+        print("\n  (pass --full for the same system at 1 MPa)")
     print("\n" + "=" * 78)
     print(
         "Scope: the 2B scheme is what is packaged and validated. General (na, nb) site\n"

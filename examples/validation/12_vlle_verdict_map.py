@@ -70,6 +70,7 @@ Needs no optional dependency. All inputs are SI. See validation Case V-5.
 
 from __future__ import annotations
 
+import argparse
 import itertools
 from typing import Callable, Sequence
 
@@ -582,6 +583,16 @@ def section_repaired_feed(nrtl: ct.NRTL) -> None:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--full",
+        action="store_true",
+        help="map all three temperatures instead of the first one only",
+    )
+    # `parse_known_args`, not `parse_args`: `tests/test_examples.py` runs this
+    # script via `runpy.run_path` with pytest's own `sys.argv` still in place.
+    args, _unknown = parser.parse_known_args()
+
     print("=" * 78)
     print("Verdict map: 1-propanol / n-butanol / water at 101325 Pa")
     print("Modified Raoult (NRTL liquid + Antoine reference fugacity, ideal vapor)")
@@ -590,9 +601,12 @@ def main() -> None:
     print("=" * 78)
 
     nrtl = model()
-    for temperature_K in TEMPERATURES:
+    temperatures = TEMPERATURES if args.full else TEMPERATURES[:1]
+    for temperature_K in temperatures:
         section_map(nrtl, temperature_K)
     section_repaired_feed(nrtl)
+    if not args.full:
+        print(f"\n  (pass --full for all {len(TEMPERATURES)} temperatures)")
 
     print("\n" + "=" * 78)
     if _FAILURES:

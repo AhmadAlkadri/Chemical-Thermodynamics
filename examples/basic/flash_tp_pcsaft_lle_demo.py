@@ -58,6 +58,7 @@ Run from the repo root::
 
 from __future__ import annotations
 
+import argparse
 from typing import Sequence
 
 import chemthermo as ct
@@ -251,12 +252,25 @@ def the_same_tie_line_at_one_megapascal() -> None:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--full",
+        action="store_true",
+        help="also run the three-feed lever rule and the 1 MPa tie line",
+    )
+    # `parse_known_args`, not `parse_args`: `tests/test_examples.py` runs this
+    # script via `runpy.run_path` with pytest's own `sys.argv` still in place.
+    args, _unknown = parser.parse_known_args()
+
     print("Liquid-liquid equilibrium from PC-SAFT (ADR-0019, validation Case P-8)")
     print("=" * 78)
     the_state_and_the_old_failure()
     the_liquid_liquid_split()
-    three_feeds_one_tie_line()
-    the_same_tie_line_at_one_megapascal()
+    if args.full:
+        three_feeds_one_tie_line()
+        the_same_tie_line_at_one_megapascal()
+    else:
+        print("\n  (pass --full for the three-feed lever rule and the 1 MPa tie line)")
     print("\n" + "=" * 78)
     print(
         "k_ij = 0 throughout. PC-SAFT without a fitted binary parameter is known to be\n"

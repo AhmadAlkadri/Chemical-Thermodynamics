@@ -294,6 +294,7 @@ def test_feos_chemical_potentials_are_equal_at_chemthermos_phases(
     assert float(difference) < POTENTIAL_TOL
 
 
+@pytest.mark.slow  # ADR-0020 runtime trim: the z=0.5 tie line runs by default
 def test_the_same_tie_line_from_three_feeds_still_matches_feos() -> None:
     """Case P-8 (ii): a tie line is a property of the state, not of the feed.
 
@@ -320,6 +321,7 @@ def test_the_same_tie_line_from_three_feeds_still_matches_feos() -> None:
         assert float(np.max(np.abs(z - recombined))) < 1e-12
 
 
+@pytest.mark.slow  # ADR-0020 runtime trim: the same negative control runs in examples/validation/17
 def test_the_agreement_is_not_vacuous() -> None:
     """Perturbing water's association energy by 1 % must move the tie line.
 
