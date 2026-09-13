@@ -41,7 +41,44 @@ class FlashSettings:
             ADR-0007 and ADR-0008 for why gamma-phi stability is not available.
         stability_settings: Settings forwarded to
             :func:`chemthermo.stability_tp` when ``phase_detection`` is
-            ``"tangent-plane"``. ``None`` uses ``StabilitySettings()``.
+            ``"tangent-plane"``, for the feed test and for the post-split test
+            of each converged phase. ``None`` uses ``StabilitySettings()``.
+        post_split_stability: Refuse to return a two-phase result whose phases
+            are not themselves stable (ADR-0009). Every converged phase is fed
+            back into :func:`chemthermo.stability_tp` and the outcome is always
+            reported in ``diagnostics``; this flag decides what happens when
+            that check *fails*. ``True`` (default) raises
+            :class:`chemthermo.ConvergenceError` saying that a third phase is
+            required; ``False`` returns the two-phase result anyway, with the
+            failure visible in ``diagnostics["post_split_status"]``.
+
+            The check runs on the tangent-plane phi-phi path and on the
+            liquid-liquid (``"gamma-gamma"``) path. It cannot run for
+            ``"gamma-phi"`` (there is no gamma-phi stability test, ADR-0007),
+            and it deliberately does not run on the legacy
+            ``phase_detection="wilson-heuristic"`` path, whose purpose is to
+            reproduce pre-ADR-0008 behavior unchanged. Those two paths report
+            ``diagnostics["post_split_checked"] = False`` and a
+            ``post_split_skipped_reason``.
+        second_order: Run a second-order stage after successive substitution in
+            the **liquid-liquid** (``"gamma-gamma"``) split. The stage is a
+            damped Newton minimization of the two-phase Gibbs energy whose
+            gradient is the equal-activity residual (ADR-0009). Near a plait
+            point successive substitution needs thousands of iterations, so the
+            stage is what makes those feeds solvable at all. The phi-phi and
+            gamma-phi splits are unchanged by this release and never enter it.
+        ssi_iterations: Successive-substitution iterations performed in the
+            liquid-liquid split before the second-order stage takes over.
+            Capped by ``max_iter``.
+        second_order_max_iter: Maximum second-order iterations in the
+            liquid-liquid split.
+        second_order_tol: Target for the second-order stage, measured on the
+            equal-activity residual ``max_i |ln(x_i^I gamma_i^I)
+            - ln(x_i^II gamma_i^II)|``. It is tighter than ``tol`` because the
+            stage converges quadratically (one extra step is cheap) and because
+            this residual is what a caller verifies in ``diagnostics``. The
+            stage stops early when it can no longer make progress; a split is
+            accepted as converged as soon as it meets ``tol``.
 
     Notes:
         The solver is deterministic for fixed inputs, models, and settings.
@@ -52,6 +89,11 @@ class FlashSettings:
     damping: float | None = None
     phase_detection: str = "tangent-plane"
     stability_settings: StabilitySettings | None = None
+    post_split_stability: bool = True
+    second_order: bool = True
+    ssi_iterations: int = 50
+    second_order_max_iter: int = 100
+    second_order_tol: float = 1e-12
 
     def __post_init__(self) -> None:
         if self.max_iter <= 0:
@@ -66,3 +108,9 @@ class FlashSettings:
                 f"phase_detection must be one of {PHASE_DETECTION_MODES}; "
                 f"got {self.phase_detection!r}."
             )
+        if self.ssi_iterations <= 0:
+            raise InputRangeError("ssi_iterations must be positive.")
+        if self.second_order_max_iter <= 0:
+            raise InputRangeError("second_order_max_iter must be positive.")
+        if self.second_order_tol <= 0.0:
+            raise InputRangeError("second_order_tol must be positive.")
