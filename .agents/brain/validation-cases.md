@@ -796,3 +796,222 @@ Rules:
   does not use to iterate).
 - **Test path:** `tests/test_flash_phase_detection.py`.
 - **Script:** `examples/basic/flash_tp_auto_phase_demo.py`.
+
+---
+
+## Case L-1: Liquid-liquid tie-lines of Tessier (2000) Problem 1
+
+- **Source:** S. R. Tessier, J. F. Brennecke and M. A. Stadtherr, "Reliable
+  phase stability analysis for excess Gibbs energy models", Chemical
+  Engineering Science 55 (2000) 1785-1796, for the **parameters and the feeds**
+  (Table 1, Table 2). The paper publishes *stationary points of the
+  tangent-plane distance*, **not tie-lines**, so no printed tie-line exists to
+  compare against and none is claimed. The published verdicts for these feeds
+  (all unstable) are checked in Case S-6.
+- **Location:** `tests/validation/test_flash_lle_tessier2000.py::test_problem1_tie_lines`.
+- **Assumptions:** Two liquid phases at one temperature share a pure-liquid
+  reference state, so it cancels and equilibrium is `x_i^I gamma_i^I =
+  x_i^II gamma_i^II`. The tie-line is a property of (T, P, model, feed) that any
+  correct solver must reproduce; the feed must lie on it.
+- **Components / units:** 1-Propanol(1) / n-Butanol(2) / Water(3), T = 298.15 K,
+  P = 101325 Pa (validated, inert). Mole fractions; residuals dimensionless.
+- **Parameters and provenance:** `tests/fixtures/nrtl/tessier2000_problem1.json`
+  (Table 1; alpha implied by the printed G matrix). Same fixture and provenance
+  as Cases N-3 and S-6. Not packaged runtime data.
+- **Expected outcome and results** (phases ordered by the 1-Propanol fraction;
+  `beta` is the fraction of the second one):
+
+  | feed z | phase A | phase B | fraction of B | `delta_g_split_rt` |
+  | --- | --- | --- | --- | --- |
+  | (0.12, 0.08, 0.80) | (0.063945, 0.030845, 0.905210) | (0.147546, 0.104156, 0.748298) | 0.670502 | -1.952259e-04 |
+  | (0.13, 0.07, 0.80) | (0.077843, 0.032599, 0.889559) | (0.153205, 0.086640, 0.760155) | 0.692089 | -7.868224e-05 |
+  | (0.12, 0.05, 0.83) | (0.093662, 0.034385, 0.871953) | (0.156101, 0.071402, 0.772496) | 0.421822 | -4.073533e-05 |
+  | (0.148, 0.052, 0.80) | (0.116727, 0.037073, 0.846200) | (0.154474, 0.055090, 0.790436) | 0.828496 | -1.065209e-06 |
+
+  Residuals (worst over the four feeds): equal-activity
+  `max_i |ln(x_i^I gamma_i^I) - ln(x_i^II gamma_i^II)| = 4.441e-16`, material
+  balance `2.220e-16`, post-split `tpd_min` `-1.414e-16` (both phases reported
+  `"stable"` on every feed, so none of these states needs a third phase).
+  Iterations per stage: 50 successive substitutions (the budget) plus 5, 6, 7
+  and 5 second-order steps respectively.
+- **Tolerance:** asserted composition and phase fraction to abs 1e-6 against the
+  independent route, equal-activity residual < 1e-10, material balance < 1e-12,
+  `delta_g_split_rt < 0`. Achieved against the independent route: worst
+  difference **1.081e-12** (the near-plait feed); the other three are <= 9.7e-14.
+- **Independent route:** a from-scratch solve written in the same test module,
+  sharing no code with `chemthermo.flash`: its own successive-substitution loop
+  (with its own Rachford-Rice bisection) followed by a damped Newton solve of
+  the full system in `(x^I, x^II, beta)` - `n` equal-activity equations, `n - 1`
+  material balances and both normalization constraints - with a
+  central-difference Jacobian. Final residual <= 1.8e-15. It needs 536, 794,
+  1315 and 3922 substitutions before the Newton stage, which is the measurement
+  behind the claim that a second-order stage is required (ADR-0009 decision 3).
+- **Test path:** `tests/validation/test_flash_lle_tessier2000.py`.
+- **Script:** `examples/validation/09_lle_tessier2000_tie_lines.py`.
+
+---
+
+## Case L-2: Tessier (2000) Problem 2 tie-lines, stable control, and post-split stability
+
+- **Source:** Tessier, Brennecke and Stadtherr (2000), section 4.2, Table 4
+  (parameters) and Table 5 (feeds and stability verdicts). As in Case L-1, the
+  paper prints no tie-lines; the verdicts are checked in Case S-7.
+- **Location:** `tests/validation/test_flash_lle_tessier2000.py::test_problem2_tie_lines_and_stable_control`.
+- **Assumptions:** As Case L-1, plus: the paper's four unstable feeds must split
+  into a benzene-rich and a water-rich liquid, its stable feed must come back as
+  a single liquid, and **both** phases of every split must themselves be stable
+  (otherwise a third liquid exists and the two-phase answer is wrong).
+- **Components / units:** 1-Propanol(1) / n-Butanol(2) / Benzene(3) / Water(4),
+  T = 298.15 K, P = 101325 Pa (inert). Mole fractions.
+- **Parameters and provenance:** `tests/fixtures/nrtl/tessier2000_problem2.json`
+  (Table 4, regressed from the DECHEMA Chemistry Data Series; test fixture only,
+  never packaged runtime data). Same provenance note as Case S-7.
+- **Expected outcome and results:**
+
+  | feed z | benzene-rich phase | water-rich phase | water-rich fraction |
+  | --- | --- | --- | --- |
+  | (0.148, 0.052, 0.600, 0.200) | (0.166960, 0.061916, 0.717646, 0.053478) | (0.052871, 0.002251, 0.009743, 0.935136) | 0.166189 |
+  | (0.148, 0.052, 0.700, 0.100) | (0.154123, 0.055232, 0.744766, 0.045880) | (0.053605, 0.002170, 0.009833, 0.934392) | 0.060911 |
+  | (0.25, 0.15, 0.40, 0.20) | (0.255929, 0.154162, 0.411130, 0.178779) | (0.041250, 0.003483, 0.008157, 0.947110) | 0.027619 |
+  | (0.25, 0.15, 0.35, 0.25) | (0.265823, 0.161123, 0.375985, 0.197069) | (0.041786, 0.003625, 0.008064, 0.946525) | 0.070626 |
+
+  `delta_g_split_rt` = -4.358433e-02, -1.171946e-02, -5.581938e-04 and
+  -2.884102e-03. Worst equal-activity residual **1.821e-14**, worst material
+  balance **1.110e-16**. Iterations per stage: 38+1, 31+1, 35+1 and 38+1
+  (successive substitution + second order); these feeds converge the first stage
+  inside its budget and the second-order stage only polishes them from ~6e-09 to
+  ~1e-14.
+  **Post-split:** all eight phases report `"stable"`; worst post-split `tpd_min`
+  is **-7.116e-16**. No feed here needs a third phase.
+  **Stable control:** z = (0.25, 0.25, 0.25, 0.25) returns a single phase named
+  `"liquid"` with `tpd_min = +3.079311e-02` and `vapor_fraction is None`.
+- **Tolerance:** as Case L-1. Achieved against the independent route: worst
+  difference **4.441e-16**.
+- **Independent route:** the same from-scratch solve as Case L-1 (its own
+  successive substitution plus a damped Newton on the full system), which needs
+  50-56 substitutions on these feeds.
+- **Test path:** `tests/validation/test_flash_lle_tessier2000.py`.
+- **Script:** `examples/validation/09_lle_tessier2000_tie_lines.py`.
+
+---
+
+## Case L-3: n-butanol / water binodal, lever rule, and a `thermo` cross-check
+
+- **Source:** Internal invariants (a tie-line does not depend on the feed; the
+  lever rule) applied to the cited n-butanol / water NRTL pair, plus `thermo`
+  0.6.0 as an external route. This is the flash-level companion of Case S-8.
+- **Location:** `tests/test_flash_lle.py::test_binary_binodal_is_independent_of_the_feed_and_obeys_the_lever_rule`
+  and `tests/validation/test_flash_lle_tessier2000.py::test_thermo_agrees_on_the_binary_binodal_but_its_flash_will_not_split`.
+- **Assumptions:** For a binary at fixed T and P the miscibility gap has exactly
+  one tie-line: every feed strictly inside it must return the *same* two
+  conjugate compositions, with only the phase amounts changing, and those
+  amounts must follow the lever rule exactly. A feed outside the gap must return
+  one phase.
+- **Components / units:** n-Butanol(1) / Water(2), T = 298.15 K, P = 101325 Pa
+  (inert). Mole fractions.
+- **Parameters and provenance:** the 2-3 pair of Tessier et al. (2000) Table 1:
+  tau_12 = 0.90047, tau_21 = 3.51307, alpha = 0.48 (implied by the printed
+  `G_23`, `G_32`). Ternary parameters used as a binary sub-system; the claim
+  under test is the equilibrium arithmetic, not the physical n-butanol / water
+  phase diagram.
+- **Expected outcome and results:**
+  - Binodal from an equal-activity solve written in the test (Newton, FD
+    Jacobian, residual < 1e-14): x1 = **0.019998419467** and
+    **0.359999661508** - the same pair as Case S-8.
+  - Feeds 0.05, 0.10, 0.20 and 0.30 all split and all return that pair;
+    worst composition deviation over the four feeds **1.7e-12**.
+  - Phase fractions of the butanol-rich phase: 0.088240, 0.235298, 0.470586 and
+    0.176469; lever-rule error **<= 2.8e-12**.
+  - `delta_g_split_rt` = -4.105485e-03, -1.053007e-02, -8.580513e-03,
+    -1.622934e-03; worst equal-activity residual 7.654e-13; worst material
+    balance 1.110e-16; all four post-split checks `"stable"` with worst
+    `tpd_min` -1.358e-13.
+  - Feed 0.45 (above the upper branch) returns a single `"liquid"` with
+    `tpd_min = +4.078314e-02`.
+  - **Label independence:** at z1 = 0.10 the butanol-rich phase comes back as
+    `liquid2`; at z1 = 0.20 it comes back as `liquid1`. The labels are roles
+    assigned by the seed (ADR-0009 decision 2), so every assertion compares the
+    phase *set*.
+  - **Correction to the slice brief:** the brief listed z1 = 0.30 as a
+    single-phase control ("outside the gap"). It is not: 0.30 < 0.3599997, so it
+    is inside, and it splits. 0.45 is used as the single-phase control instead.
+    `thermo` independently calls 0.30 unstable (below).
+- **Independent route / external check:** `thermo` 0.6.0 with the same taus and
+  alphas.
+  - `thermo.FlashVLN` built from two `thermo.GibbsExcessLiquid` phases over one
+    `thermo.NRTL` model plus a `CEOSGas` **will not return a liquid-liquid
+    split**: it reports `unique_liquid_count == 1` (the two liquid phases are
+    deduplicated because they share an excess-Gibbs model) and returns a single
+    phase for all four in-gap feeds. No phase-fraction comparison is therefore
+    possible and none is claimed. This is recorded, not worked around; the
+    assertion `flasher.unique_liquid_count == 1` will fail if a future `thermo`
+    changes it.
+  - `thermo`'s own `stability_test_Michelsen` on the same model **does** find
+    the split, calls all four feeds unstable, and returns the conjugate pair
+    x1 = 0.0199994 and 0.3600248. Against this package's 0.0199984 / 0.3599997
+    that is **1.0e-06** and **2.5e-05**, both inside the asserted 1e-04.
+    `thermo`'s own stationarity residual there is ~1.9e-06, which is the
+    precision limit of the comparison.
+- **Tolerance:** binodal asserted to abs 1e-6 (achieved 1.7e-12), lever rule to
+  abs 1e-6 (achieved 2.8e-12), `thermo` to abs 1e-4 (achieved 2.5e-05).
+- **Test path:** `tests/test_flash_lle.py`,
+  `tests/validation/test_flash_lle_tessier2000.py`.
+- **Script:** `examples/basic/flash_tp_nrtl_lle_demo.py`.
+
+---
+
+## Case L-4: post-split stability of every two-phase phi-phi flash
+
+- **Source:** Internal invariant (two coexisting phases share one tangent plane;
+  a converged phase set is only an answer if each phase is itself stable). This
+  entry's "independent route" is an internal invariant, stated as required by
+  the ledger rules. It extends Case F-3, which verified the split but not the
+  phases.
+- **Location:** `tests/test_flash_phase_detection.py::test_every_two_phase_grid_state_passes_the_post_split_stability_check`,
+  and the guard itself in `tests/test_flash_lle.py::test_a_converged_phase_that_finds_its_partner_is_marginal_not_unstable`
+  and `::test_post_split_failure_raises_and_post_split_stability_false_returns`.
+- **Assumptions:** Feeding a converged equilibrium phase back into
+  `stability_tp` must find its partner phase as the tangent-plane minimizer with
+  `tpd = 0` (Case S-3). Any *other* negative stationary point means a third
+  phase exists and the two-phase answer is wrong.
+- **Components / units:** the 144-state Peng-Robinson grid of Case F-3 (6 binary
+  and ternary hydrocarbon systems, T 170-360 K, P 2e5-8e6 Pa, `kij = 0`), of
+  which 47 states are two-phase. Mole fractions; `tpd` dimensionless.
+- **Parameters and provenance:** packaged chemthermo databank; `kij = 0`.
+- **Expected outcome and results:**
+  - All 47 two-phase states pass: 94 phases, every one reported `"stable"`,
+    `post_split_status == "stable"`, nothing raised. **No state in this
+    repository genuinely needs a third phase.**
+  - Most negative post-split `tpd_min` anywhere on the grid: **-7.0055e-09**, at
+    Ethane/n-Heptane (0.7, 0.3), 360 K, 1 MPa, on the vapor phase. That is
+    inside the default `tpd_tol = 1e-8` by a factor of only **1.4**, which is
+    the reason the converged-onto-the-partner ("marginal") rule exists.
+  - At the default `tol = 1e-8` the minimizer *is* the partner phase to
+    `max_i |w_i - x_i^partner| <= 7.0e-09` and
+    `sum_i ln(w_i / x_i^partner)^2 <= 4.0e-16` - twelve orders below
+    `trivial_tol = 1e-8` - so the rule never had to fire on this grid
+    (`marginal` count 0).
+  - The rule is exercised directly by loosening the split tolerance:
+    at `FlashSettings(tol=1e-4)` the canonical ternary's liquid phase reports a
+    raw `tpd_min` of **-2.0e-05** (far past `tpd_tol`) at a point that *is* the
+    partner, is classified `"marginal"`, and the flash still returns.
+  - **Synthetic failure control:** at `FlashSettings(tol=1e-3)` the
+    Ethane/n-Heptane state's phases are only accurate to ~1e-3, the minimizer is
+    no longer recognisable as the partner, and `flash_tp` raises
+    `ConvergenceError` ("not a stable phase set"). With
+    `post_split_stability=False` the same call returns the two-phase result with
+    `post_split_stable = False`, `post_split_status = "unstable"` and
+    `post_split_tpd_min < -1e-8`. This is **not** a genuine three-phase state -
+    it is an under-converged split - and the test says so; it exists because
+    that is the only way to reach the failure path in this repository today.
+- **Tolerance:** asserted `post_split_tpd_min > -1e-8` on every grid state and
+  the worst value pinned to rel 1e-3.
+- **Not covered:** `phase_detection="wilson-heuristic"` and `gamma-phi` results
+  are not post-split checked (no stability test is available for gamma-phi,
+  ADR-0007, and the legacy path exists to reproduce old behavior unchanged).
+  Both report `post_split_checked = False` with a reason; asserted in
+  `tests/test_flash_lle.py::test_gamma_phi_and_legacy_paths_declare_that_they_were_not_checked`.
+- **Independent route:** internal invariant.
+- **Test path:** `tests/test_flash_phase_detection.py`, `tests/test_flash_lle.py`.
+- **Script:** `examples/basic/flash_tp_nrtl_lle_demo.py` (prints the post-split
+  block for a liquid-liquid split).
