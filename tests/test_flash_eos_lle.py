@@ -221,6 +221,7 @@ def test_water_hexane_at_one_atm_returns_two_liquids() -> None:
     assert delta_g == pytest.approx(float(diagnostics["delta_g_split_rt"]), abs=1e-12)
 
 
+@pytest.mark.slow  # ADR-0020 runtime trim: the 1-atm tie line is covered by test_water_hexane_at_one_atm_returns_two_liquids
 def test_the_same_tie_line_comes_back_from_three_feeds_and_obeys_the_lever_rule() -> None:
     """Case P-8(ii): a tie line is a property of the state, not of the feed."""
     reference: list[np.ndarray] | None = None
@@ -244,6 +245,7 @@ def test_the_same_tie_line_comes_back_from_three_feeds_and_obeys_the_lever_rule(
         assert np.max(np.abs(z - ((1.0 - beta) * phases[0] + beta * phases[1]))) < 1e-12
 
 
+@pytest.mark.slow  # ADR-0020 runtime trim: naming is also asserted by the two fast tie-line tests
 def test_liquid1_is_the_phase_richer_in_the_first_component() -> None:
     """ADR-0019 decision 3: the LLE order is composition-based, so it is stable."""
     eos = ct.PCSAFTEOS()
@@ -482,6 +484,7 @@ def test_a_model_without_phase_identity_keeps_the_wilson_ranking_fallback() -> N
     assert result.diagnostics["phase_regime"] == "VLE"
 
 
+@pytest.mark.slow  # ADR-0020 runtime trim: determinism of the phi-phi path is covered on the PR grid
 def test_the_liquid_liquid_answer_is_deterministic() -> None:
     """Same inputs, same models, same settings - same doubles, every time."""
     eos = ct.PCSAFTEOS()

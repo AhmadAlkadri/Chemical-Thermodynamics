@@ -494,7 +494,13 @@ def main() -> None:
 
     check_reference_state()
     check_grid(_grid_states() if args.full else SUBSET, full=args.full)
-    check_previously_failing()
+    if args.full:
+        check_previously_failing()
+    else:
+        print(
+            "\n  (pass --full for the four previously failing states; they also run in\n"
+            "   tests/test_flash_phi_phi_second_order.py on every default pytest run)"
+        )
 
     print("\n" + "=" * 78)
     if failures:

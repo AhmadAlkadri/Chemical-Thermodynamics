@@ -169,6 +169,7 @@ def test_the_whole_grid_answers_and_every_answer_is_verified() -> None:
 
 
 @pytest.mark.parametrize(("components", "z1", "temperature_K", "pressure_Pa"), PREVIOUSLY_FAILING)
+@pytest.mark.slow  # ADR-0020 runtime trim: the same four states run in tests/test_flash_phi_phi_second_order.py
 def test_each_previously_failing_state_needs_and_gets_the_second_order_stage(
     components: tuple[str, str], z1: float, temperature_K: float, pressure_Pa: float
 ) -> None:

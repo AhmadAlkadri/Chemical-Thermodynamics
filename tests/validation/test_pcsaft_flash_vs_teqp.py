@@ -279,7 +279,15 @@ def test_flash_tie_line_matches_teqp_at_300_K(reference, pressure: float) -> Non
 _BUBBLE_COMPOSITIONS = [0.10, 0.20, 0.30]
 
 
-@pytest.mark.parametrize("x1", _BUBBLE_COMPOSITIONS, ids=[f"x1={v}" for v in _BUBBLE_COMPOSITIONS])
+@pytest.mark.parametrize(
+    "x1",
+    # ADR-0020 runtime trim: one composition runs by default and the other two
+    # are `slow`. All three bisect the same verdict against the same teqp
+    # curve, so the default run still exercises the route end to end.
+    [_BUBBLE_COMPOSITIONS[0]]
+    + [pytest.param(value, marks=pytest.mark.slow) for value in _BUBBLE_COMPOSITIONS[1:]],
+    ids=[f"x1={v}" for v in _BUBBLE_COMPOSITIONS],
+)
 def test_bubble_pressure_from_stability_verdicts_matches_teqp(reference, x1: float) -> None:
     """Where ``stability_tp`` flips verdict at fixed feed is the bubble pressure.
 

@@ -48,6 +48,7 @@ The script prints a message and exits 0 when it is missing.
 
 from __future__ import annotations
 
+import argparse
 from typing import Callable, Sequence
 
 import numpy as np
@@ -322,6 +323,16 @@ def check_kij_binary() -> None:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--full",
+        action="store_true",
+        help="also run the bubble-pressure bisection and the kij binary",
+    )
+    # `parse_known_args`, not `parse_args`: `tests/test_examples.py` runs this
+    # script via `runpy.run_path` with pytest's own `sys.argv` still in place.
+    args, _unknown = parser.parse_known_args()
+
     if teqp is None:
         print("teqp is not installed; skipping. Install with: pip install -e '.[validation]'")
         return
@@ -349,8 +360,11 @@ def main() -> None:
     pressures = np.array([point["pL / Pa"] for point in trace])
 
     check_tie_lines(eos, model, trace, pressures)
-    check_bubble_pressures(eos, model, trace, pressures)
-    check_kij_binary()
+    if args.full:
+        check_bubble_pressures(eos, model, trace, pressures)
+        check_kij_binary()
+    else:
+        print("\n  (pass --full for the bubble-pressure bisection and the kij binary)")
 
     print("\n" + "=" * 78)
     if failures:

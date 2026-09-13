@@ -43,12 +43,16 @@ pytest -q
 
 `pyproject.toml` registers `slow` and sets `addopts = "-m 'not slow'"`, so a
 plain `pytest -q` (what CI runs) **deselects** slow-marked tests rather than
-running them - currently just the full 188-state PC-SAFT validation grid,
-`tests/validation/test_flash_split_robustness_pcsaft.py::test_the_whole_grid_answers_and_every_answer_is_verified`
-(ADR-0017). A representative 16-state subset of the same grid
-(`tests/validation/test_flash_split_robustness_pcsaft_subset.py`) runs in the
-default `pytest -q`, so CI still exercises the PC-SAFT phi-phi path on every
-run; the exhaustive grid is opt-in:
+running them. What is marked:
+
+- the full 188-state PC-SAFT validation grid (ADR-0017), with a representative
+  16-state subset (`tests/validation/test_flash_split_robustness_pcsaft_subset.py`)
+  in the default run;
+- the exhaustive three-phase checks of ADR-0020 - the 41-point temperature
+  scans across the water / n-hexane three-phase temperature, the PC-SAFT
+  ternary tie triangle, the verdict-boundary bisection;
+- a handful of *repetitions*: a further feed on a tie line the default run
+  already checks, a further pressure or temperature on the same map.
 
 ```bash
 pytest -q -m slow
@@ -56,12 +60,27 @@ pytest -q -m slow
 
 Command-line `-m` overrides `addopts`' `-m` (standard pytest behavior: the
 last `-m` value wins), so this runs exactly the slow-marked tests and nothing
-else. CI does not run it automatically - the full grid does not fit the
-suite's runtime budget alongside everything else, which is why the trim
-above exists; see validation Case F-5 in `.agents/brain/validation-cases.md`
-for the measured before/after. Mark a new test `@pytest.mark.slow` only for a
-full/exhaustive grid that already has a cheaper representative subset or
-golden-path example covering the same code by default.
+else. CI does not run it automatically - the marked tests do not fit the
+suite's runtime budget alongside everything else; see validation Cases F-5 and
+P-9 in `.agents/brain/validation-cases.md` for the measured before/after.
+
+**When to mark a new test `slow`** (widened by ADR-0020): only when the default
+run still covers the same capability. That means one of
+
+- a full/exhaustive grid whose representative subset runs by default, or
+- a *repetition* of something the default run does - another feed on the same
+  tie line, another temperature on the same map, the other side of a
+  two-sided check.
+
+Never for the only test of a capability. Put the reason in a comment next to
+the marker, naming what covers it by default.
+
+Heavy **examples** are trimmed the other way, not marked: an example that costs
+more than a few seconds takes a `--full` flag and defaults to a cheaper subset,
+as `examples/validation/15_flash_split_robustness.py` has since ADR-0017 and
+six more examples do since ADR-0020. `tests/test_examples.py` runs every
+example with its default, so the smoke test stays cheap and the full run is one
+flag away.
 
 ## Installability smoke checks
 
