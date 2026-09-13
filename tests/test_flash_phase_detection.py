@@ -312,6 +312,51 @@ def test_grid_invariants() -> None:
     assert worst_delta_g < 0.0
 
 
+def test_every_two_phase_grid_state_passes_the_post_split_stability_check() -> None:
+    """Validation Case L-4: the post-split gate over the phi-phi grid (ADR-0009).
+
+    Every converged phase of every two-phase state is fed back into
+    `stability_tp`. Two coexisting phases share one tangent plane, so each
+    stability test converges onto its *partner* and reports a tangent-plane
+    distance of zero up to the split's own tolerance.
+
+    Achieved over the 47 two-phase states (94 phases): every phase reports
+    `"stable"`, none needed the `"marginal"` (converged-onto-the-partner)
+    reclassification at the default `tol = 1e-8`, and the most negative
+    post-split `tpd_min` seen anywhere on the grid is **-7.0055e-09**, at
+    Ethane/n-Heptane (0.7, 0.3), 360 K, 1 MPa. That is inside the default
+    `tpd_tol = 1e-8` by only a factor of 1.4, which is why the
+    converged-onto-the-partner rule exists at all; `tests/test_flash_lle.py`
+    exercises it directly by loosening `tol`.
+
+    No state on this grid needs a third phase, so no state raises.
+    """
+    two_phase = 0
+    worst = 0.0
+    marginal = 0
+
+    for names, _z, temperature_K, pressure_Pa, result in _grid_results():
+        if len(result.phase_names()) != 2:
+            assert "post_split_checked" not in result.diagnostics
+            continue
+        where = (names, temperature_K, pressure_Pa)
+        two_phase += 1
+        diagnostics = result.diagnostics
+        assert diagnostics["post_split_checked"] is True, where
+        assert diagnostics["post_split_stable"] is True, where
+        assert diagnostics["post_split_status"] == "stable", where
+        for phase in ("liquid", "vapor"):
+            verdict = diagnostics[f"phase_stability_{phase}"]
+            assert verdict in {"stable", "marginal"}, where
+            marginal += verdict == "marginal"
+        worst = min(worst, float(diagnostics["post_split_tpd_min"]))
+
+    assert two_phase >= 30, two_phase
+    assert worst > -1e-8
+    assert worst == pytest.approx(-7.0055e-09, rel=1e-3)
+    assert marginal == 0
+
+
 def test_results_are_permutation_invariant_and_deterministic() -> None:
     cases = (
         (("Methane", "Ethane", "Propane"), (0.5, 0.3, 0.2), 240.0, 3.0e6),

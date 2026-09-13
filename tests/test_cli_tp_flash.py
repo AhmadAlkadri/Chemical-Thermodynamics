@@ -134,6 +134,47 @@ def test_cli_tp_flash_json_diagnostics_carry_the_phase_detection_keys() -> None:
     assert json.loads(json.dumps(diagnostics)) == diagnostics
 
 
+def test_cli_tp_flash_json_diagnostics_carry_the_post_split_keys() -> None:
+    """The post-split stability keys serialize through the CLI (ADR-0009).
+
+    `cli_schema_version` stays 1 for the same reason as in ADR-0008: these keys
+    live inside the free-form `diagnostics` mapping, which removes nothing and
+    changes no type. The numeric per-phase tangent-plane distances are asserted
+    by magnitude rather than pinned in the fixture: they are near-cancellation
+    quantities of order 1e-10 whose last digits are not a contract.
+    """
+    proc = _run_cli(
+        "tp-flash",
+        "--components",
+        "Methane,Ethane,Propane",
+        "--z",
+        "0.5,0.3,0.2",
+        "--temperature-k",
+        "240",
+        "--pressure-pa",
+        "3000000",
+        "--format",
+        "json",
+    )
+    assert proc.returncode == 0, proc.stderr
+    payload = json.loads(proc.stdout)
+
+    assert payload["cli_schema_version"] == 1
+    diagnostics = payload["diagnostics"]
+    assert diagnostics["post_split_checked"] is True
+    assert diagnostics["post_split_stable"] is True
+    assert diagnostics["post_split_status"] == "stable"
+    assert diagnostics["phase_stability_liquid"] == "stable"
+    assert diagnostics["phase_stability_vapor"] == "stable"
+    for key in (
+        "post_split_tpd_min",
+        "phase_stability_tpd_min_liquid",
+        "phase_stability_tpd_min_vapor",
+    ):
+        assert abs(float(diagnostics[key])) < 1e-8, key
+    assert json.loads(json.dumps(diagnostics)) == diagnostics
+
+
 def test_cli_tp_flash_gamma_phi_json_output_matches_fixture_contract() -> None:
     proc = _run_cli(
         "tp-flash",
