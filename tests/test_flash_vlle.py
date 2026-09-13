@@ -166,11 +166,11 @@ def test_post_split_stability_false_still_returns_the_two_phase_pair(butanol_wat
 
 @pytest.mark.parametrize("offset_K", (-0.05, -0.10))
 def test_below_t3_the_window_resolves_to_the_two_liquids(butanol_water, offset_K: float) -> None:
-    """Case V-3. Achieved: tie-line to 1.4e-16 of the independent binodal.
+    """Case V-3. Achieved: tie-line to 3.3e-13 of the independent binodal.
 
-    Phase fractions 0.470585520652 / 0.529414479348 at both temperatures - the
-    tie-line of this model is temperature independent, so the lever rule gives
-    the same answer at each.
+    Phase fractions 0.470585520652 / 0.529414479348 at both temperatures, equal
+    to the lever rule exactly (difference 0.0) - the tie-line of this model is
+    temperature independent, so the lever rule gives the same answer at each.
     """
     result = _flash(butanol_water, T3_K + offset_K)
 
@@ -244,7 +244,8 @@ def test_the_window_answer_is_the_same_as_a_direct_liquid_liquid_flash(butanol_w
     Below T3 the two-liquid state is also reachable without any vapor at all,
     by the `gamma-gamma` path. The tie-line the addition/removal search returns
     must be that tie-line, not merely something near it: achieved worst
-    composition deviation 1.4e-16.
+    composition deviation 1.8e-12, against the two routes' own convergence
+    tolerances.
     """
     through_the_window = _flash(butanol_water, T3_K - 0.05)
     direct = ct.flash_tp(

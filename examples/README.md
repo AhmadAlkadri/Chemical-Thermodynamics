@@ -69,6 +69,17 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
     (Tessier, Brennecke & Stadtherr, Chem. Eng. Sci. 55 (2000) 1785, Table 1,
     pairs 1-3 and 2-3) and are **not** the packaged synthetic defaults. Needs no
     optional dependency. See validation Cases R-1 and R-2.
+- `examples/basic/flash_tp_vlle_demo.py`
+  - Three-phase (vapor-liquid-liquid) TP flash, **discovered not assumed**.
+    1-propanol / n-butanol / water at 364 K and 1 atm with
+    `flash_mode="modified-raoult"`: two feeds inside the tie-triangle return the
+    same three phases in different amounts, and a third feed outside it returns
+    two, from the identical call. Prints the phase-set history
+    (`L -> LV -> LLV`), the stage counts, the verification residuals,
+    `delta_g_vs_two_phase_rt` and the post-split block. Parameters are written
+    inline with their citation (Tessier, Brennecke & Stadtherr, Chem. Eng. Sci.
+    55 (2000) 1785, Table 1) and are **not** the packaged synthetic defaults.
+    Needs no optional dependency. See validation Cases V-1 and V-2.
 - `examples/validation/00_reference_case.py`
   - Deterministic single-case comparison against `thermo` (optional dependency).
     Unchanged by the tangent-plane phase-detection slice: beta 0.46829044 vs
@@ -112,9 +123,26 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
     *checked* on the other), prints the shared vapor y = (0.234063, 0.765937),
     and then runs the three negative controls: a stable liquid-liquid split
     2 K below T3, a fully evaporated feed 2 K above it (verified against the
-    dew-point equation), and the refusal just below T3, where `flash_tp` raises
-    `ConvergenceError` because the converged pair is not a stable phase set.
-    Needs no optional dependency. See validation Case R-3.
+    dew-point equation), and the window just below T3, where the first
+    two-phase iterate is the wrong one: `FlashSettings(max_phases=2)` still
+    raises there, while the default `max_phases=3` resolves it to the two
+    liquids by adding a phase and removing another
+    (`phase_set_history = "V -> LV -> LLV -> LL"`).
+    Needs no optional dependency. See validation Cases R-3 and V-3.
+- `examples/validation/11_vlle_water_propanol_butanol.py`
+  - The ternary vapor-liquid-liquid **tie-triangle** of
+    1-propanol / n-butanol / water at 1 atm, with PASS/FAIL on every check.
+    Solves the triangle at 365, 364 and 363 K from its own six-equation Newton
+    iteration (three equal activities, two normalizations, and the bubble
+    condition on **one** liquid - that the other liquid also boils, and that
+    both share one vapor, are then checked as consequences). Six feeds inside
+    the triangle are reproduced to |dx| <= 2.2e-14 and |dbeta| <= 1.6e-13 with
+    `G(3 phases) < G(2-phase candidate) < G(feed)` computed in the script; four
+    feeds outside it (vapor-liquid region, liquid-liquid region, water-rich
+    corner, superheated) are each verified by their own route; and the binary
+    refusal window of Case R-3 is shown resolved. Records the one feed the
+    stability test misses at 363 K. Needs no optional dependency. See validation
+    Cases V-1, V-2 and V-3.
 - `examples/validation/*.py`
   - Optional validation sweeps against `thermo` (requires `pip install -e ".[validation]"`).
   - CSV output is disabled by default; pass `--outdir <dir>` or set `CHEMTHERMO_OUTDIR`.
