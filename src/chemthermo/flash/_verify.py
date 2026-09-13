@@ -263,11 +263,12 @@ def _post_split_stability(
 ) -> dict[str, float | int | str | bool]:
     """:func:`_post_split_report` with the historical raise-on-failure behavior.
 
-    Used by the paths that cannot add a phase: the phi-phi and gamma-gamma
-    splits (ADR-0011 leaves both at two phases because no state in this
-    repository exercises a third one there). The check always runs;
-    ``settings.post_split_stability`` decides whether a *failure* raises or is
-    only reported, so the diagnostics show the failure either way.
+    Used by the one path that cannot add a phase: the ``gamma-gamma``
+    (activity-only) split. ADR-0011 left it at two phases because no state in
+    this repository exercises a third liquid there, and ADR-0020 - which wired
+    the search to phi-phi - left that reasoning standing. The check always
+    runs; ``settings.post_split_stability`` decides whether a *failure* raises
+    or is only reported, so the diagnostics show the failure either way.
     """
     report = _post_split_report(
         mixture,
@@ -288,10 +289,11 @@ def _post_split_stability(
             "The converged two-phase solution is not a stable phase set: the post-split "
             f"stability test reports '{report.status}' for phase(s) {detail} "
             f"(most negative post-split tpd = {report.tpd_min:.6e}). A third phase is "
-            "required, and flash_tp returns at most two phases in this release "
-            "(multiphase flash is the next slice). Pass "
-            "FlashSettings(post_split_stability=False) to receive the two-phase result "
-            "anyway, with this failure recorded in diagnostics."
+            "required, and the gamma-gamma (activity-only) path returns at most two "
+            "phases: no state in this repository exercises a third liquid there, so "
+            "the phase addition/removal search is not wired to it (ADR-0011, ADR-0020). "
+            "Pass FlashSettings(post_split_stability=False) to receive the two-phase "
+            "result anyway, with this failure recorded in diagnostics."
         )
 
     return report.diagnostics

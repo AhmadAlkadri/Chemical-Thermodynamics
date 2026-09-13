@@ -86,14 +86,15 @@ class FlashSettings:
             consulted by the phi-phi split; see ``second_order`` and ADR-0016.
         second_order_max_iter: Maximum second-order iterations.
         max_phases: Largest number of phases :func:`chemthermo.flash_tp` may
-            return (ADR-0011). Validated ``>= 1``.
+            return (ADR-0011, ADR-0020). Validated ``>= 1``.
 
-            The default 3 lets the ``"modified-raoult"`` path *discover* a
-            third phase: after any converged phase set fails its post-split
-            stability test, the incipient phase found there is added and the
-            set is re-solved, and a phase whose fraction converges to zero or
-            below is removed again. ``max_phases=2`` reproduces the pre-ADR-0011
-            behavior exactly - a phase set that needs a third phase raises
+            The default 3 lets the ``"modified-raoult"`` path (ADR-0011) and
+            the ``"phi-phi"`` path (ADR-0020) *discover* a third phase: after
+            any converged phase set fails its post-split stability test, the
+            incipient phase found there is added and the set is re-solved, and
+            a phase whose fraction converges to zero or below is removed again.
+            ``max_phases=2`` reproduces the pre-search behavior exactly - a
+            phase set that needs a third phase raises
             :class:`chemthermo.ConvergenceError` instead of being resolved.
 
             The cap is only consulted for the *third* and further phases. The
@@ -102,9 +103,10 @@ class FlashSettings:
             ``max_phases=2``: it cannot turn a feed the stability test proved
             unstable into a single-phase answer.
 
-            The phi-phi and gamma-gamma paths still stop at two phases whatever
-            this is set to; see ADR-0011 "What remains" and ADR-0016
-            "Next slice".
+            The ``"gamma-gamma"`` path still stops at two phases whatever
+            this is set to: no activity-only state in this repository needs a
+            third liquid, so wiring it would ship an unexercised path
+            (ADR-0011 "What remains", narrowed by ADR-0020 decision 5).
         second_order_tol: Target for the second-order stage, measured on the
             equal-activity residual ``max_i |ln(x_i^I gamma_i^I)
             - ln(x_i^II gamma_i^II)|``. It is tighter than ``tol`` because the
