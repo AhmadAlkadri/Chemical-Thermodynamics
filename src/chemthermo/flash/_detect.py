@@ -649,6 +649,7 @@ def _flash_tp_modified_raoult(
             vapor="ideal",
             settings=settings,
             base=base,
+            additions=1,
         )
 
     post_split = report.diagnostics

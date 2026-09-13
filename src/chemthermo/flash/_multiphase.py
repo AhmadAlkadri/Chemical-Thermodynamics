@@ -633,6 +633,7 @@ def _flash_tp_phase_addition(
     vapor: Literal["none", "ideal"],
     settings: FlashSettings,
     base: Mapping[str, float | int | str | bool],
+    additions: int = 0,
 ) -> FlashResult:
     """Discover the equilibrium phase count by adding and removing phases.
 
@@ -644,6 +645,8 @@ def _flash_tp_phase_addition(
         compositions: Compositions of that starting phase set.
         history: Phase-set labels visited so far, e.g. ``["L", "LV"]``; this
             function appends to it.
+        additions: Phases the caller already added before handing over, counted
+            into ``diagnostics["phases_added"]``.
         ln_f_feed: Tangent-plane terms of the single-phase feed, for
             ``delta_g_split_rt``.
         two_phase_g_rt: Reduced Gibbs energy of the two-phase candidate that
@@ -659,7 +662,6 @@ def _flash_tp_phase_addition(
     current_labels = list(labels)
     current = [np.array(value, dtype=float) for value in compositions]
     rounds = settings.max_phases + _EXTRA_ROUNDS
-    additions = 0
     removals = 0
     total_ssi = 0
     total_second_order = 0
