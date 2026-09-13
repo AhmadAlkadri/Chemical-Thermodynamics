@@ -352,6 +352,10 @@ def stability_tp(
     n_active = int(np.count_nonzero(active))
 
     ln_f_feed, feed_branch = evaluator.ln_fugacity_terms(z)
+    # ADR-0017: replace the min-Gibbs tie-break label with a compressibility
+    # identity where the model supports one. Relabels only; `ln_f_feed` (the
+    # numeric terms `d` below is built from) is untouched.
+    feed_branch = evaluator.identity_label(z, feed_branch)
 
     # d_i = ln z_i + ln phi_i(z); inactive components are excluded rather than
     # floored, which keeps W_i = 0 for them at every iteration (equation (8)).
@@ -412,12 +416,20 @@ def _reported_terms(
     the lower envelope of the candidates, so it is evaluated with the
     minimum-Gibbs candidate at the converged composition even when the trial
     iterated on a pinned surface. For ``surface is None`` the terms already in
-    hand *are* the minimum-Gibbs ones and are reused, which keeps those families
-    bit-identical and spares a model call.
+    hand *are* the minimum-Gibbs ones and are reused, which keeps the *terms*
+    of those families bit-identical and spares a model call for them.
+
+    The *label* is then passed through :meth:`_TangentPlaneEvaluator.identity_label`
+    (ADR-0017): a no-op for every family except the EOS one, where it may
+    replace a min-Gibbs tie-break with a compressibility-measured identity.
+    This changes only the reported ``StabilityTrial.phase_branch`` string,
+    never ``terms``, so it cannot move a tangent-plane distance or a verdict.
     """
     if surface is None:
-        return surface_terms, surface_branch
-    return evaluator.ln_fugacity_terms(w)
+        terms, branch = surface_terms, surface_branch
+    else:
+        terms, branch = evaluator.ln_fugacity_terms(w)
+    return terms, evaluator.identity_label(w, branch)
 
 
 def _run_trial(

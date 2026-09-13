@@ -166,7 +166,7 @@ from ..core import Mixture
 from ..data import normalize_name
 from ..exceptions import CompositionError, InputRangeError, ModelError
 from ..models._kij import KijInput, KijPairs, canonicalize_kij, kij_matrix
-from ..models.base import EquationOfState
+from ..models.base import KAPPA_LIQUID_THRESHOLD, EquationOfState
 from ..parameters.pcsaft import (
     PCSAFTParameterError,
     PCSAFTParameters,
@@ -736,6 +736,56 @@ class PCSAFTEOS(EquationOfState, EOSProtocol):
             phase=phase,
         )
         return 1.0 / density
+
+    def phase_identity(
+        self,
+        *,
+        mixture: Mixture,
+        temperature_K: float,
+        pressure_Pa: float,
+        composition: Sequence[float],
+        phase: str,
+    ) -> str:
+        """Return "liquid" or "vapor" from the compressibility criterion (ADR-0017).
+
+        ``kappa = P / (rho * dP/drho)`` is the dimensionless isothermal
+        compressibility times pressure, evaluated at the density root
+        ``phase`` selects (see :meth:`density_roots`). ``dP/drho`` is the
+        analytic derivative already computed by
+        :meth:`chemthermo.eos._pcsaft_density.PCSAFTIsotherm.pressure_and_slope`
+        for the Newton refinement and the mechanical-stability filter of the
+        density-root solver, so this needs no new derivative and no finite
+        difference. See ``chemthermo.models.base.KAPPA_LIQUID_THRESHOLD`` for
+        the threshold and ADR-0017 for the measured separation between liquid
+        and vapor roots.
+
+        When the isotherm has a single admissible root at this composition,
+        both ``phase="liquid"`` and ``phase="vapor"`` name that same root and
+        this method returns the same identity either way - which is exactly
+        the case the historical vapor-first Gibbs tie-break (ADR-0008
+        decision 3, superseded by ADR-0017) could not tell apart.
+        """
+        if phase not in (_VAPOR, _LIQUID):
+            raise ValueError("phase must be 'vapor' or 'liquid'.")
+
+        names = self._resolve_components(mixture)
+        density = self._root_for_phase(
+            names=names,
+            temperature_K=temperature_K,
+            pressure_Pa=pressure_Pa,
+            composition=composition,
+            phase=phase,
+        )
+        isotherm = self._isotherm(names=names, temperature_K=temperature_K, composition=composition)
+        eta = density / isotherm.density_per_eta
+        model_pressure, slope = isotherm.pressure_and_slope(eta)
+        if not math.isfinite(slope) or slope <= 0.0:
+            raise ModelError(
+                f"PC-SAFT root at rho = {density!r} mol/m^3 is mechanically unstable "
+                "(dP/drho <= 0); phase identity is undefined there."
+            )
+        kappa = model_pressure / (density * slope)
+        return _LIQUID if kappa < KAPPA_LIQUID_THRESHOLD else _VAPOR
 
     # -- parameter and component plumbing -----------------------------------
 

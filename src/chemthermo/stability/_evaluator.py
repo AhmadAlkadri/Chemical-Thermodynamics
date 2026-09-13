@@ -210,6 +210,22 @@ class _TangentPlaneEvaluator(Protocol):
         """Return deterministic trial-phase initial estimates."""
         ...
 
+    def identity_label(self, composition: np.ndarray, label: str | None) -> str | None:
+        """Replace a min-Gibbs ``label`` with a compressibility identity, if possible.
+
+        ``label`` is a candidate label already selected by
+        :func:`_select_min_gibbs` / :func:`_select_surface` (a min-Gibbs tie-break
+        when two candidates coincide, e.g. a cubic's single real root). This
+        gives the evaluator a chance to replace it with a model-measured
+        identity instead (ADR-0017); it must never change ``composition`` or
+        any numeric term, only the label reported alongside it.
+
+        The default the EOS family relies on is ``EquationOfState.phase_identity``
+        returning ``None``; families with no such measurement (activity-only,
+        modified-Raoult) return ``label`` unchanged.
+        """
+        ...
+
 
 # ---------------------------------------------------------------------------
 # Candidates
@@ -479,6 +495,32 @@ class _EOSTangentPlane:
         estimates.extend(_pure_component_estimates(self._mixture, z, active))
         return estimates
 
+    def identity_label(self, composition: np.ndarray, label: str | None) -> str | None:
+        """Ask the model for a compressibility identity of the ``label`` root (ADR-0017).
+
+        ``label`` names which of the two compressibility branches
+        :func:`_select_min_gibbs` kept - the branch computed with
+        ``eos.fugacity_coefficients(..., phase=label)`` - so asking
+        ``eos.phase_identity(..., phase=label)`` measures the identity of that
+        *same* root, never a different one. When the model returns ``None``
+        (the ``EquationOfState.phase_identity`` default: not implemented) or
+        raises evaluating a root that was just evaluated successfully (should
+        not happen, defensive only), ``label`` is returned unchanged.
+        """
+        if label is None:
+            return None
+        try:
+            identity = self._eos.phase_identity(
+                mixture=self._mixture,
+                temperature_K=self._temperature,
+                pressure_Pa=self._pressure,
+                composition=composition.tolist(),
+                phase=label,
+            )
+        except ModelError:
+            return label
+        return identity if identity in (_LIQUID, _VAPOR) else label
+
 
 class _ActivityTangentPlane:
     """Evaluator backed by an activity-coefficient model (liquid-liquid).
@@ -542,6 +584,10 @@ class _ActivityTangentPlane:
             index = int(np.argmax(active))
             return [_InitialEstimate(f"pure-{names[index]}", _normalized(z, active))]
         return _pure_component_estimates(self._mixture, z, active)
+
+    def identity_label(self, composition: np.ndarray, label: str | None) -> str | None:
+        """No compressibility identity for an activity-only liquid: ``label`` (always ``None``)."""
+        return label
 
 
 class _ModifiedRaoultTangentPlane:
@@ -659,6 +705,13 @@ class _ModifiedRaoultTangentPlane:
             index = int(np.argmax(active))
             estimates.append(_InitialEstimate(f"pure-{names[index]}", _normalized(z, active)))
         return estimates
+
+    def identity_label(self, composition: np.ndarray, label: str | None) -> str | None:
+        """No compressibility identity: an activity liquid and an ideal gas are already
+        two different models, not two branches of one equation of state, so there is
+        no tie to break and ``label`` is returned unchanged.
+        """
+        return label
 
 
 def _cubic_root_candidates(

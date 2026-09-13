@@ -15,6 +15,12 @@ that names a *pressure* and a *phase* has to solve
 set, and ``phase="vapor"`` / ``"liquid"`` pick its lowest / highest density -
 the Peng-Robinson convention verbatim.
 
+``PCSAFTEOS`` also implements ``phase_identity`` (ADR-0017): a dense state with
+only one density root is still named "liquid" or "vapor" from a measured
+compressibility ratio (``kappa = P / (rho dP/drho)``, 1 for an ideal gas and
+well below 1 for a liquid), not from a vapor-first Gibbs tie-break. Section 3
+below is exactly that case.
+
 The script prints, at 300 K:
 
 1. the density roots: the feed at three pressures, where the model has only
@@ -106,6 +112,7 @@ _DIAGNOSTIC_KEYS = (
     "post_split_checked",
     "post_split_stable",
     "post_split_tpd_min",
+    "phase_label_method",
 )
 
 
@@ -173,8 +180,11 @@ def main() -> None:
     print(f"  phases: {len(single.phases)} -> {list(single.phases)}")
     _print_diagnostics(single)
     print(
-        "  Only one density root exists here, so the phase name is the min-Gibbs\n"
-        "  tie-break convention, not a statement the model can make."
+        "  Only one density root exists here, so 'vapor' and 'liquid' would call the\n"
+        "  same state, but the name is still measured: kappa = P / (rho dP/drho) at\n"
+        "  that root is well below 1 (dense fluid), so phase_identity reports\n"
+        "  'liquid' and phase_label_method records 'compressibility' - not a\n"
+        "  vapor-first tie-break (ADR-0017)."
     )
 
     print("\n4) Peng-Robinson on the same state, for contrast (not a validation)")

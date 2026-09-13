@@ -17,7 +17,7 @@ from ..validation import (
     validate_temperature,
 )
 from ._kij import KijInput, KijPairs, canonicalize_kij, kij_matrix
-from .base import EquationOfState
+from .base import KAPPA_LIQUID_THRESHOLD, EquationOfState
 
 R_J_PER_MOL_K = 8.314462618
 
@@ -163,6 +163,78 @@ class PengRobinsonEOS(EquationOfState):
             return min(roots)
         else:
             raise ValueError("phase must be 'vapor' or 'liquid'.")
+
+    def phase_identity(
+        self,
+        *,
+        mixture: Mixture,
+        temperature_K: float,
+        pressure_Pa: float,
+        composition: Sequence[float],
+        phase: str,
+    ) -> str:
+        """Return "liquid" or "vapor" from the compressibility criterion (ADR-0017).
+
+        ``kappa = -P / (V * dP/dV)`` is the dimensionless isothermal
+        compressibility times pressure, evaluated at the root ``phase``
+        selects. ``dP/dV`` is the exact analytic derivative of the
+        Peng-Robinson pressure equation
+        ``P = RT/(V - b) - a / (V^2 + 2 b V - b^2)``, whose root in ``Z`` is
+        algebraically the same cubic :meth:`compressibility_factor` already
+        solves - so this needs no new root-finding and no finite difference.
+        See ``chemthermo.models.base.KAPPA_LIQUID_THRESHOLD`` for the
+        threshold and ADR-0017 for the measured separation between liquid and
+        vapor roots.
+
+        When the cubic has a single real root at this composition, both
+        ``phase="liquid"`` and ``phase="vapor"`` name that same root and this
+        method returns the same identity either way - which is exactly the
+        case the historical vapor-first Gibbs tie-break (ADR-0008 decision 3,
+        superseded by ADR-0017) could not tell apart.
+        """
+        temperature = validate_temperature(temperature_K)
+        pressure = validate_pressure(pressure_Pa)
+
+        if len(composition) != len(mixture.components):
+            raise CompositionError("Composition length must match number of mixture components.")
+
+        fractions = validate_fractions(composition, normalize=False, tol=COMPOSITION_SUM_TOL)
+        y = np.array(fractions, dtype=float)
+
+        _a_i, _b_i, _aij, a_mix, b_mix = self._mixture_parameters(mixture, temperature, y)
+        if a_mix <= 0.0 or b_mix <= 0.0:
+            raise ModelError("Invalid mixture parameters for Peng-Robinson EOS.")
+
+        A = a_mix * pressure / (R_J_PER_MOL_K**2 * temperature**2)
+        B = b_mix * pressure / (R_J_PER_MOL_K * temperature)
+
+        roots = self._compressibility_roots(A, B)
+        if not roots:
+            raise ModelError("No real compressibility roots found for Peng-Robinson EOS.")
+
+        if phase == "vapor":
+            Z = max(roots)
+        elif phase == "liquid":
+            Z = min(roots)
+        else:
+            raise ValueError("phase must be 'vapor' or 'liquid'.")
+
+        if Z <= B:
+            raise ModelError("Invalid state: Z <= B for Peng-Robinson EOS.")
+
+        molar_volume = Z * R_J_PER_MOL_K * temperature / pressure
+        denominator = molar_volume**2 + 2.0 * b_mix * molar_volume - b_mix**2
+        dP_dV = (
+            -R_J_PER_MOL_K * temperature / (molar_volume - b_mix) ** 2
+            + a_mix * (2.0 * molar_volume + 2.0 * b_mix) / denominator**2
+        )
+        if not math.isfinite(dP_dV) or dP_dV >= 0.0:
+            raise ModelError(
+                "Peng-Robinson root is mechanically unstable (dP/dV >= 0); phase identity "
+                "is undefined there."
+            )
+        kappa = -pressure / (molar_volume * dP_dV)
+        return "liquid" if kappa < KAPPA_LIQUID_THRESHOLD else "vapor"
 
     def _mixture_parameters(
         self, mixture: Mixture, temperature: float, y: np.ndarray

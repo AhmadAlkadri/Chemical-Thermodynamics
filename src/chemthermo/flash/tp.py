@@ -21,10 +21,12 @@ ADR-0010). The flow is
    ``activity_model=`` plus ``vapor="ideal"`` for modified-raoult).
 2. ``status == "stable"``: a single-phase ``FlashResult`` is returned with
    ``termination_reason = "feed_stable_tangent_plane"``. For phi-phi its phase
-   name is the minimum-Gibbs root branch the stability test selected
-   (``feed_branch``); when the cubic has a single real root both branches
-   coincide and the label is a *convention*, not a measurement. For
-   gamma-gamma the single phase is a liquid and is named ``"liquid"``.
+   name is the branch the stability test selected (``feed_branch``), which the
+   evaluator names from ``EquationOfState.phase_identity`` (a compressibility
+   criterion, ADR-0017) when the model implements one - including when the
+   cubic has a single real root, where the two branches coincide and a
+   min-Gibbs comparison alone cannot tell them apart. For gamma-gamma the
+   single phase is a liquid and is named ``"liquid"``.
 3. ``status == "unstable"``: the converged stationary point seeds the K-values
    (see :func:`chemthermo.flash._detect._stability_k_seed`) and the
    successive-substitution / Rachford-Rice loop - Michelsen's recommended
@@ -221,17 +223,19 @@ def flash_tp(
           modified-raoult):
           ``stability_status``, ``tpd_min``, ``stability_trials``, and
           ``feed_branch`` when the model reports one. A single phase adds
-          nothing else and uses
-          ``termination_reason = "feed_stable_tangent_plane"``. A two-phase
-          result adds ``k_seed``, ``mass_balance_residual``,
-          ``delta_g_split_rt``, the equilibrium residual
-          (``fugacity_residual`` for phi-phi, ``equilibrium_residual`` for
-          gamma-gamma) and the post-split keys ``post_split_checked``,
+          nothing else, uses
+          ``termination_reason = "feed_stable_tangent_plane"``, and - phi-phi
+          only - ``phase_label_method`` (ADR-0017: ``"compressibility"`` or
+          ``"tie-break"``). A two-phase result adds ``k_seed``,
+          ``mass_balance_residual``, ``delta_g_split_rt``, the equilibrium
+          residual (``fugacity_residual`` for phi-phi, ``equilibrium_residual``
+          for gamma-gamma) and the post-split keys ``post_split_checked``,
           ``post_split_stable``, ``post_split_status``,
           ``post_split_tpd_min``, ``phase_stability_<name>`` and
           ``phase_stability_tpd_min_<name>``. Phi-phi additionally reports
-          ``incipient_phase``, ``max_delta_k``, ``k_min`` and ``k_max``, plus -
-          **only when the ADR-0016 second-order stage actually ran** -
+          ``incipient_phase``, ``phase_label_method`` (``"compressibility"`` or
+          ``"wilson-ranking"``), ``max_delta_k``, ``k_min`` and ``k_max``,
+          plus - **only when the ADR-0016 second-order stage actually ran** -
           ``ssi_iterations``, ``second_order_iterations``, ``converged_stage``
           and ``negative_flash_steps``. Those four keys are absent from a
           phi-phi result that converged in the first stage, deliberately: such
@@ -288,18 +292,31 @@ def flash_tp(
         ``phase_detection="wilson-heuristic"`` it only means an initial-estimate
         heuristic said so.
 
-        **Vapor/liquid labelling convention.** For a single-phase phi-phi result
-        the name is the minimum-Gibbs compressibility root branch of the feed.
-        When the cubic has a single real root (dense or supercritical fluids)
-        both branches return identical fugacity coefficients, the branch label
-        is a tie-break, and the reported ``"vapor"`` / ``"liquid"`` name is
-        therefore a naming convention rather than a phase identification. For a
-        two-phase phi-phi result the two converged phases are named by
-        volatility ordering: the phase enriched (relative to the feed) in the
-        component with the largest Wilson K relative to the one with the
-        smallest is named ``"vapor"``. ``EquationOfState`` exposes no molar
-        volume, so no density-based identification is available; this ordering
-        decides the *name* only, never the verdict or the compositions.
+        **Vapor/liquid labelling by compressibility (ADR-0017).** A phi-phi
+        phase name comes from ``EquationOfState.phase_identity``, evaluated on
+        the root the phase actually converged on: a dimensionless
+        isothermal-compressibility ratio (``kappa = -P / (V dP/dV)`` for
+        Peng-Robinson, the analogous ``P / (rho dP/drho)`` for PC-SAFT) that is
+        1 for an ideal gas and well below 1 for a liquid
+        (``chemthermo.models.base.KAPPA_LIQUID_THRESHOLD``). For a
+        single-phase result this replaces the historical min-Gibbs tie-break -
+        the case where the cubic has a single real root and both branches
+        return identical fugacity coefficients, so no Gibbs comparison can
+        distinguish them, is exactly the case ``kappa`` was added to settle.
+        For a two-phase result the phase with the lower ``kappa`` is named
+        ``"liquid"``; when both converged phases fall on the same side of the
+        threshold (near-critical states, where any label is a convention) the
+        historical volatility ordering is kept instead - the phase enriched
+        (relative to the feed) in the component with the largest Wilson K
+        relative to the one with the smallest is named ``"vapor"``.
+        ``diagnostics["phase_label_method"]`` records which rule decided:
+        ``"compressibility"``, ``"wilson-ranking"`` (a two-phase fallback) or
+        ``"tie-break"`` (a single-phase fallback, for a model that does not
+        implement ``phase_identity``). Neither rule ever decides the verdict,
+        the compositions or the vapor fraction's *magnitude* - only which
+        already-converged phase (or ``1 - vapor_fraction``) the name
+        ``"vapor"`` attaches to. See ADR-0008 decision 3 (superseded) and
+        ADR-0017.
 
         **Liquid-liquid phase names are roles, not identities.** ``"liquid1"``
         is the phase the split was started from as feed-like and ``"liquid2"``
