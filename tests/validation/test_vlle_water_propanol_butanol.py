@@ -271,9 +271,9 @@ def test_a_feed_inside_the_tie_triangle_returns_three_verified_phases(
     """Case V-1. Compositions and phase fractions against the independent solve.
 
     Achieved over the six (temperature, feed) combinations: worst composition
-    deviation 2.8e-16, worst phase-fraction deviation 3.6e-13, worst
-    equilibrium residual 8.9e-16, worst mass-balance residual 1.1e-16, worst
-    post-split ``tpd_min`` -3.3e-16.
+    deviation 2.2e-14, worst phase-fraction deviation 1.6e-13, worst
+    equilibrium residual 1.8e-15, worst mass-balance residual 6.9e-18, worst
+    post-split ``tpd_min`` -4.1e-16.
     """
     names, model, ln_gamma, psat = system
     x_i, x_ii, y, _ = _tie_triangle(temperature_K, TRIANGLE_SEEDS[temperature_K], ln_gamma, psat)
@@ -380,8 +380,9 @@ def test_three_phase_results_are_deterministic_and_permutation_invariant(system)
     The `liquid1` / `liquid2` labels are roles and may swap, exactly as for a
     two-phase liquid-liquid result, so the comparison is on the sorted set of
     compositions. `vapor` is the one name with a model-level meaning and must
-    stay on the vapor. Achieved: worst composition difference after undoing the
-    permutation 1.5e-13, worst phase-fraction difference 3.0e-13.
+    stay on the vapor. Achieved over all six orderings: worst composition
+    difference after undoing the permutation 4.3e-15, worst phase-fraction
+    difference 1.5e-14.
     """
     names, model, ln_gamma, psat = system
     temperature_K = 364.0

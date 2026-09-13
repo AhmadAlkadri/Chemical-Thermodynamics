@@ -320,17 +320,12 @@ Notes and limits:
   `liquid1` / `liquid2` with `vapor_fraction = None` (the same role-not-identity
   caveat as `gamma-gamma`); a single phase is named by the feed's candidate.
   There is no volatility-ordering convention here, unlike phi-phi.
-- **Both phases are re-tested against both candidates.** A vapor-liquid answer
+- **Every phase is re-tested against both candidates.** A vapor-liquid answer
   whose liquid is inside a miscibility gap, or a liquid-liquid answer that
-  should be boiling, raises `ConvergenceError` ("a third phase is required")
-  rather than being returned.
-- **Near a three-phase state it refuses.** For water / 1-butanol at 1 atm and
-  z(butanol) = 0.20 there is a window about **0.135 K wide just below** the
-  three-phase temperature T3 = 366.2138 K where the deepest tangent-plane
-  minimum is the vapor, the converged vapor-liquid pair is not the equilibrium,
-  and `flash_tp` raises. The refusal is correct; the *resolution* below T3 is
-  not a third phase but a different pair of two, which needs phase addition
-  **and removal**. See validation Case R-3.
+  should be boiling, is not returned: it is the starting point of the phase
+  search below.
+- **This is the mode that can return three phases.** See
+  [Three phases, and how many there are](#three-phases-and-how-many-there-are).
 - **Honest limits of the model itself:** ideal vapor, so low pressure only; no
   Poynting correction; no `phi^sat`; and the temperature must lie inside every
   component's Antoine validity range, which is **enforced** - outside it the
@@ -373,10 +368,12 @@ print(result.diagnostics["phase_stability_liquid1"])      # 'stable'
 print(result.diagnostics["phase_stability_tpd_min_liquid1"])
 ```
 
-- If a phase is genuinely unstable, `flash_tp` raises `ConvergenceError` saying
-  that the two-phase solution is **not a stable phase set and a third phase is
-  required**. It refuses rather than returning an answer it has proved wrong.
-  Multiphase flash is the next slice.
+- If a phase is genuinely unstable, the phase set is not the answer. On the
+  `modified-raoult` path the incipient phase found there is **added** and the
+  set re-solved (see below); on the phi-phi and `gamma-gamma` paths `flash_tp`
+  raises `ConvergenceError` saying that the solution is **not a stable phase
+  set and a third phase is required**. Either way it never returns an answer it
+  has proved wrong.
 - `FlashSettings(post_split_stability=False)` returns the result anyway; the
   flag gates the *raise*, not the computation, so the diagnostics show the
   failure either way.
@@ -395,6 +392,102 @@ print(result.diagnostics["phase_stability_tpd_min_liquid1"])
   reproduce pre-ADR-0008 behavior unchanged; both report
   `diagnostics["post_split_checked"] == False` with a
   `post_split_skipped_reason`.
+
+### Three phases, and how many there are
+
+`flash_tp(..., flash_mode="modified-raoult")` discovers the number of
+equilibrium phases, up to `FlashSettings.max_phases` (default 3). Nothing is
+told how many phases there are:
+
+```
+stability of the feed  ->  a two-phase split  ->  stability of every phase
+                       ->  add the phase that was found, re-solve
+                       ->  a phase fraction goes to zero or below? remove it
+                       ->  every phase stable and every fraction positive: done
+```
+
+The inner solve is the multiphase Rachford-Rice written as the constrained
+convex minimization of `F(beta) = -sum_i z_i ln(t_i)` (Okuno, Johns &
+Sepehrnoori, SPE J 15 (2010) 313) over a feasible region built from
+`x_i^j >= 0`, which contains no pole. That region does **not** constrain the
+sign of the phase fractions, so a phase that should not be there converges to a
+non-positive fraction - the "negative flash" - instead of making the solve
+fail, and that sign is the removal signal. Successive substitution hands over
+to a Newton minimization of the total Gibbs energy in the non-reference phases'
+mole numbers (ADR-0011).
+
+```python
+from chemthermo import Mixture, NRTL, NRTLParameters, flash_tp
+
+# 1-propanol / n-butanol / water, NRTL parameters from Tessier, Brennecke &
+# Stadtherr, Chem. Eng. Sci. 55 (2000) 1785, Table 1. LLE-fitted and
+# temperature independent: an illustration of the method, not a correlation.
+parameters = NRTLParameters.from_pairs(
+    [
+        ("1-Propanol", "n-Butanol", -0.61259, 0.7164, 0.3, 0.3),
+        ("1-Propanol", "Water", -0.07149, 2.7425, 0.3, 0.3),
+        ("n-Butanol", "Water", 0.90047, 3.51307, 0.48, 0.48),
+    ]
+)
+mixture = Mixture.from_database(
+    ("1-Propanol", "n-Butanol", "Water"), (0.13418838, 0.08427618, 0.78153544)
+)
+
+result = flash_tp(
+    mixture,
+    temperature_K=364.0,
+    pressure_Pa=101325.0,
+    activity_model=NRTL(parameters=parameters),
+    flash_mode="modified-raoult",
+)
+
+print(result.phase_names())                          # ['liquid1', 'liquid2', 'vapor']
+print(result.diagnostics["phase_regime"])            # 'VLLE'
+print(result.diagnostics["phase_set_history"])       # 'L -> LV -> LLV'
+print(result.phase_fractions)                        # ~1/3 each
+print(result.vapor_fraction)                         # 0.3333333...
+print(result.diagnostics["delta_g_vs_two_phase_rt"]) # -3.69e-04  (< 0)
+```
+
+```bash
+python examples/basic/flash_tp_vlle_demo.py
+python examples/validation/11_vlle_water_propanol_butanol.py
+```
+
+Notes and limits:
+
+- **`max_phases` caps the search, it does not choose the answer.** The
+  one-versus-two decision is Michelsen's stability test, not a setting, so
+  `max_phases=1` behaves like `max_phases=2`. `max_phases=2` reproduces the
+  pre-ADR-0011 behavior exactly: a state needing a third phase raises.
+- **`FlashSettings(post_split_stability=False)` skips the search**, returning
+  the converged two-phase answer with the failure in `diagnostics`. The flag
+  means "do not police the phase set".
+- **Only `modified-raoult` searches.** The phi-phi and `gamma-gamma` paths still
+  stop at two phases whatever `max_phases` says, and raise as before: no state
+  in this repository needs a third phase on either, and an unexercised path is
+  not a shipped capability. See ADR-0011 "What remains".
+- **Diagnostics keys appear only on a result that entered the search**
+  (`phase_set_history`, `phases_added`, `phases_removed`,
+  `delta_g_vs_two_phase_rt`, `rachford_rice_iterations`). Every single- and
+  two-phase result of the earlier releases is unchanged down to the last bit,
+  diagnostics included.
+- **Phase names.** `vapor` is the ideal-gas candidate; `liquid`, or
+  `liquid1` / `liquid2` / ..., are the liquids, numbered in the order the search
+  created them. The liquid numbers are **roles, not identities** - compare the
+  phase *set*. `vapor_fraction` is the `vapor` phase's fraction when there is
+  one and `None` when there is not.
+- **The phase count is never better than the stability test that produced it.**
+  `"stable"` means no negative tangent-plane distance was found from the
+  deterministic trial set. A thin three-phase region can hide from it: measured
+  at 363 K for this ternary, one feed inside the tie-triangle comes back a
+  single liquid (validation Case V-2).
+- **No performance work was done.** A three-phase solve costs a two-phase solve
+  plus several stability tests plus roughly 50 successive substitutions, a
+  handful of Newton steps and ~100-150 Rachford-Rice Newton iterations.
+- **`chemthermo.vlle` is untouched.** That public plugin boundary predates this
+  work and `flash_mode="vlle"` still raises a `ModelError` pointing at it; a
+  follow-up ADR will decide its disposition now that VLLE is in-tree.
 
 ### Binary interaction parameters (`kij`)
 

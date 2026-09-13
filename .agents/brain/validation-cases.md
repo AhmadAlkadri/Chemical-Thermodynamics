@@ -1261,3 +1261,296 @@ Rules:
   without it).
 - **Test path:** `tests/validation/test_modified_raoult_vs_thermo.py`.
 - **Script:** none (the `thermo` comparison lives in tests only).
+
+---
+
+## Case V-1: The ternary vapor-liquid-liquid tie-triangle
+
+- **Source:** Internal invariant plus an independent solve. A ternary at fixed
+  `(T, P)` holds three phases over a *region* of feeds (Gibbs' phase rule:
+  F = 3 - 3 + 2 = 2, and fixing T and P still leaves the tie-triangle), whose
+  corners are the two conjugate liquids and the vapor they share. **No
+  experimental ternary VLLE data is used anywhere in this case.** This entry's
+  "independent route" is a separately written Newton solve, stated as required
+  by the ledger rules.
+- **Location:** `tests/validation/test_vlle_water_propanol_butanol.py`
+  (`::test_the_independent_tie_triangle_is_a_genuine_three_phase_state`,
+  `::test_a_feed_inside_the_tie_triangle_returns_three_verified_phases`,
+  `::test_the_three_phase_state_has_the_lowest_gibbs_energy`,
+  `::test_three_phase_results_are_deterministic_and_permutation_invariant`) and
+  `examples/validation/11_vlle_water_propanol_butanol.py`.
+- **Assumptions:** modified Raoult (`f_i^0 = Psat_i(T)`, `phi^sat = 1`,
+  Poynting = 1, ideal vapor). Six unknowns - the two liquid compositions - and
+  six equations: three equal activities, two normalizations, and the bubble
+  condition on liquid I only. That liquid II is *also* at its bubble point, and
+  that both liquids give the same vapor, are consequences and are checked.
+- **Components / units:** 1-Propanol(1) / n-Butanol(2) / Water(3),
+  P = 101325 Pa, T = 363.0, 364.0 and 365.0 K. Mole fractions; `tpd` and
+  `G/RT` dimensionless. All three Antoine windows cover these temperatures.
+- **Parameters and provenance:** NRTL Table 1 of Tessier, Brennecke and
+  Stadtherr, Chem. Eng. Sci. 55 (2000) 1785-1796 (attributed there to McDonald
+  and Floudas, AIChE J. 41 (1995) 1798), fixture
+  `tests/fixtures/nrtl/tessier2000_problem1.json`; alpha implied by
+  `G_ij = exp(-alpha_ij tau_ij)`. Antoine from the packaged databank
+  (Koretsky 2012). **LLE-fitted and temperature independent.**
+- **Expected outcome and results:**
+  - Tie-triangle vertices (independent Newton, residual <= 6.7e-16):
+
+    | T [K] | x^I | x^II | y |
+    |---|---|---|---|
+    | 365.0 | (0.02361601, 0.02440696, 0.95197703) | (0.09873744, 0.20195471, 0.69930785) | (0.12724459, 0.14989592, 0.72285949) |
+    | 364.0 | (0.05214424, 0.02917157, 0.91868419) | (0.13963944, 0.12347805, 0.73688251) | (0.21078146, 0.10017893, 0.68903962) |
+    | 363.0 | (0.10282779, 0.03539032, 0.86178189) | (0.15630287, 0.06422717, 0.77946996) | (0.28312929, 0.06046985, 0.65640086) |
+
+    These reproduce the orchestrator's separately written reference (same
+    vertices to the 8 digits it recorded).
+  - The *unsolved* equations hold: liquid II's bubble sum is
+    1.000000000000 to <= 2e-15 at all three temperatures, and the vapor
+    computed from liquid II equals the vapor computed from liquid I to
+    <= 1e-15.
+  - Six feeds inside the triangle (barycentric weights (1/3, 1/3, 1/3) and
+    (0.2, 0.3, 0.5) at each temperature) return **three phases**
+    `liquid1`/`liquid2`/`vapor`. Worst deviations over the six:
+    compositions **2.2e-14**, phase fractions **1.6e-13**,
+    `equilibrium_residual` **1.8e-15**, `mass_balance_residual` **6.9e-18**,
+    post-split `tpd_min` **-4.1e-16**, every phase `"stable"`.
+  - Independently reproduced with the orchestrator's own reference feeds at
+    364.0 K: z = (0.134, 0.084, 0.782) -> (LI, LII, V) =
+    (0.336081159, 0.329853965, 0.334064877) against the reference
+    (0.336081, 0.329854, 0.334065); z = (0.10, 0.06, 0.84) ->
+    (0.621821904, 0.170607495, 0.207570601); z = (0.16, 0.09, 0.75) ->
+    (0.218035553, 0.227613768, 0.554350679). `delta_g_split_rt` for the first
+    is **-0.002712735**, i.e. G3/RT = -0.69315706 against a single liquid at
+    -0.69044432, the reference values; the other two feeds give
+    **-0.001641130** and **-0.006438596**.
+  - **Gibbs ordering**, computed in the test file: G3 < G2 < G1 at every one of
+    the six feeds, e.g. at 364 K, centroid: **-0.693912758 < -0.693543323 <
+    -0.691218474**. `delta_g_vs_two_phase_rt` ranges from -1.2e-05 (363 K,
+    centroid) to -1.58e-03 (365 K, centroid) and is negative everywhere.
+  - `phase_set_history` is `"L -> LV -> LLV"` or `"L -> LL -> LLV"` depending
+    on which candidate the feed's deepest tangent-plane minimum is; both routes
+    reach the same triangle.
+  - **Invariants:** deterministic (identical diagnostics on a repeat run);
+    permutation invariant over all 6 component orderings with worst restored
+    composition difference **4.3e-15** and worst phase-fraction difference
+    **1.5e-14**; the `vapor` phase stays the vapor under every permutation;
+    `vapor_fraction == phase_fractions["vapor"]` exactly.
+- **Tolerance:** asserted 1e-6 on compositions and phase fractions (achieved
+  2.2e-14 and 1.6e-13); 1e-10 on the equilibrium residual (achieved 1.8e-15);
+  1e-12 on mass balance (achieved 6.9e-18); 1e-9 on permutation invariance
+  (achieved 1.5e-14).
+- **Independent route:** the six-equation Newton solve written in the test file
+  and again in the script, sharing no code with `chemthermo.flash`; plus the
+  Gibbs-energy ordering computed there. No external package: `thermo` 0.6.0
+  cannot split two liquids over one excess-Gibbs model (Case L-2), so **no
+  external VLLE reference is available for this system** and none is claimed.
+- **Test path:** `tests/validation/test_vlle_water_propanol_butanol.py`,
+  `tests/test_flash_vlle.py`.
+- **Script:** `examples/validation/11_vlle_water_propanol_butanol.py`,
+  `examples/basic/flash_tp_vlle_demo.py`.
+
+---
+
+## Case V-2: Feeds outside the tie-triangle, and one the stability test misses
+
+- **Source:** Internal invariants, each verified by a different independent
+  route (a liquid-liquid stability test, a bubble-point sum, a dew-point sum).
+  Stated as required by the ledger rules.
+- **Location:** `tests/validation/test_vlle_water_propanol_butanol.py`
+  (`::test_a_feed_in_the_vapor_liquid_region_returns_two_phases`,
+  `::test_a_feed_in_the_liquid_liquid_region_returns_two_liquids`,
+  `::test_the_water_rich_corner_is_a_single_liquid`,
+  `::test_a_superheated_feed_is_a_single_vapor`,
+  `::test_a_thin_tie_triangle_can_hide_from_the_deterministic_trial_set`),
+  section 2 of `examples/validation/11_vlle_water_propanol_butanol.py`.
+- **Assumptions:** as Case V-1. "Outside" is decided by the barycentric weights
+  of the feed in the *independent* tie-triangle, not by what the flash returns.
+- **Components / units:** as Case V-1; T = 364.0 K except the superheated
+  control at 380.0 K (inside every Antoine window: 1-Propanol [285, 400] K,
+  n-Butanol [288, 404] K, Water [284, 441] K).
+- **Parameters and provenance:** as Case V-1.
+- **Expected outcome and results:**
+  - **(a) Vapor-liquid region**, weights (-0.25, 0.45, 0.80),
+    z = (0.21842685, 0.12841537, 0.65315777): `['vapor', 'liquid']`,
+    `vapor_fraction = 0.71129282`, vapor (0.22553936, 0.10455392, 0.66990672),
+    liquid (0.20090366, 0.18720324, 0.61189310). Independent check: that liquid
+    on its own is `"stable"` against a second liquid (`stability_tp` with
+    `vapor="none"`, `tpd_min = 0.0`), so no third phase exists there.
+    Post-split `tpd_min = -2.4e-16`.
+  - **(b) Liquid-liquid region**, weights (0.55, 0.60, -0.15),
+    z = (0.08084578, 0.07510435, 0.84404987): `['liquid1', 'liquid2']`,
+    `vapor_fraction is None`, fractions 0.41992979 / 0.58007021, compositions
+    (0.13181652, 0.14030670, 0.72787677) and
+    (0.04394656, 0.02790247, 0.92815097). Independent check: **both** liquids
+    have `sum_i x_i gamma_i Psat_i / P = 0.990647948 < 1`, i.e. neither can
+    boil. Per-phase post-split `tpd_min` +1.03e-13 and -1.27e-14, both
+    `"stable"`.
+  - **(c) Water-rich corner**, z = (0.01, 0.005, 0.985): a single `"liquid"`,
+    `feed_branch = "liquid"`, `tpd_min = 0.0`; independently
+    `sum_i z_i gamma_i Psat_i / P = 0.859278566 < 1`.
+  - **(d) Superheated**, 380.0 K, z = (0.20, 0.15, 0.65): a single `"vapor"`,
+    `feed_branch = "vapor"`, `vapor_fraction = 1.0`; independently the dew sum
+    `sum_i z_i P / (gamma_i(x) Psat_i) = 0.574785505 < 1`, i.e. above the dew
+    point.
+  - None of (a)-(d) reports `phase_set_history`: the search was never entered,
+    which is the correct signal that nothing was added or removed.
+  - **Recorded limitation, not accommodated.** At 363.0 K the two liquid
+    vertices differ by only 0.053 in x_1 (near the plait point). For the feed
+    at barycentric weights (0.5, 0.3, 0.2), z = (0.15493061, 0.04905728,
+    0.79601210) - which **is** inside the triangle - every trial of the
+    deterministic stability set collapses onto the trivial solution,
+    `tpd_min = 0.0`, and `flash_tp` returns a single `"liquid"`. That is wrong
+    for this model. The failure is in the *stability* test, not in the phase
+    search, which is never entered. Pinned by test so that a future improvement
+    to the trial set is noticed rather than silently absorbed.
+- **Tolerance:** verdicts are exact (phase names and counts); the independent
+  bubble and dew sums are compared against 1 with no tolerance needed
+  (0.859-0.991 and 0.575).
+- **Independent route:** a liquid-liquid `stability_tp` call for (a); bubble
+  and dew sums written in the test file for (b), (c) and (d).
+- **Test path:** `tests/validation/test_vlle_water_propanol_butanol.py`.
+- **Script:** `examples/validation/11_vlle_water_propanol_butanol.py`.
+
+---
+
+## Case V-3: The binary refusal window, resolved by removing a phase
+
+- **Source:** Gibbs' phase rule (a binary at fixed pressure has three phases at
+  a single temperature only, F = 2 - 3 + 2 = 1) plus the binodal and T3 of
+  Case R-3. This entry continues Case R-3, whose "Finding, recorded not
+  accommodated" this case discharges.
+- **Location:** `tests/test_flash_vlle.py`
+  (`::test_below_t3_the_window_resolves_to_the_two_liquids`,
+  `::test_just_above_t3_the_answer_is_a_vapor_liquid_pair`,
+  `::test_the_window_answer_is_the_same_as_a_direct_liquid_liquid_flash`,
+  `::test_max_phases_two_reproduces_the_pre_adr_0011_refusal`,
+  `::test_post_split_stability_false_still_returns_the_two_phase_pair`),
+  `tests/test_flash_modified_raoult.py::test_at_t3_the_two_phase_answer_is_refused`,
+  section 3 of `examples/validation/11_vlle_water_propanol_butanol.py`, and
+  section 5 of `examples/validation/10_modified_raoult_water_butanol.py`.
+- **Assumptions:** as Case R-3. The binodal of this NRTL pair is temperature
+  independent (the fitted tau are), so the two-liquid answer below T3 is the
+  *same* tie-line at every temperature and the lever rule fixes the amounts.
+- **Components / units:** n-Butanol(1) / Water(2), P = 101325 Pa,
+  z = (0.20, 0.80), T = T3 - 0.05 K, T3 - 0.10 K and T3 + 0.05 K with
+  T3 = 366.213774 K.
+- **Parameters and provenance:** as Case R-1 / R-3.
+- **Expected outcome and results:**
+  - **Below T3 (both -0.05 K and -0.10 K):** `['liquid1', 'liquid2']`,
+    `phase_regime = "LLE"`, `vapor_fraction is None`, tie-line
+    x1 = **0.019998419467 / 0.359999661508** - the Case L-3 / R-1 / R-3
+    binodal - with worst deviation **3.3e-13**. Phase fractions
+    **0.470585520652 / 0.529414479348**, equal to the lever rule to
+    **0.0**. `equilibrium_residual` 8.9e-16 and 3.1e-15,
+    `mass_balance_residual` 0.0, `delta_g_split_rt` -5.269806e-03 and
+    -7.185443e-03, both phases post-split `"stable"`.
+  - **The route:** `phase_set_history = "V -> LV -> LLV -> LL"`,
+    `phases_added = 1`, `phases_removed = 1`. The feed's own lowest-Gibbs
+    candidate here is the *vapor*, so the search starts from `V`; the
+    vapor-liquid pair is unstable towards a second liquid, which is added; the
+    three-phase Rachford-Rice for a binary away from T3 has no finite solution,
+    the vapor's amount runs negative, and it is removed. **This is the case
+    that needs removal and not only addition.**
+  - **Same answer, different route:** the tie-line reached through the window
+    equals the one a direct `gamma-gamma` flash returns at the same state to
+    **1.8e-12**, which is the two routes' own convergence tolerances rather
+    than round-off.
+  - **Above T3 (+0.05 K):** `['vapor', 'liquid']`,
+    `vapor_fraction = 0.847371275`, vapor (0.23249827, 0.76750173), liquid
+    (0.01957460, 0.98042540). Verified independently in the test file: the
+    liquid is exactly at its bubble point
+    (`sum x gamma Psat / P = 1.000000000000`, |deviation| < 1e-12) and modified
+    Raoult's law holds to **5.8e-15**; the liquid is also `"stable"` against a
+    second liquid. (Case R-3(ii) recorded a *single vapor* two kelvin above T3;
+    0.05 K above it the feed is still between its bubble and dew points, so a
+    pair is what the physics gives.)
+  - **Regression of the documented behavior:** `FlashSettings(max_phases=2)` at
+    T3 - 0.05 K still raises
+    `ConvergenceError("... a third phase is required ...")`, and so does
+    `max_phases=1`. `FlashSettings(post_split_stability=False)` still returns
+    the vapor-liquid pair with `post_split_status = "unstable"` and no
+    `phase_set_history` key.
+- **Tolerance:** 1e-8 on the tie-line against the independent binodal
+  (achieved 3.3e-13); 1e-10 on the lever rule (achieved 0.0); 1e-10 on the
+  bubble equation and on modified Raoult's law above T3 (achieved 5.8e-15);
+  1e-9 between the two routes to the same tie-line (achieved 1.8e-12).
+- **Independent route:** the binodal and T3 of Case R-3, solved in
+  `tests/test_flash_modified_raoult.py` and in
+  `examples/validation/10_modified_raoult_water_butanol.py` with no
+  `chemthermo.flash` code; the bubble and Raoult checks written in
+  `tests/test_flash_vlle.py`; and the `gamma-gamma` path as a second route to
+  the same tie-line.
+- **Test path:** `tests/test_flash_vlle.py`,
+  `tests/test_flash_modified_raoult.py`.
+- **Script:** `examples/validation/11_vlle_water_propanol_butanol.py`,
+  `examples/validation/10_modified_raoult_water_butanol.py`.
+
+---
+
+## Case V-4: Multiphase Rachford-Rice against Okuno et al. (2010) Table 1
+
+- **Source:** R. Okuno, R. T. Johns and K. Sepehrnoori, "A new algorithm for
+  Rachford-Rice for multiphase compositional simulation", SPE Journal 15 (2010)
+  313-325. Table 1 gives four overall compositions with constant K-values; the
+  text prints the solution of Example 3 as `(beta_1, beta_2) = (0.87, 2.2e-6)`
+  and gives Example 4 as three phase compositions `x_ij` for a feed outside the
+  tie-triangle. Open-access PDF text used:
+  `scratchpad/okuno2010_multiphase_rr.txt`, Table 1 and the "Comparisons in
+  Standalone Calculations" section.
+- **Location:** `tests/test_multiphase_rr.py`.
+- **Assumptions:** the Rachford-Rice stage takes `(z, K)` and returns `beta`
+  and never calls a thermodynamic model, so constant-K data isolates exactly
+  this solver. The reference phase is the paper's phase 3, so the two K columns
+  are phases 1 and 2 against it.
+- **Components / units:** 7 components for Examples 1-3, 3 for Example 4; mole
+  fractions, dimensionless K.
+- **Parameters and provenance:** the printed Table 1 values verbatim.
+- **Expected outcome and results:**
+  - **Example 1:** beta = (0.68683289, 0.06019424), reference phase
+    0.25297286451, 8 Newton iterations, scaled residual 3.1e-16.
+  - **Example 2** (the case the paper's reference root-finder cannot solve at
+    all): beta = (0.46945316, 0.47024452), reference 0.06030232018,
+    7 iterations, residual 1.3e-14.
+  - **Example 3** (next to a critical end point): beta =
+    **(0.8701633569, 2.180303e-06)**, reference 0.1298344631, **4 iterations**,
+    residual 1.7e-15. The paper prints **(0.87, 2.2e-6)**; agreement 1.9e-04
+    absolute on beta_1 and 0.9% on beta_2 against the two printed digits. The
+    paper reports 4 iterations for its own algorithm on this example.
+  - **Example 4** (a *negative* flash near a critical end point): the printed
+    K-values are the printed compositions against phase 3 to **< 1e-8**, so the
+    phase fractions are the exact solution of `z = sum_j beta_j x^j`:
+    **(1.2, 14.66, -14.86)**. Achieved
+    **(1.2000000000, 14.6599999, -14.8599999033)** in 5 iterations, residual
+    2.3e-13. One fraction is negative, which is the signal `flash_tp` uses to
+    *remove* a phase.
+  - **Iteration counts differ from the paper** for Examples 1 and 2 (8 and 7
+    here against 4 and 4 printed). The initial estimate and the line search are
+    reimplemented from the description, the stopping test here is a *scaled*
+    residual, and the paper's tolerance is 1e-8 against 1e-12 here. The
+    solutions agree; the counts are recorded, not matched.
+  - **Convexity, checked not assumed:** the Hessian
+    `A^T diag(z / t^2) A` is positive definite at all four solutions, and `F`
+    does not decrease along any of eight deterministic feasible perturbations
+    at each.
+  - **Feasible region:** every point of `S` tested satisfies
+    `t_i >= max(z_i, max_j K_i^j z_i)`, i.e. `S` contains no pole.
+  - **Constructed negative flash:** three chosen phase compositions and weights
+    (0.8, 0.45, -0.25) are recovered to **1e-10**.
+  - **No-solution control:** the `(z, K)` the flash reaches for the binary
+    three-phase set at T3 - 0.05 K (Case V-3) is reported as a recession, with
+    the reference phase (the vapor) named as the one whose amount runs to minus
+    infinity - not as a convergence failure.
+  - **Degenerate control:** `K^j = 1` makes phase `j` the reference phase; `F`
+    is then flat in `beta_j`, the Hessian is singular (smallest eigenvalue
+    0 to 1e-14), and the duplicate is removed upstream by the trivial-solution
+    metric rather than guessed at here.
+- **Tolerance:** Rachford-Rice equations asserted < 1e-11 (achieved 1.5e-14);
+  material balance < 1e-12; Example 3 against the printed digits at abs 5e-3
+  and rel 5e-2; Example 4 against the exact linear solve at abs 1e-6.
+- **Independent route:** published constant-K data plus, for Example 4, the
+  exact 3x3 linear solve from the paper's own printed compositions. The
+  Rachford-Rice equations, the objective and the Hessian are all rewritten in
+  the test file rather than imported.
+- **Test path:** `tests/test_multiphase_rr.py`.
+- **Script:** none (a solver-level unit test; the flash-level scripts are
+  Cases V-1 and V-3).
