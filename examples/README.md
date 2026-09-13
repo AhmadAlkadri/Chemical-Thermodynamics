@@ -20,8 +20,12 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
   - Existing TP flash demo (Peng-Robinson EOS).
 - `examples/basic/flash_tp_gamma_phi_demo.py`
   - Existing TP flash demo (gamma-phi, NRTL + Peng-Robinson).
+- `examples/basic/stability_tp_peng_robinson_demo.py`
+  - Michelsen tangent-plane phase stability at two states (unstable and stable).
 - `examples/validation/00_reference_case.py`
   - Deterministic single-case comparison against `thermo` (optional dependency).
+- `examples/validation/06_stability_vs_thermo.py`
+  - Deterministic stability cross-check against `thermo`'s Michelsen test over 7 states.
 - `examples/validation/*.py`
   - Optional validation sweeps against `thermo` (requires `pip install -e ".[validation]"`).
   - CSV output is disabled by default; pass `--outdir <dir>` or set `CHEMTHERMO_OUTDIR`.

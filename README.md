@@ -73,6 +73,51 @@ print(result.phases["vapor"].composition.fractions)
 See `examples/basic/flash_tp_peng_robinson_demo.py` for a runnable script that prints a
 table-style summary.
 
+## Phase stability (tangent-plane analysis)
+
+`stability_tp` answers "is this feed one phase or more?" at fixed T, P and z
+using Michelsen's tangent-plane-distance criterion, independently of `flash_tp`.
+
+```python
+from chemthermo import Mixture, PengRobinsonEOS, stability_tp
+
+mixture = Mixture.from_database(("Methane", "Ethane", "Propane"), (0.50, 0.30, 0.20))
+
+result = stability_tp(
+    mixture,
+    temperature_K=240.0,
+    pressure_Pa=3.0e6,
+    eos=PengRobinsonEOS(),
+)
+
+print(result.status)             # "unstable"
+print(result.tpd_min)            # -0.3492770207  (dimensionless, units of RT)
+print(result.trial_composition)  # incipient-phase mole fractions w
+print(result.k_values)           # w_i / z_i for the incipient phase
+```
+
+Runnable demo:
+
+```bash
+python examples/basic/stability_tp_peng_robinson_demo.py
+```
+
+Notes:
+- `status` is `"unstable"` when a trial converges to a stationary point with a
+  negative tangent-plane distance, `"stable"` when trials converge and none
+  does, and `"inconclusive"` when no trial converges.
+- **What "stable" means here:** no negative tangent-plane distance was found
+  from the deterministic trial set (two Wilson estimates plus one
+  pure-component-dominant estimate per component). This is *not* a global proof
+  of stability; Michelsen's test is a local stationary-point search and a
+  stationary point that no initial estimate reaches can hide an instability.
+- `tpd_min` is dimensionless (units of RT). At a stationary point it equals
+  `-ln(sum_i W_i)`, so `sum(W) > 1` is the instability signal.
+- Fugacity coefficients for both the feed and every trial are taken from the
+  compressibility root with the lowest Gibbs energy at that state.
+- `flash_tp` does **not** consume this yet; its single-phase decision is still a
+  K-bound heuristic.
+
 ## CLI usage
 
 Run TP flash without writing Python:
@@ -130,10 +175,11 @@ Install the reference library used by validation tests:
 pip install -e ".[validation]"
 ```
 
-Deterministic single-case validation script:
+Deterministic single-case validation scripts:
 
 ```bash
 python examples/validation/00_reference_case.py
+python examples/validation/06_stability_vs_thermo.py
 ```
 
 ## Database source of truth
