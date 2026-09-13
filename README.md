@@ -77,7 +77,10 @@ table-style summary.
 ### Automatic phase detection
 
 In phi-phi mode `flash_tp` decides one phase versus two with Michelsen's
-tangent-plane stability test, not with Wilson K-value heuristics (ADR-0008):
+tangent-plane stability test, not with Wilson K-value heuristics (ADR-0008).
+`eos=` accepts any `EquationOfState`, which since ADR-0015 means
+`PengRobinsonEOS()` **or** `PCSAFTEOS()` (see
+[PC-SAFT](#phase-equilibrium-with-pc-saft)):
 
 ```
 flash_tp -> stability_tp(feed) -> single phase | split seeded from the minimizer
@@ -786,14 +789,67 @@ eos.ln_fugacity_coefficients(temperature_K=300.0, density_mol_m3=200.0, composit
 # [0.0365173954, -0.2096785687]     natural logs, one per component
 ```
 
-The state is always `(T, molar density, x)` (or `(T, molar volume, x)` for
-`residual_helmholtz`). Binary interaction parameters use the same contract as
-Peng-Robinson (ADR-0006) - a scalar applied to every off-diagonal pair, or a
-mapping keyed by an unordered pair of component names:
+The state of those four methods is always `(T, molar density, x)` (or
+`(T, molar volume, x)` for `residual_helmholtz`). Binary interaction parameters
+use the same contract as Peng-Robinson (ADR-0006) - a scalar applied to every
+off-diagonal pair, or a mapping keyed by an unordered pair of component names:
 
 ```python
 PCSAFTEOS(components=("Methane", "n-Decane"), kij={("Methane", "n-Decane"): 0.03})
 ```
+
+### Phase equilibrium with PC-SAFT
+
+Since ADR-0015 `PCSAFTEOS` also implements the pressure-based
+`chemthermo.models.EquationOfState` interface, so it goes straight into the
+stability test and the flash - **no solver changed for this**:
+
+```python
+import chemthermo as ct
+from chemthermo.eos import PCSAFTEOS
+
+mixture = ct.Mixture.from_database(["Methane", "n-Hexane"], [0.30, 0.70])
+eos = PCSAFTEOS()                      # components come from the mixture
+
+ct.stability_tp(mixture, temperature_K=300.0, pressure_Pa=3.0e6, eos=eos).status
+# 'unstable'
+
+result = ct.flash_tp(mixture, temperature_K=300.0, pressure_Pa=3.0e6, eos=eos)
+result.vapor_fraction
+# 0.16844005
+result.phases["liquid"].composition.fractions
+# (0.16086974, 0.83913026)
+result.phases["vapor"].composition.fractions
+# (0.98686249, 0.01313751)
+```
+
+Leave `components` out and the model takes its order from the `Mixture`; pass
+it and a mixture whose names differ is rejected rather than silently reordered.
+
+Under the hood, a call that names a pressure and a phase has to solve
+`P_model(T, rho, x) = P` first. That root set is public:
+
+```python
+eos.density_roots(
+    temperature_K=300.0, pressure_Pa=21858.084278856164, composition=[1.0],
+    mixture=ct.Mixture.from_database(["n-Hexane"], [1.0]),
+)
+# (8.868596301913758, 7518.498733715524)     mol/m^3, ascending
+```
+
+Only mechanically stable roots (`dP/drho > 0`) are returned, ascending, so the
+first is the vapour-like candidate and the last the liquid-like one -
+`phase="vapor"` and `phase="liquid"` pick exactly those, which is the
+Peng-Robinson convention verbatim. **One root is a normal answer**, not a
+failure: at a dense or supercritical state both labels name the same state and
+the phase name that comes back is the min-Gibbs tie-break convention. The
+spinodal-branch root is found and discarded, never returned.
+`PCSAFTEOS.molar_volume(..., phase=)` is the reciprocal of the selected root.
+
+Two roots close enough together to fall inside one step of the scan grid
+(`5e-4` in packing fraction) are not resolved, and the state is then reported
+with one root fewer; that happens only where the isotherm is nearly tangent to
+the target pressure, i.e. near a critical or spinodal state.
 
 ### Parameters
 
@@ -827,22 +883,36 @@ A component with no record raises `PCSAFTParameterError`.
   (2002) 5510) and the polar terms are not implemented. Do not use this for
   water, alcohols, acids or amines: nothing in the code stops you, and the
   answer will be wrong.
-- **No density solver.** Every method takes the density (or molar volume) as an
-  input. PC-SAFT is Helmholtz-explicit, so a `(T, P)` state is several states
-  until a root is chosen, and this release does not choose. Between the two
-  spinodals `Z` is negative, `pressure_Pa` returns the (real) negative
-  pressure, and `ln_fugacity_coefficients` raises `ModelError` instead of
-  returning a `nan`.
-- **Not wired into `flash_tp` or `stability_tp`.** `PCSAFTEOS` is not an
-  `EquationOfState` (that interface is pressure-based and needs the root
-  solver). Phase equilibrium still means Peng-Robinson or the activity-model
-  paths. Wiring PC-SAFT in is the next slice, `pcsaft-density-roots-flash`.
-- **No temperature derivative**, so no residual enthalpy or entropy.
+- **Two phases at most.** The phi-phi flash decides one phase versus two and
+  stops there, whatever `FlashSettings(max_phases=...)` says (ADR-0009,
+  ADR-0011). Automatic phase *addition* exists only on the `modified-raoult`
+  path. A three-phase PC-SAFT system is returned as one or two phases with no
+  error.
+- **The `(T, rho, x)` methods still choose nothing.** `compressibility_factor`,
+  `pressure_Pa` and `ln_fugacity_coefficients` take the density you give them.
+  Between the two spinodals `Z` is negative, `pressure_Pa` returns the (real)
+  negative pressure, and `ln_fugacity_coefficients` raises `ModelError` instead
+  of returning a `nan`. Use `density_roots` (or the `phase=` interface) when
+  you want the model to choose.
+- **`kij` is yours to justify.** The packaged parameter set is pure components
+  only; no PC-SAFT binary-interaction table ships with this package, and any
+  `kij` used in the docs or examples (0.03 for methane / n-decane) is
+  **illustrative**, not a literature-validated value.
+- **No temperature derivative**, so no residual enthalpy or entropy, and no
+  phase densities in `FlashResult` (compute them with `density_roots` at the
+  converged composition).
 - Validated against [teqp](https://github.com/usnistgov/teqp) (NIST, MIT,
   automatic differentiation) to better than 3e-14 in `A^res/RT`, `Z` and
-  `ln phi` over fourteen states, and against its `pure_VLE_T` saturation solver
-  for n-hexane at 300 K and 400 K. See validation Cases P-0, P-1, P-2 and
-  `examples/validation/13_pcsaft_vs_teqp.py`.
+  `ln phi` over fourteen states; against its `pure_VLE_T` saturation solver for
+  n-hexane at 300 K and 400 K (densities to 2.2e-16 relative); and, for phase
+  equilibrium, against teqp's own traced methane / n-hexane 300 K isotherm -
+  seven tie lines to `|dx1| <= 2.0e-9` and `|dy1| <= 3.7e-12`, phase densities
+  to 1.3e-9 relative, and teqp's own fugacity coefficients evaluated at
+  chemthermo's converged phases giving equal fugacities to 3.8e-9 relative.
+  Bubble pressures located by bisecting `stability_tp`'s verdict match teqp's
+  `mix_VLE_Tx` to 1.4e-8 relative. See validation Cases P-0 to P-5,
+  `examples/validation/13_pcsaft_vs_teqp.py` and
+  `examples/validation/14_pcsaft_flash_vs_teqp.py`.
 
 ## EOS extension points
 
@@ -888,6 +958,7 @@ Deterministic single-case validation scripts:
 python examples/validation/00_reference_case.py
 python examples/validation/06_stability_vs_thermo.py
 python examples/validation/13_pcsaft_vs_teqp.py
+python examples/validation/14_pcsaft_flash_vs_teqp.py
 ```
 
 Every validation test and script skips cleanly when its optional dependency is

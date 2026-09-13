@@ -92,6 +92,16 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
     Table 1; see its `provenance` block). **No density root solving happens
     anywhere**: the state is given as `(T, molar density, x)`. Needs no optional
     dependency. See ADR-0014 and validation Case P-0.
+- `examples/basic/flash_tp_pcsaft_demo.py`
+  - PC-SAFT in `stability_tp` / `flash_tp` (ADR-0015): methane / n-hexane at
+    300 K. Prints the density roots of the feed at three pressures and of pure
+    n-hexane at its saturation pressure (two roots, equal fugacity on them, to
+    5.6e-12), a two-phase flash at 3 MPa with both phase densities and the
+    three verification residuals, the same feed at 8 MPa where the
+    tangent-plane test finds one stable phase, and the Peng-Robinson answer
+    beside it **for contrast only** - two models, two answers, neither line
+    evidence about the other. Needs no optional dependency. See validation
+    Cases P-3, P-4 and P-5.
 - `examples/validation/00_reference_case.py`
   - Deterministic single-case comparison against `thermo` (optional dependency).
     Unchanged by the tangent-plane phase-detection slice: beta 0.46829044 vs
@@ -182,6 +192,22 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
     n-hexane at 300 K and 400 K with a bisection density root finder written
     inside the script. Requires `pip install -e ".[validation]"`; prints a
     message and exits 0 without teqp. See validation Cases P-1 and P-2.
+- `examples/validation/14_pcsaft_flash_vs_teqp.py`
+  - PC-SAFT **phase equilibrium** against teqp, with PASS/FAIL per check.
+    teqp traces its own 300 K methane / n-hexane isotherm and polishes a tie
+    line at each of seven pressures; chemthermo reaches the same tie lines
+    through the tangent-plane test and the Rachford-Rice split, agreeing to
+    `|dx1| <= 2.0e-9` and `|dy1| <= 3.7e-12` with phase densities to 1.3e-9
+    relative. The decisive check needs no reference tie line at all: teqp's own
+    `get_fugacity_coefficients`, evaluated at chemthermo's converged
+    compositions and densities, must make the two phases equal in fugacity
+    (achieved 3.8e-9 relative, worst case). Also: pure n-hexane's two
+    saturation densities at 300 K and 400 K; bubble pressures found by
+    bisecting `stability_tp`'s *verdict* against teqp's `mix_VLE_Tx` (1.4e-8
+    relative); and one methane / n-decane case with an **illustrative**
+    `kij = 0.03` (not a literature-validated parameter). Requires
+    `pip install -e ".[validation]"`; prints a message and exits 0 without
+    teqp. Runs in about 25 s. See validation Cases P-3 and P-5.
 - `examples/validation/*.py`
   - Optional validation sweeps against `thermo` (requires `pip install -e ".[validation]"`).
   - CSV output is disabled by default; pass `--outdir <dir>` or set `CHEMTHERMO_OUTDIR`.
