@@ -1015,3 +1015,249 @@ Rules:
 - **Test path:** `tests/test_flash_phase_detection.py`, `tests/test_flash_lle.py`.
 - **Script:** `examples/basic/flash_tp_nrtl_lle_demo.py` (prints the post-split
   block for a liquid-liquid split).
+
+---
+
+## Case R-1: Modified-Raoult liquid-liquid agrees with the `gamma-gamma` path
+
+- **Source:** Internal invariant (the pure-liquid reference fugacity cancels
+  between two liquid phases), applied to the cited n-butanol / water NRTL pair.
+  This entry's "independent route" is an internal invariant, stated as required
+  by the ledger rules. It is the modified-Raoult companion of Case L-3.
+- **Location:** `tests/test_flash_modified_raoult.py::test_liquid_liquid_matches_the_gamma_gamma_path_exactly`,
+  `::test_a_feed_outside_the_gap_is_one_liquid`,
+  `::test_both_liquid_phases_are_stable_against_the_vapor_candidate`, and
+  `tests/test_stability_candidates.py::test_a_liquid_liquid_tangent_plane_is_unchanged_by_the_reference_offset`.
+- **Assumptions:** In `flash_mode="modified-raoult"` the liquid candidate's term
+  is `ln gamma_i + ln(Psat_i/P)`. When both the feed reference and the trial are
+  the liquid candidate, the offset `ln(Psat_i/P)` appears on both sides of the
+  tangent-plane distance and cancels identically, and in the split it cancels
+  from `K_i = exp(t_i(x) - t_i(y)) = gamma_i(x)/gamma_i(y)`. So at a temperature
+  where the vapor candidate is never the lower-Gibbs one, the two modes must
+  return the *same* tie-line - not merely a similar one.
+- **Components / units:** n-Butanol(1) / Water(2), T = 330 K, P = 101325 Pa.
+  Mole fractions. 330 K is inside both Antoine windows (n-Butanol [288, 404] K,
+  Water [284, 441] K).
+- **Parameters and provenance:** Tessier et al. (2000) Table 1 pair 2-3:
+  tau_12 = 0.90047, tau_21 = 3.51307, alpha = 0.48 (implied by the printed
+  `G_23`, `G_32`). Antoine from the packaged databank (Koretsky 2012).
+- **Expected outcome and results:**
+  - Feeds z1 = 0.05, 0.10, 0.20, 0.30 all return `phase_regime == "LLE"`,
+    phases `liquid1`/`liquid2`, `vapor_fraction is None`.
+  - Worst composition deviation from the `gamma-gamma` answer over the four
+    feeds: **1.7e-15** (asserted 1e-10). Worst phase-fraction deviation
+    **2.7e-15**.
+  - Tie-line: x1 = **0.019998419467** / **0.359999661508**, the Case L-3 /
+    Case S-8 binodal.
+  - z1 = 0.45 returns a single `"liquid"` with `feed_branch == "liquid"` and
+    `tpd_min = +4.078314e-02`.
+  - Post-split at z1 = 0.20: both liquids `"stable"` against the vapor
+    candidate, `post_split_tpd_min = -1.354e-13`.
+  - Stability-level check: at the same state `tpd_min` with `vapor="ideal"`
+    equals `tpd_min` with `vapor="none"` to **< 1e-14**, and the minimizing
+    compositions agree to **5.1e-12** (the two evaluators reach the same
+    stationary point from different trial sets, so the agreement is the
+    solver's `tol = 1e-10`, not round-off).
+- **Tolerance:** asserted 1e-10 on compositions and phase fractions (achieved
+  1.7e-15); 1e-14 on the tangent-plane distance (achieved < 1e-14).
+- **Independent route:** internal invariant plus the pre-existing `gamma-gamma`
+  path, which Case L-3 validated against `thermo` and an independent
+  equal-activity solve.
+- **Test path:** `tests/test_flash_modified_raoult.py`,
+  `tests/test_stability_candidates.py`.
+- **Script:** `examples/basic/flash_tp_modified_raoult_demo.py`.
+
+---
+
+## Case R-2: Modified-Raoult VLE - bubble, dew, split invariants and the azeotrope
+
+- **Source:** The modified-Raoult equilibrium condition itself
+  (`y_i P = x_i gamma_i Psat_i`, e.g. Koretsky 2012 ch. 8; Smith, Van Ness &
+  Abbott ch. 10), evaluated independently in the test file. Literature value for
+  the azeotrope is **commonly tabulated and was not read from a primary source
+  in this work**; it is recorded as context, not as a validation anchor.
+- **Location:** `tests/test_flash_modified_raoult.py::test_bubble_temperature_from_flash_verdicts_satisfies_the_scalar_equation`,
+  `::test_dew_temperature_from_flash_verdicts_satisfies_the_scalar_equation`,
+  `::test_the_verdict_boundary_sits_exactly_at_the_stability_tolerance`,
+  `::test_vapor_liquid_split_satisfies_modified_raoults_law`,
+  `::test_the_azeotrope_matches_an_independent_solve_and_is_a_vanishing_band`.
+- **Assumptions:** `flash_tp` is treated as a black box returning a phase
+  *count*. The temperature at which the count changes from 1 to 2 is the bubble
+  point and from 2 to 1 (upwards) the dew point. What is asserted is the scalar
+  identity at that temperature, computed by code written in the test file.
+- **Components / units:** 1-Propanol(1) / Water(2), P = 101325 Pa, mole
+  fractions. Antoine windows: 1-Propanol [285, 400] K, Water [284, 441] K, so
+  the mixture window is [285, 400] K and is reported in diagnostics.
+- **Parameters and provenance:** Tessier et al. (2000) Table 1 pair 1-3:
+  tau_13 = -0.07149, tau_31 = 2.7425, alpha = 0.3. **LLE-fitted and temperature
+  independent**; with these parameters the binary is fully miscible (checked:
+  `stability_tp(..., vapor="none")` is `"stable"` at z1 = 0.1 ... 0.9, 330 K).
+- **Expected outcome and results:**
+  - **Verdict boundary identity.** At a stationary point `tpd = -ln(sum_i W_i)`
+    and the first vapor substitution from a liquid feed gives
+    `W_i = x_i gamma_i Psat_i / P`, so a feed is called unstable exactly when
+    `sum_i x_i gamma_i Psat_i / P > exp(tpd_tol)`. Measured at the default
+    `tpd_tol = 1e-8`: the bisected boundary gives a ratio of
+    **1.000000010000000** (i.e. `exp(1e-8)` to 1e-11). The boundary tests
+    therefore use `StabilitySettings(tpd_tol=1e-14)`.
+  - **Bubble** (tpd_tol = 1e-14): x1 = 0.3 -> T = **360.976515439 K**, residual
+    `sum x gamma Psat / P - 1 = 4.7e-15`; x1 = 0.5 -> T = **360.988638079 K**,
+    residual 3.3e-15.
+  - **Dew** (implicit x solved in the test by fixed point): y1 = 0.3 ->
+    T = **364.328227469 K**, x1 = 0.04181356, residual
+    `sum y P/(gamma Psat) - 1 = 2.6e-14`; y1 = 0.5 -> T = **361.611862978 K**,
+    x1 = 0.63295515, residual 1.4e-14.
+  - **Split invariants** at 361 K, z = (0.5, 0.5): x = (0.50549118, 0.49450882),
+    y = (0.44232093, 0.55767907), beta = **0.08692668740410228**.
+    `max_i |y_i P - x_i gamma_i Psat_i| / P = 1.6e-15`; mass balance **0.0**;
+    `delta_g_split_rt = -2.004104e-05`; lever rule
+    `(z1 - x1)/(y1 - x1) - beta = < 1e-12`; post-split `"stable"` on both
+    phases. Stages: 32 successive substitutions + 1 second-order step.
+  - **Incipient vapor equals the equilibrium vapor.** At `T_bubble + 1e-8 K`
+    the stability minimizer reproduces `y(x)` from the independent bubble solve
+    to **< 1e-8** (x1 = 0.3: 0.40599129; x1 = 0.4: 0.41626188).
+  - **Azeotrope** (independent bisection of `y_1(x_1) - x_1` on the bubble
+    curve, written in the test): x1 = **0.419874**, T = **360.917975 K =
+    87.768 C**. Commonly tabulated (unverified here): ~87.7 C, x1 ~ 0.43.
+    Deviation **+0.07 K** and **-0.012 in x1**. Reported, not tuned; the
+    parameters are LLE-fitted and temperature independent, so agreement this
+    close is partly fortuitous.
+  - **Flash-level azeotrope signature:** at x1 = xa the two-phase band has zero
+    width - `flash_tp` returns one `"liquid"` 0.01 K below and one `"vapor"`
+    0.01 K above. The incipient vapor is richer in propanol at xa - 0.05 and
+    leaner at xa + 0.05, bracketing the azeotrope from the package side.
+- **Tolerance:** 1e-8 relative on both scalar equations (achieved 4.7e-15 and
+  2.6e-14); 1e-10 on modified Raoult's law (achieved 1.6e-15); 1e-12 on mass
+  balance (achieved 0.0).
+- **Independent route:** scalar bubble/dew/azeotrope solves written in the test
+  file, sharing no code with `chemthermo.flash`; plus `thermo` 0.6.0 in
+  Case R-4.
+- **Test path:** `tests/test_flash_modified_raoult.py`.
+- **Script:** `examples/basic/flash_tp_modified_raoult_demo.py`.
+
+---
+
+## Case R-3: The three-phase neighbourhood of water / 1-butanol (negative controls)
+
+- **Source:** Gibbs' phase rule (a binary at fixed pressure has three phases at
+  a single temperature) plus the two simultaneous bubble equations that define
+  it. Literature heteroazeotrope is **commonly tabulated, not read from a
+  primary source in this work**.
+- **Location:** `tests/test_flash_modified_raoult.py::test_three_phase_temperature_is_where_both_liquids_boil`,
+  `::test_two_kelvin_below_t3_is_a_stable_liquid_liquid_split`,
+  `::test_two_kelvin_above_t3_the_feed_has_evaporated`,
+  `::test_at_t3_the_two_phase_answer_is_refused`, and
+  `examples/validation/10_modified_raoult_water_butanol.py`.
+- **Assumptions:** At T3 both conjugate liquids are at their bubble point
+  simultaneously and share one vapor. The binodal is obtained from equal
+  activities (no Antoine); T3 is then solved from the *water-rich* branch only
+  and **checked** on the butanol-rich branch, which is a non-trivial identity.
+- **Components / units:** n-Butanol(1) / Water(2), P = 101325 Pa, feed
+  z = (0.20, 0.80). Mole fractions. T3 is inside both Antoine windows.
+- **Parameters and provenance:** as Case R-1.
+- **Expected outcome and results:**
+  - Binodal (independent Newton, residual 1.1e-16): x1 = **0.019998419467** and
+    **0.359999661508**.
+  - **T3 = 366.213774 K (93.064 C).** Both liquids give
+    `sum x gamma Psat / P = 0.999999999999999` (checked to 1e-10 on the branch
+    that was not solved for). Shared vapor
+    **y = (0.234063, 0.765937)**, sum = 1.000000000000.
+    gamma^I = (30.55830, 1.00658), gamma^II = (1.69755, 1.54133).
+    These reproduce the independent orchestrator reference (T3 = 366.2138 K,
+    y = (0.23406, 0.76594), same gammas) to 1e-5 or better.
+  - Commonly tabulated heteroazeotrope ~365.9 K, y(water) ~ 0.75-0.76:
+    deviation **+0.31 K**, y(water) = **0.76594**. Partly fortuitous - the NRTL
+    pair is LLE-fitted and temperature independent.
+  - **(i) T3 - 2 K:** liquid-liquid split, tie-line equal to the binodal to
+    1e-9, `equilibrium_residual = 7.7e-13`,
+    `delta_g_split_rt = -8.580513e-03`, `post_split_stable = True`,
+    `post_split_tpd_min = -1.354e-13`. Both liquids are stable against the
+    vapor candidate.
+  - **(ii) T3 + 2 K:** the feed has **fully evaporated** - a single `"vapor"`
+    with `feed_branch == "vapor"` and `tpd_min = +3.393303e-02`. Verified
+    independently: `sum z P/(gamma(x) Psat) = 0.966636 < 1`, i.e. the feed is
+    above its dew point. (The brief allowed either this or a vapor-liquid pair;
+    the model gives this.)
+  - **(iii) T3 (to 1e-7 K):** `flash_tp` returns a vapor-liquid pair with
+    vapor **(0.234063, 0.765937)** - the three-phase vapor to 1e-6 - and liquid
+    on the water-rich binodal, `post_split_tpd_min = -1.4e-15`, i.e. *marginal*:
+    at T3 the third phase lies exactly on the tangent plane, so it is not an
+    instability. Which side of that knife edge a run lands on depends on how
+    exactly T3 is known, so the test accepts either the marginal two-phase
+    answer or the `ConvergenceError`, and asserts the numbers in each branch.
+  - **(iii, continued) T3 - 0.01 K:** `flash_tp` **raises**
+    `ConvergenceError("... a third phase is required ...")`. With
+    `FlashSettings(post_split_stability=False)` the same call returns
+    `['vapor', 'liquid']` with `post_split_status = "unstable"` and
+    `phase_stability_tpd_min_vapor == phase_stability_tpd_min_liquid =
+    -6.122901e-04` - identical because two coexisting phases share one tangent
+    plane, so a third stationary point below it has the same tpd measured from
+    either.
+  - **Measured width of the refusal window: about 0.135 K below T3** for this
+    feed (LLE returned at T3 - 0.14 K, refusal from T3 - 0.13 K to T3).
+- **Finding, recorded not accommodated:** inside that window the *correct*
+  answer is the two-liquid pair, not three phases. The solver seeds its split
+  from the deepest tangent-plane minimum, which there is the vapor; the pair it
+  converges is genuinely not the equilibrium, so refusing is right, but the
+  message's diagnosis ("a third phase is required") is only half the story -
+  resolving it needs phase addition **and removal** (the vapor amount would go
+  to zero). No retry-from-the-second-minimum heuristic was added: that is
+  `flash-vlle-phase-addition`. See ADR-0010 "Known limitation, measured".
+- **Tolerance:** 1e-10 on the bubble equation at T3 (achieved 1e-15); 1e-5 on
+  the shared vapor against the independent reference (achieved ~3e-6); 1e-9 on
+  the tie-line below T3.
+- **Independent route:** binodal and T3 solved in the test file and in the
+  script, sharing no code with `chemthermo.flash`; cross-checked against the
+  orchestrator's separately written reference.
+- **Test path:** `tests/test_flash_modified_raoult.py`.
+- **Script:** `examples/validation/10_modified_raoult_water_butanol.py`
+  (prints the whole neighbourhood with PASS/FAIL).
+
+---
+
+## Case R-4: Modified-Raoult VLE against `thermo` 0.6.0
+
+- **Source:** `thermo` 0.6.0 as an independent implementation:
+  `GibbsExcessLiquid` (`use_Poynting=False`, `use_phis_sat=False`) over
+  `thermo.NRTL`, an `IdealGas` vapor, and `FlashVL`.
+- **Location:** `tests/validation/test_modified_raoult_vs_thermo.py`.
+- **Assumptions:** The comparison is only meaningful if both packages evaluate
+  the same `Psat_i(T)`, so that is established first. `thermo`'s
+  `VaporPressure.add_correlation(model="Antoine", ..., base=e)` computes
+  `base**(A - B/(T+C))` in **Pa**, while the chemthermo databank stores
+  `ln(P/bar)`, so the only conversion needed is `A -> A + ln(1e5)`.
+- **Components / units:** 1-Propanol(1) / Water(2), P = 101325 Pa, mole
+  fractions; `thermo` IDs `1-propanol`, `water`.
+- **Parameters and provenance:** as Case R-2; identical taus and alphas are
+  passed to both packages, and chemthermo's own Antoine records are pushed into
+  `thermo`.
+- **Expected outcome and results:**
+  - **Psat:** worst relative difference **2.3e-15** over 300, 330, 361, 380 and
+    399 K (asserted 1e-10). The shared reference is established.
+  - **Bubble / dew**, each package bisected on its own verdicts:
+    z1 = 0.3 bubble 360.976515439 vs 360.976515464 (**2.6e-08 K**), dew
+    364.328227469 vs 364.328227441 (**2.9e-08 K**); z1 = 0.5 bubble
+    360.988638079 vs 360.988638104 (**2.6e-08 K**), dew 361.611862978 vs
+    361.611862978 (**3.4e-13 K**).
+  - **VL flash** at 361 K, z = (0.5, 0.5): |d beta| = **4.3e-06**,
+    worst |dx| = **3.0e-07**, worst |dy| = **3.4e-13** (asserted 1e-5).
+    Adjudicated with the modified-Raoult residual
+    `max_i |ln(x_i gamma_i Psat_i / P) - ln y_i|`: chemthermo **1.6e-15**,
+    `thermo` **2.0e-07**. Both satisfy their own material balance to round-off,
+    so the difference is `thermo`'s convergence tolerance, not a model
+    disagreement.
+- **Recorded limitation (not worked around):** `thermo`'s
+  vapor-fraction-specified flash on this phase pair is unusable -
+  `flash(P=101325, zs=[0.5,0.5], VF=0)` returns **T = 1.8e5 K** and `VF=1`
+  returns **T = 9.2e3 K**, for a feed whose true boundaries are 360.99 K and
+  361.61 K. The T,P flashes on the same objects are correct, so this is a
+  solver-path problem in `thermo`. Bubble and dew points from `thermo` are
+  therefore obtained by bisecting its own T,P flashes, and the failure is
+  asserted (`test_thermo_vapor_fraction_specified_flash_is_unusable_here`) so a
+  future `thermo` that fixes it is noticed. Same spirit as Cases S-7 and L-2.
+- **Tolerance:** 1e-10 relative on Psat (achieved 2.3e-15); 1e-5 K on bubble and
+  dew (achieved 2.9e-08 K); 1e-5 on beta, x and y (achieved 4.3e-06).
+- **Independent route:** `thermo` 0.6.0 (optional dependency; the module skips
+  without it).
+- **Test path:** `tests/validation/test_modified_raoult_vs_thermo.py`.
+- **Script:** none (the `thermo` comparison lives in tests only).
