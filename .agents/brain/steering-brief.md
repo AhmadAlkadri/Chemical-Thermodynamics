@@ -1,6 +1,16 @@
 # Steering Brief
 
 ## What changed since last brief (files + bullets)
+- `src/chemthermo/stability/_evaluator.py` (new), `src/chemthermo/stability/tp.py`, `settings.py`, `results.py`
+  - `stability_tp` now takes `eos=None, activity_model=None` (exactly one required; both raises `ModelError` because combined gamma-phi stability is out of scope, ADR-0007). Introduced the INTERNAL `_TangentPlaneEvaluator` protocol (`ln_fugacity_terms(w) -> (ndarray, str | None)`, `initial_estimates(z, active)`) with `_EOSTangentPlane` (ln phi on the min-Gibbs root, Wilson + pure trials) and `_ActivityTangentPlane` (ln gamma, pure-component trials only); the solver, trivial detection, summary and result types no longer know the model family. Added a damped-Newton second stage in `ln W` (FD Jacobian, step cap, backtracking line search) after `settings.ssi_iterations`; new settings `second_order`, `ssi_iterations` (50), `second_order_max_iter`, `second_order_max_step`; new trial fields `ssi_iterations`, `second_order_iterations`, `converged_stage`; `feed_branch`/`phase_branch` are `None` for activity models. Peng-Robinson results are bit-identical (pinned to 1e-12 with per-trial iteration counts).
+- `tests/fixtures/nrtl/tessier2000_problem2.json` (new), `tests/conftest.py`
+  - Cited Tessier (2000) Table 4 parameters for n-propanol / n-butanol / benzene / water. Table 4 prints G and tau, not alpha; recovered alpha is symmetric to 2.597e-05 and the rounded symmetric average reproduces the printed G to 4.413e-06. Third-party DECHEMA-regressed data: test fixture only, never packaged runtime data.
+- `tests/test_stability_activity.py`, `tests/validation/test_stability_nrtl_tessier2000.py`, `tests/test_stability_tp.py`
+  - Activity-path invariants (tangent-plane identity, stationarity + FD gradient of tm, tm/tpd/sum(W), permutation invariance, determinism, degenerate feeds), negative controls (pure component, ideal solution, n-butanol/water LLE with an independent binodal solve), a proof that SSI alone cannot solve the near-plait feed, the Tessier Problem 1 / Problem 2 reproduction, a `thermo` 0.6.0 ln-gamma cross-check (max |dD| = 4.7e-16), and a bit-level PR regression pin.
+- `examples/basic/stability_tp_nrtl_lle_demo.py`, `examples/validation/08_stability_nrtl_tessier2000.py`, `README.md`, `examples/README.md`
+  - Golden paths for the activity-model stability verdict and for the published-minima reproduction (neither needs `thermo`), plus README coverage of the activity usage and the gamma-phi "not supported" note.
+- `.agents/brain/adr/0007-stability-tangent-plane-evaluator.md`, `.agents/brain/validation-cases.md`, `.agents/brain/brain.md`
+  - Recorded the evaluator contract (and why it stays internal), and added validation Cases S-6 (Problem 1 minima), S-7 (Problem 2 minima + the stable control + one disputed printed D) and S-8 (n-butanol/water LLE control).
 - `src/chemthermo/models/nrtl.py`
   - Corrected the NRTL activity-coefficient equation. The previous code computed `S = G @ x` (row sums) and divided the first term term-by-term; the standard Renon-Prausnitz form needs the column sums `S_j = sum_k G_kj x_k`, `C_j = sum_k tau_kj G_kj x_k` and a single denominator `S_i` in the first term. The implementation is now vectorized (`G.T @ x`, `(tau * G).T @ x`) and the module docstring derives the equation and states the index convention (`tau[i, j] = tau_ij`, `G_ij = exp(-alpha_ij tau_ij)`). Public signature and the single-component `[1.0]` shortcut unchanged; returned values change for asymmetric parameters (pre-fix: Gibbs-Duhem residuals ~1e-1, up to 0.89 off in `ln gamma` versus `thermo.NRTL`).
 - `src/chemthermo/parameters/data/activity/nrtl.json`, `src/chemthermo/parameters/nrtl.py`
@@ -53,7 +63,7 @@
 ## Current architecture (8-12 lines)
 - `NRTL` implements the standard Renon-Prausnitz equation (column sums); it satisfies Gibbs-Duhem to ~2e-10 and matches `thermo` to ~9e-16 with asymmetric parameters. Packaged pair parameters are synthetic placeholders; published sets live in `tests/fixtures/`.
 - `PengRobinsonEOS.kij` is a scalar (off-diagonal only) or a name-keyed per-pair `Mapping`; `flash_tp` and `stability_tp` results for nonzero kij are now trustworthy (ADR-0006).
-- Phase stability (`chemthermo.stability`) is a solver-independent sibling of `chemthermo.flash`; `flash_tp` does NOT consume it yet.
+- Phase stability (`chemthermo.stability`) is a solver-independent sibling of `chemthermo.flash`; `flash_tp` does NOT consume it yet. It serves both an EOS and an activity model through the internal `_TangentPlaneEvaluator` contract, and each trial runs successive substitution then an optional damped-Newton stage.
 - Canonical runtime DB path is `src/chemthermo/data/components.json`.
 - Runtime DB loading is package-resource based via `chemthermo.data` helpers.
 - Raw DB source tables stay in `database/organics.txt` and `database/inorganics.txt`.
@@ -66,7 +76,7 @@
 
 ## Public API status (stable vs experimental)
 - Stable:
-  - `chemthermo` Python exports in `src/chemthermo/__init__.py`, including `stability_tp` / `StabilityResult` / `StabilitySettings` / `StabilityTrial` (ADR-0005).
+  - `chemthermo` Python exports in `src/chemthermo/__init__.py`, including `stability_tp` / `StabilityResult` / `StabilitySettings` / `StabilityTrial` (ADR-0005, ADR-0007). `stability_tp` takes exactly one of `eos=` / `activity_model=`.
   - `PengRobinsonEOS(kij=...)` scalar-or-mapping constructor contract (ADR-0006).
   - `chemthermo.eos` and `chemthermo.vlle` documented public subpackages.
   - CLI script `chemthermo` with `tp-flash` subcommand and defined exit-code contract.
@@ -75,7 +85,9 @@
   - Validation policy promotion to required CI remains deferred.
 
 ## Risks / unknowns
-- `stability_tp` reporting "stable" is bounded by its deterministic trial set; it is not a global proof, and the docs must keep saying so.
+- `stability_tp` reporting "stable" is bounded by its deterministic trial set; it is not a global proof, and the docs must keep saying so. Measured limit: on Tessier (2000) Problem 2 the trial set reaches 7 of the 10 non-trivial published stationary points; the three it misses all have D > 0 (Cases S-6, S-7).
+- Combined gamma-phi stability (activity liquid vs EOS vapor) raises `ModelError`. It stays unsupported until there is a consistent pure-liquid reference fugacity (ADR-0007); the current gamma-phi flash does not carry one correctly.
+- The second-order stage uses a central-difference Jacobian of `ln phi`/`ln gamma`. For a cubic EOS the min-Gibbs branch can switch between finite-difference probes, which would make that Jacobian noisy; it has not been observed because every validated PR state converges inside the 50-iteration SSI budget and never enters the stage. Watch for it if PR states that need the stage ever appear.
 - chemthermo uses the rounded PR constants 0.45724 / 0.07780 while `thermo` uses the exact roots; this bounds external agreement at a few times 1e-4 in ln(phi) (was ~2e-4 at the stability states, ~4-6e-4 at some nonzero-kij states -- see Case K-1).
 - The illustrative kij value used in docs/examples/tests (0.0411, Methane/n-Decane) is explicitly NOT a validated literature parameter -- do not let it drift into being read as one.
 - `thermo`'s own `CEOSLiquid`/`CEOSGas` root solver was observed to be numerically order-sensitive (not permutation-invariant) at some near-critical-locus states during `pr-kij-matrix` development; avoid cross-checking permutation invariance against `thermo` at such states (use chemthermo-internal invariance checks instead, as `tests/validation/test_pr_kij_vs_thermo.py` now does).
@@ -85,8 +97,7 @@
 - (Removed) Unpinned `bibtexparser>=1.4.0` allowed a fresh/non-editable install to resolve `bibtexparser` 2.x, whose removed `bparser`/`customization` modules broke `import chemthermo`; this was invisible locally because the dev venv already had 1.4.4 installed. Now pinned to `>=1.4.0,<2` and covered by `tests/test_packaging_constraints.py`.
 
 ## Next 3 recommended actions
-- `stability-tpd-nrtl`: activity-model (liquid-liquid) tangent-plane stability.
-- `flash-auto-phase-detection`: let `flash_tp` consume `stability_tp` instead of the K-bound heuristic.
+- `flash-auto-phase-detection`: let `flash_tp` consume `stability_tp` instead of the K-bound heuristic, and seed K-values from the converged stationary point.
 - (not yet scoped): define after `flash-auto-phase-detection` lands.
 
 ## One simplification / deletion candidate
@@ -98,6 +109,8 @@
 - CLI v1 scope remains TP flash with Peng-Robinson EOS and `--flash-mode {phi-phi,gamma-phi}`.
 
 ## How to validate quickly
+- `python examples/basic/stability_tp_nrtl_lle_demo.py`
+- `python examples/validation/08_stability_nrtl_tessier2000.py`
 - `python examples/basic/tp_flash_pr_kij_demo.py`
 - `python -m pytest tests/validation/test_pr_kij_vs_thermo.py -q` (with `pip install -e ".[validation]"`)
 - `python examples/basic/stability_tp_peng_robinson_demo.py`

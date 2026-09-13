@@ -179,19 +179,78 @@ Runnable demo:
 python examples/basic/stability_tp_peng_robinson_demo.py
 ```
 
+### Liquid-liquid stability with an activity model
+
+Pass `activity_model=` instead of `eos=` to test a liquid feed for a
+liquid-liquid split. Both phases are liquids with the same pure-liquid
+reference state, so that reference cancels and `ln gamma_i` takes the place of
+`ln phi_i` in the same tangent-plane distance - no other change.
+
+```python
+from chemthermo import Mixture, NRTL, NRTLParameters, stability_tp
+
+# n-butanol / water, NRTL parameters from Tessier, Brennecke & Stadtherr,
+# Chem. Eng. Sci. 55 (2000) 1785, Table 1 (pair 2-3).
+parameters = NRTLParameters.from_pairs(
+    [("n-Butanol", "Water", 0.90047, 3.51307, 0.48, 0.48)]
+)
+mixture = Mixture.from_database(("n-Butanol", "Water"), (0.10, 0.90))
+
+result = stability_tp(
+    mixture,
+    temperature_K=298.15,
+    pressure_Pa=101325.0,
+    activity_model=NRTL(parameters=parameters),
+)
+
+print(result.status)             # "unstable"
+print(result.tpd_min)            # -0.0299944888
+print(result.trial_composition)  # (0.419473, 0.580527) - the incipient phase
+```
+
+Runnable demo:
+
+```bash
+python examples/basic/stability_tp_nrtl_lle_demo.py
+```
+
+Reproduce the published tangent-plane global minima of Tessier et al. (2000)
+Problems 1 and 2:
+
+```bash
+python examples/validation/08_stability_nrtl_tessier2000.py
+```
+
 Notes:
 - `status` is `"unstable"` when a trial converges to a stationary point with a
   negative tangent-plane distance, `"stable"` when trials converge and none
   does, and `"inconclusive"` when no trial converges.
 - **What "stable" means here:** no negative tangent-plane distance was found
-  from the deterministic trial set (two Wilson estimates plus one
-  pure-component-dominant estimate per component). This is *not* a global proof
-  of stability; Michelsen's test is a local stationary-point search and a
+  from the deterministic trial set (for an EOS: two Wilson estimates plus one
+  pure-component-dominant estimate per component; for an activity model: the
+  pure-component-dominant estimates only). This is *not* a global proof of
+  stability; Michelsen's test is a local stationary-point search and a
   stationary point that no initial estimate reaches can hide an instability.
 - `tpd_min` is dimensionless (units of RT). At a stationary point it equals
   `-ln(sum_i W_i)`, so `sum(W) > 1` is the instability signal.
-- Fugacity coefficients for both the feed and every trial are taken from the
-  compressibility root with the lowest Gibbs energy at that state.
+- Exactly one of `eos` and `activity_model` must be given. **The combined
+  gamma-phi case (activity-coefficient liquid tested against an
+  equation-of-state vapor) is not supported** and raises `ModelError`: it needs
+  a consistent pure-liquid reference fugacity that this package does not yet
+  carry, and returning a plausible-looking wrong tangent plane would be worse
+  than refusing. See ADR-0007.
+- `pressure_Pa` is required and validated for both families, but it does not
+  affect an activity-model result; `result.diagnostics["pressure_dependent"]`
+  says which case applies, and `["model_family"]` is `"eos"` or `"activity"`.
+- `feed_branch` and `phase_branch` are the minimum-Gibbs compressibility root
+  labels for an EOS and are `None` for an activity model (single branch).
+  For an EOS, fugacity coefficients for both the feed and every trial are taken
+  from the compressibility root with the lowest Gibbs energy at that state.
+- Each trial runs successive substitution for `settings.ssi_iterations` (default
+  50) and then, if still above `settings.tol`, a damped Newton stage on the
+  stationarity condition. Near a plait point successive substitution alone does
+  not converge at all; `trial.ssi_iterations`, `trial.second_order_iterations`
+  and `trial.converged_stage` record what actually happened.
 - `flash_tp` does **not** consume this yet; its single-phase decision is still a
   K-bound heuristic.
 

@@ -396,3 +396,200 @@ Rules:
   commits e5ccd8f and ecd476e with no source. They are now labelled as such in
   the file's `provenance` block and per-pair `source` field, and in README /
   `examples/README.md`. They must never be cited as physical parameters.
+
+---
+
+## Case S-6: `stability_tp` with NRTL reproduces the Tessier (2000) Problem 1 global minima
+
+- **Source:** S. R. Tessier, J. F. Brennecke and M. A. Stadtherr, "Reliable
+  phase stability analysis for excess Gibbs energy models", Chemical
+  Engineering Science 55 (2000) 1785-1796. Author copy:
+  https://academicweb.nd.edu/~markst/srt2000.pdf
+- **Location:** Table 1 (NRTL parameters), Table 2 (stationary points and D).
+  Where Case N-3 tests the *model* (is the published stationary point a
+  stationary point of our `ln gamma`?), this case tests the *solver*: given
+  only the feed and the model, does `stability_tp` find the global minimum and
+  report the right verdict?
+- **Assumptions:** Both phases are liquids with the same pure-liquid reference
+  state, so `tpd(w) = sum_i w_i [ln w_i + ln gamma_i(w) - ln z_i -
+  ln gamma_i(z)]` is exactly the paper's `D(x)`. tau is dimensionless and
+  temperature independent as printed; T = 298.15 K and P = 101325 Pa are passed
+  only because the API requires them (`pressure_dependent` is recorded as
+  `False`).
+- **Components / units:** n-propanol(1) / n-butanol(2) / water(3), databank
+  names `1-Propanol`, `n-Butanol`, `Water`. `tpd` is dimensionless.
+- **Parameters and provenance:** `tests/fixtures/nrtl/tessier2000_problem1.json`
+  (see Case N-3). Not packaged runtime data.
+- **Expected outcome:** all four feeds UNSTABLE, `tpd_min` equal to the feed's
+  lowest stationary D (recomputed, Case N-3), minimizing `w` equal to that
+  stationary point.
+- **Results (defaults: `tol = 1e-10`, `tpd_tol = 1e-8`, `ssi_iterations = 50`):**
+
+  | feed | verdict | `tpd_min` | reference D (refined) | rel. diff | minimizing `w` | max abs `dw` | winning trial | ssi + newton |
+  | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+  | (0.148, 0.052, 0.80) | unstable | -9.8510373256e-06 | -9.8510373257e-06 | 1.9e-11 | (0.11433639, 0.03599266, 0.84967095) | 1.5e-10 | `pure-Water` | 50 + 5 |
+  | (0.12, 0.08, 0.80) | unstable | -7.4817968990e-04 | -7.4817968990e-04 | 1.6e-14 | (0.05974494, 0.02823583, 0.91201923) | 6.6e-17 | `pure-Water` | 50 + 3 |
+  | (0.13, 0.07, 0.80) | unstable | -3.2762254313e-04 | -3.2762254313e-04 | 8.9e-14 | (0.07378748, 0.03031163, 0.89590089) | 2.3e-12 | `pure-Water` | 50 + 3 |
+  | (0.12, 0.05, 0.83) | unstable | -5.7359882819e-05 | -5.7359882819e-05 | 1.7e-12 | (0.15757285, 0.07289671, 0.76953044) | 1.2e-10 | `pure-n-Butanol` | 50 + 4 |
+
+  Every trial of every feed converged (`converged_stage = "second-order"` for
+  all of them). Against the *printed* five-digit D the relative differences are
+  1.34e-02 (the Case N-3 typo), 4.1e-07, 7.8e-06 and 2.0e-06.
+- **Tolerance:** asserted `tpd_min` to rel 1e-5 against the recomputed minima,
+  `w` to abs 1e-6 against an independent damped-Newton refinement written in
+  the test module. Achieved: 1.9e-11 relative and 1.5e-10 absolute (worst).
+- **`tpd_tol` choice:** the default 1e-8. The smallest |D| here is 9.85e-06,
+  three orders of magnitude above it, so the verdicts do not depend on the
+  tolerance. A `tpd_tol` of 1e-5 or looser would wrongly call the z1 = 0.148
+  feed stable.
+- **Second-order stage is load-bearing here (asserted, not incidental):** with
+  `second_order=False` and `max_iter=1000`, *no* trial at feed
+  (0.148, 0.052, 0.80) reaches `tol = 1e-10` - all three end with
+  `termination_reason = "max_iter"` and the result is `"inconclusive"`. The
+  fixed-point map's contraction ratio is too close to one near the plait point.
+- **Stationary points reached / not reached (honest record):** seven of the
+  eight non-trivial printed Table 2 points are reached by some trial. The one
+  that is not is the near-plait-point *saddle* of the z1 = 0.148 feed (printed
+  D = +4.5711e-08): trials heading toward it are pulled into the trivial
+  solution. It has positive D, so it cannot change a verdict.
+- **Independent route:** a from-scratch damped-Newton refinement of the
+  constrained stationarity system written in the test module (no shared code
+  with `chemthermo.stability`), plus `thermo` 0.6.0 `ln gamma` (Case S-7's
+  cross-check covers both problems).
+- **Test path:** `tests/validation/test_stability_nrtl_tessier2000.py`
+  (`test_problem1_stability_tp_finds_the_table2_global_minima`,
+  `test_problem1_reaches_every_printed_table2_point_except_the_plait_saddle`),
+  `tests/test_stability_activity.py::test_successive_substitution_alone_cannot_solve_the_near_plait_feed`.
+- **Script:** `examples/validation/08_stability_nrtl_tessier2000.py`.
+
+---
+
+## Case S-7: `stability_tp` with NRTL reproduces the Tessier (2000) Problem 2 global minima
+
+- **Source:** Tessier, Brennecke and Stadtherr (2000), op. cit.
+- **Location:** Section 4.2, Table 4 (NRTL parameters), Table 5 (stationary
+  points and D). The paper states "All but the second feed listed are
+  unstable", which is the verdict under test.
+- **Assumptions:** as Case S-6.
+- **Components / units:** n-propanol(1) / n-butanol(2) / benzene(3) / water(4),
+  databank names `1-Propanol`, `n-Butanol`, `Benzene`, `Water`.
+- **Parameters and provenance:**
+  `tests/fixtures/nrtl/tessier2000_problem2.json`. Table 4 prints `G_ij` and
+  `tau_ij` but not `alpha_ij`; alpha is implied by
+  `alpha_ij = -ln(G_ij)/tau_ij`. The two directions of each pair agree to
+  max |alpha_ij - alpha_ji| = **2.597e-05**, i.e. alpha is symmetric to the
+  precision the five-decimal printed G supports; the fixture stores the
+  symmetric average rounded to three decimals
+  (0.494, 0.286, 0.282, 0.297, 0.344, 0.281). Re-exponentiating it reproduces
+  the printed G to max |dG| = **4.413e-06**, which moves the recomputed D by at
+  most 9.0e-05 relative (measured against using the printed G matrix verbatim).
+  **Redistribution caution:** Table 4 attributes these values to Gmehling et
+  al., DECHEMA Chemistry Data Series (1977-1990). They are fitted third-party
+  data reproduced here solely as a cited test fixture; they are NOT packaged
+  runtime data and must never be loaded as defaults.
+- **Expected outcome:** feed 2 STABLE (printed D values 0.03079, 0.06532,
+  0.00000, all >= 0); the other four UNSTABLE with the printed global minima.
+- **Results (defaults):**
+
+  | feed | verdict | `tpd_min` | reference D (refined) | rel. diff vs refined | printed D | rel. diff vs printed | winning trial | ssi + newton |
+  | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+  | (0.148, 0.052, 0.600, 0.200) | unstable | -3.3982528336e-01 | -3.3982528336e-01 | 6.5e-16 | -0.33982 | 1.56e-05 | `pure-Water` | 18 + 0 |
+  | (0.25, 0.25, 0.25, 0.25) | **stable** | +3.0793112777e-02 | +3.0793112777e-02 | 1.9e-15 | +0.03079 | 1.01e-04 | `pure-Water` | 35 + 0 |
+  | (0.148, 0.052, 0.700, 0.100) | unstable | -3.1097303625e-01 | -3.1097303625e-01 | 8.9e-16 | -0.31097 | 9.76e-06 | `pure-n-Butanol` | 30 + 0 |
+  | (0.25, 0.15, 0.40, 0.20) | unstable | -3.8665151099e-02 | -3.8665151099e-02 | 5.4e-15 | -0.03867 | 1.25e-04 | `pure-Water` | 31 + 0 |
+  | (0.25, 0.15, 0.35, 0.25) | unstable | -7.3625780741e-02 | -7.3625780741e-02 | 9.4e-16 | -0.07363 | 5.73e-05 | `pure-Water` | 28 + 0 |
+
+  The minimizing composition matches the independent refinement to
+  max |dw| = 3.7e-12 in every case, and every trial of every feed converged.
+- **Tolerance:** asserted `tpd_min` to rel 1e-6 against the refined values and
+  `w` to abs 1e-6; asserted the refined D against the printed D at rel 2.5e-04
+  (five printed digits alone justify ~5e-05; the alpha recovery adds up to
+  9.0e-05). Achieved: 5.4e-15 relative against the refinement, 1.25e-04 against
+  the printed digits.
+- **Stationary points reached / not reached (honest record):** of the eight
+  non-trivial printed Table 5 points, five are the global minima above and are
+  all reached. Of the remaining three non-global points, two are reached - the
+  benzene-rich points of the z3-rich feeds, printed D = -0.03365 (recomputed
+  -3.3651657e-02) and -3.1279e-03 (recomputed -3.1280532e-03) - and **three are
+  not**: the positive-D points +0.06532 (feed 2), +0.02268 (feed 4) and
+  +0.01066 (feed 5). Trials heading toward those collapse onto the trivial
+  solution. All three have D > 0, so none can change a verdict, but the trial
+  set is genuinely not exhaustive and that is what "stable" is bounded by.
+- **One printed D is not reproduced and is recorded, not accommodated:** feed
+  (0.25, 0.15, 0.40, 0.20), stationary point near
+  (0.195, 7.86e-2, 0.114, 0.613). Refining the printed composition to a
+  stationarity residual of 6.7e-16 gives
+  w = (0.194545, 0.078562, 0.113961, 0.612933) - within 3.4e-04 of the printed
+  three-digit composition - but D = **+2.66799e-02**, not the printed
+  +2.26800e-02 (17.6% apart). The recomputed value is +2.667985e-02 with the
+  rounded alpha and +2.667994e-02 with the printed G matrix verbatim, so it is
+  not a parameter-rounding artefact, and every other Table 5 point reproduces
+  to 2.5e-04 relative or better. Treated as a typographical error
+  (2.6680 printed as 2.2680). The test asserts the mismatch exceeds 1e-2
+  relative, so a future change that "fixed" it would fail.
+- **Independent route:** the same from-scratch damped-Newton refinement as
+  Case S-6, plus `thermo` 0.6.0. Recomputing the tangent-plane distance at
+  `stability_tp`'s reported minimizer with `thermo.NRTL`'s `ln gamma` agrees to
+  max |dD| = **4.72e-16** over the nine feeds of Problems 1 and 2 (asserted
+  1e-10 per feed, 1e-12 overall).
+- **Not attempted:** confirming the two-liquid split of feed 1 with `thermo`'s
+  `FlashVLN`. That needs a full `thermo` property package (pure-component
+  `HeatCapacityGas`, `VaporPressure`, volume correlations) for the four
+  components before an LLE flash can run, and the paper's parameters are
+  dimensionless taus with no temperature attached, so the flash would be
+  answering a different question than the table does. The `ln gamma`
+  cross-check above is the part that is actually comparable, and it is exact.
+- **Test path:** `tests/validation/test_stability_nrtl_tessier2000.py`
+  (`test_problem2_alpha_is_symmetric_and_reproduces_the_printed_G_matrix`,
+  `test_problem2_components_map_to_the_databank`,
+  `test_problem2_stability_tp_reproduces_the_table5_verdicts_and_minima`,
+  `test_problem2_records_which_other_printed_points_are_reached`,
+  `test_problem2_disputed_printed_D_is_recorded_not_accommodated`,
+  `test_stability_minima_agree_with_thermo_ln_gamma`).
+- **Script:** `examples/validation/08_stability_nrtl_tessier2000.py`.
+
+---
+
+## Case S-8: n-butanol / water LLE control, and one tangent plane for two liquids
+
+- **Source:** Internal invariant (the definition of liquid-liquid equilibrium),
+  applied to the cited n-butanol / water NRTL pair. This is the activity-model
+  analogue of Case S-3.
+- **Location:** `tests/test_stability_activity.py::test_butanol_water_binary_splits_and_both_phases_share_one_tangent_plane`.
+- **Assumptions:** At an LLE split the two liquid phases are the two points
+  where one common hyperplane touches the Gibbs surface. Each of them, used as
+  a feed, must therefore be marginally stable (`tpd_min = 0`) and must find the
+  *other* phase as its stationary point.
+- **Components / units:** n-Butanol(1) / Water(2), T = 298.15 K,
+  P = 101325 Pa (inert). Mole fractions; `tpd` dimensionless.
+- **Parameters and provenance:** the 2-3 pair of Tessier et al. (2000) Table 1:
+  tau_12 = 0.90047, tau_21 = 3.51307, alpha = 0.48 (implied by the printed
+  `G_23`, `G_32`). Same fixture provenance as Case N-3. Note these are ternary
+  parameters used here as a binary sub-system; the claim under test is the
+  tangent-plane geometry, not the physical n-butanol / water phase diagram.
+- **Expected outcome and results:**
+  - Feed z1 = 0.10 (inside the gap): UNSTABLE, `tpd_min = -2.9994488835e-02`
+    at w = (0.419473294157, 0.580526705843), found by `pure-n-Butanol`
+    (50 ssi + 1 Newton). The second trial finds a second negative stationary
+    point at D = -5.2965300e-03. Recomputing `tpd` at the reported minimizer
+    from the definition agrees to 1e-12.
+  - Conjugate phases from an independent equal-activity solve
+    (`x_i gamma_i` equal in both phases, Newton with a finite-difference
+    Jacobian, residual 1.1e-16): x1 = 0.019998419467 and x1 = 0.359999661508.
+    The feed lies strictly between them.
+  - Feed = x1 = 0.0199984: STABLE, `tpd_min = +1.77e-16`, stationary point at
+    x1 = 0.359999662 (the other phase, to 1e-9).
+  - Feed = x1 = 0.3599997: STABLE, `tpd_min = -1.34e-16`, stationary point at
+    x1 = 0.019998419 (the other phase, to 1e-9).
+- **Tolerance:** asserted `tpd_min` to rel 1e-9 (unstable feed) and abs 1e-10
+  (marginal feeds), conjugate composition to abs 1e-9. Achieved: 1.8e-16 on the
+  marginal feeds.
+- **Other negative controls in the same module:** a one-component feed and a
+  component at zero mole fraction are reported STABLE with `tpd = 0` and a
+  single trivial trial; an ideal solution (`tau = 0`, so `gamma = 1`) is STABLE
+  at z = (0.5, 0.5), (0.1, 0.9) and (0.9, 0.1), which is the analytic answer
+  since `tpd(w) = sum_i w_i ln(w_i / z_i) >= 0`.
+- **Independent route:** internal invariant plus an equal-activity binodal
+  solve sharing no code with `chemthermo.stability`.
+- **Test path:** `tests/test_stability_activity.py`.
+- **Script:** `examples/basic/stability_tp_nrtl_lle_demo.py`.

@@ -28,6 +28,14 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
     `src/chemthermo/parameters/data/activity/nrtl.json`.
 - `examples/basic/stability_tp_peng_robinson_demo.py`
   - Michelsen tangent-plane phase stability at two states (unstable and stable).
+- `examples/basic/stability_tp_nrtl_lle_demo.py`
+  - Liquid-liquid tangent-plane stability with an NRTL activity model
+    (`stability_tp(..., activity_model=...)`) on the partially miscible
+    n-butanol / water binary: a feed inside the miscibility gap, one outside it,
+    and one of the two conjugate liquid phases (marginally stable). Parameters
+    are written inline with their citation (Tessier, Brennecke & Stadtherr,
+    Chem. Eng. Sci. 55 (2000) 1785, Table 1, pair 2-3) and are **not** the
+    packaged synthetic defaults. Needs no optional dependency.
 - `examples/validation/00_reference_case.py`
   - Deterministic single-case comparison against `thermo` (optional dependency).
 - `examples/validation/06_stability_vs_thermo.py`
@@ -39,6 +47,16 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
     from the cited fixture `tests/fixtures/nrtl/tessier2000_problem1.json`, not from
     the packaged defaults. Two printed D values do not reproduce and are reported as
     `KNOWN-TYPO`; see `.agents/brain/validation-cases.md` Case N-3.
+- `examples/validation/08_stability_nrtl_tessier2000.py`
+  - Runs `stability_tp` with an NRTL activity model on every published feed of
+    Tessier, Brennecke & Stadtherr (2000) Problem 1 (Table 2) and Problem 2
+    (Table 5), and compares its verdict, `tpd_min` and minimizing composition
+    against an independent damped-Newton refinement of the printed stationary
+    points and against the printed five-digit D values. Needs no optional
+    dependency. Parameters come from the cited fixtures
+    `tests/fixtures/nrtl/tessier2000_problem1.json` and
+    `tests/fixtures/nrtl/tessier2000_problem2.json`. One printed D is reported
+    as `KNOWN-TYPO`; see `.agents/brain/validation-cases.md` Cases S-6 and S-7.
 - `examples/validation/*.py`
   - Optional validation sweeps against `thermo` (requires `pip install -e ".[validation]"`).
   - CSV output is disabled by default; pass `--outdir <dir>` or set `CHEMTHERMO_OUTDIR`.
