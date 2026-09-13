@@ -214,3 +214,185 @@ Rules:
   regression/unit coverage in `tests/test_pr_eos.py`.
 - **Script:** `examples/basic/tp_flash_pr_kij_demo.py` (golden path; contrasts
   kij=0.0 against the mapping form on the same feed, no `thermo` dependency).
+
+---
+
+## Case N-1: NRTL Gibbs-Duhem consistency and binary reduction
+
+- **Source:** H. Renon and J. M. Prausnitz, "Local compositions in
+  thermodynamic excess functions for liquid mixtures", AIChE Journal 14 (1968)
+  135-144 (the NRTL equation and its two-component form); the Gibbs-Duhem
+  relation at fixed T, P.
+- **Location:** Working equation restated as equations (1)-(4) in the module
+  docstring of `src/chemthermo/models/nrtl.py`; the binary expressions are
+  written out in the test docstring.
+- **Assumptions:** Fixed T, P. `ln gamma` must be the composition derivative of
+  a single reduced excess Gibbs energy `g^E`, hence
+  `sum_i x_i d ln gamma_i = 0` along any direction in the composition simplex.
+- **Components / units:** 1-Propanol / n-Butanol / Water (dimensionless
+  compositions and activity coefficients). Four interior compositions
+  (0.12, 0.08, 0.80), (0.50, 0.30, 0.20), (0.20, 0.20, 0.60),
+  (0.05, 0.05, 0.90) and four simplex directions (1,-1,0), (1,0,-1), (0,1,-1),
+  (1,1,-2). Binary reduction uses a synthetic asymmetric pair
+  (tau_12 = 0.6, tau_21 = -0.35, alpha = 0.3) at six compositions.
+- **Parameters and provenance:** Tessier (2000) Table 1 via
+  `tests/fixtures/nrtl/tessier2000_problem1.json` (see Case N-3 for
+  provenance). The binary-reduction parameters are synthetic and carry no
+  physical claim; only the algebraic identity is under test.
+- **Expected outcome:** Gibbs-Duhem residual 0; multicomponent code equals the
+  textbook two-component NRTL formulas exactly; reordering components permutes
+  `ln gamma` exactly; `tau = 0` gives `gamma = 1`.
+- **Tolerance:** asserted |residual| < 1e-7 (and < 1e-8 for the worst case),
+  binary abs 1e-14, permutation rtol 1e-12. Achieved: worst Gibbs-Duhem
+  residual 2.07e-10 at step 1e-6; binary agreement 1.1e-16; permutation
+  agreement at round-off.
+- **Pre-fix vs post-fix evidence (measured during the
+  `nrtl-gibbs-duhem-fix` slice, not persisted as a test):** the previous
+  implementation summed `G` along rows and used per-term denominators in the
+  first term. Gibbs-Duhem residuals with the same parameters were
+  +1.2549e-01 at (0.12, 0.08, 0.80) along (1,-1,0), +5.8681e-01 along
+  (1,0,-1), and -4.5359e-02 at (0.50, 0.30, 0.20) along (1,-1,0). `ln gamma`
+  differed from the standard equation by up to 0.113 at (0.12, 0.08, 0.80),
+  0.649 at (0.50, 0.30, 0.20) and 0.889 at (0.0597, 0.0282, 0.9120).
+  A regression guard pins `ln gamma` at (0.12, 0.08, 0.80) to
+  (0.9120183964, 1.1593117705, 0.1849764954) within 1e-9; the pre-fix code
+  returned (0.857845, 1.045984, 0.174959).
+- **Independent route:** internal invariant (Gibbs-Duhem by central
+  differences) plus an independently written two-component formula. External
+  cross-check is Case N-2.
+- **Test path:** `tests/test_activity_nrtl.py`
+  (`test_nrtl_satisfies_gibbs_duhem_for_asymmetric_parameters`,
+  `test_nrtl_binary_reduces_to_textbook_two_component_formulas`,
+  `test_nrtl_is_permutation_invariant`,
+  `test_nrtl_regression_guard_against_row_sum_bug`,
+  `test_nrtl_gamma_unity_with_zero_tau`,
+  `test_nrtl_fully_symmetric_ternary_is_permutation_symmetric`).
+
+---
+
+## Case N-2: NRTL against an independent implementation (`thermo` 0.6.0)
+
+- **Source:** `thermo` 0.6.0 (`thermo.NRTL` and `thermo.nrtl.NRTL_gammas`) as
+  an external implementation of the same closed-form Renon-Prausnitz equation.
+- **Location:** `tests/validation/test_nrtl_tessier2000.py::test_nrtl_matches_thermo_for_asymmetric_parameters`.
+- **Assumptions:** Both sides evaluate the same closed form at the same
+  dimensionless tau and alpha, so agreement is expected at round-off, not at a
+  "physically reasonable" tolerance. `thermo` receives the parameters as
+  temperature-independent coefficients (`tau_coeffs` / `alpha_coeffs` with only
+  the constant term non-zero).
+- **Components / units:** 1-Propanol / n-Butanol / Water at six compositions:
+  (0.12, 0.08, 0.80), (0.50, 0.30, 0.20), (0.0597449, 0.0282358, 0.9120193),
+  (0.20, 0.20, 0.60), (0.80, 0.10, 0.10), (0.05, 0.90, 0.05). `ln gamma` is
+  dimensionless.
+- **Parameters and provenance:** as Case N-3 (Tessier 2000 Table 1 fixture).
+  Strongly asymmetric: tau_12 = -0.61259 vs tau_21 = 0.71640, and
+  alpha_23 = 0.48 vs alpha_12 = alpha_13 = 0.3.
+- **Expected outcome:** identical `ln gamma` from both implementations.
+- **Tolerance:** asserted max |d ln gamma| < 1e-9 per composition and < 1e-12
+  overall. Achieved: 8.88e-16 against both `thermo.NRTL` and
+  `thermo.nrtl.NRTL_gammas`.
+- **Known weakness this replaces:** the pre-existing cross-check
+  (`tests/validation/test_flash_vs_thermo.py::test_nrtl_activity_coefficients_vs_thermo`)
+  used a 50/50 Methane/Ethane binary with tau = 0.2/0.1 and symmetric
+  alpha = 0.3 at rtol/atol 2e-3. The row-sum bug moved `ln gamma` by only
+  ~1.1e-3 there, so that test passed both before and after the fix. A
+  symmetric-`G` binary cannot detect a row/column mix-up.
+- **Independent route:** external reference implementation.
+- **Test path:** `tests/validation/test_nrtl_tessier2000.py`.
+
+---
+
+## Case N-3: Tessier, Brennecke & Stadtherr (2000) Table 2 stationary points
+
+- **Source:** S. R. Tessier, J. F. Brennecke and M. A. Stadtherr, "Reliable
+  phase stability analysis for excess Gibbs energy models", Chemical
+  Engineering Science 55 (2000) 1785-1796. Author copy of the accepted
+  manuscript: https://academicweb.nd.edu/~markst/srt2000.pdf
+- **Location:** Section 2.2 (NRTL form), Table 1 (Problem 1 parameters),
+  Table 2 (stationary points of the tangent-plane distance D). Table 1
+  attributes the parameters to C. M. McDonald and C. A. Floudas, AIChE Journal
+  41 (1995) 1798-1814.
+- **Assumptions:** The paper's `g^E` is the standard Renon-Prausnitz form
+  (verified against section 2.2 equations 5-7), so `D` is the activity-based
+  tangent-plane distance
+  `D(x) = sum_i x_i [ln x_i + ln gamma_i(x) - ln z_i - ln gamma_i(z)]`.
+  tau is dimensionless and temperature-independent as printed, so no
+  temperature is needed (the paper states none for Problem 1).
+- **Components / units:** n-propanol(1) / n-butanol(2) / water(3), mapped to
+  the chemthermo databank names `1-Propanol`, `n-Butanol`, `Water`. Four feeds:
+  (0.148, 0.052, 0.80), (0.12, 0.08, 0.80), (0.13, 0.07, 0.80),
+  (0.12, 0.05, 0.83). D is dimensionless.
+- **Parameters and provenance:** `tests/fixtures/nrtl/tessier2000_problem1.json`
+  (deliberately NOT in the packaged default data). Table 1 prints `G_ij` and
+  `tau_ij` but not `alpha_ij`; alpha is implied by
+  `alpha_ij = -ln(G_ij)/tau_ij`, which evaluates to 0.3 for pairs 1-2 and 1-3
+  and 0.48 for pair 2-3 (recovered values 0.29999945 to 0.30000003 and
+  0.48000005). Re-exponentiating the rounded alpha reproduces the printed G to
+  max |dG| = 3.99e-08 (asserted < 1e-7).
+- **Expected outcome:** every printed stationary composition is a stationary
+  point of D (residual `max_i |ln w_i + ln gamma_i(w) - d_i - k| = 0` with
+  `D = k`), the trivial point `w = z` gives `D = 0` exactly, and the recomputed
+  D matches the printed D.
+- **Tolerance:** asserted stationarity residual < 1e-10, composition match
+  atol 1e-3 (the paper prints three digits), `|D/D_printed - 1| < 2e-5` for
+  the undisputed points. Achieved: residuals 1.6e-16 to 3.7e-15; composition
+  agreement 1.5e-05 to 3.8e-04; `D = k` to ~1e-16.
+- **Recomputed vs printed D (all eight non-trivial points):**
+
+  | feed | refined w | printed D | recomputed D | rel. diff |
+  | --- | --- | --- | --- | --- |
+  | (0.148, 0.052, 0.80) | (0.143614, 0.049882, 0.806503) | +4.5711e-08 | +4.571050e-08 | 1.09e-05 |
+  | (0.148, 0.052, 0.80) | (0.114336, 0.035993, 0.849671) | -9.9851e-06 | -9.851037e-06 | **1.34e-02** |
+  | (0.12, 0.08, 0.80) | (0.129742, 0.089090, 0.781167) | -3.0693e-06 | -3.069309e-06 | 3.03e-06 |
+  | (0.12, 0.08, 0.80) | (0.059745, 0.028236, 0.912019) | -7.4818e-04 | -7.481797e-04 | 4.15e-07 |
+  | (0.13, 0.07, 0.80) | (0.137539, 0.075645, 0.786817) | -8.6268e-07 | -8.626898e-07 | 1.14e-05 |
+  | (0.13, 0.07, 0.80) | (0.073787, 0.030312, 0.895901) | -3.2762e-04 | -3.276225e-04 | 7.76e-06 |
+  | (0.12, 0.05, 0.83) | (0.157573, 0.072897, 0.769530) | -5.7360e-05 | -5.735988e-05 | 2.04e-06 |
+  | (0.12, 0.05, 0.83) | (0.093970, 0.034854, 0.871177) | -3.0088e-05 | -3.088768e-05 | **2.66e-02** |
+
+  The four trivial points (`w = z`) reproduce `D = 0` to 0.0 or 1.8e-17.
+- **Two printed D values are treated as typographical errors, not as model
+  disagreement (recorded honestly rather than choosing whichever number
+  passes):**
+  1. Feed (0.148, 0.052, 0.80), root near (0.114, 0.036, 0.850): printed
+     -9.9851e-06, recomputed -9.851037e-06. The paper's own section 4 text
+     reports the verified interval
+     `x1 = [0.11433639929296194, 0.11433639934254627]` for this root; feeding
+     the printed `G` matrix verbatim into the same stationarity solve returns
+     `x1 = 0.11433639931776886`, **inside** that interval, with
+     D = -9.850999e-06. So the composition is confirmed to 17 digits while the
+     printed D digit string is not reproducible; it looks like a duplicated
+     leading digit of 9.8510.
+  2. Feed (0.12, 0.05, 0.83), root near (0.094, 0.0349, 0.871): printed
+     -3.0088e-05, recomputed -3.088768e-05 (-3.088768e-05 with the printed G
+     matrix as well). Looks like 3.0888 printed as 3.0088.
+  Both mismatches are two to three orders of magnitude larger than the
+  round-off of a 5-digit printed value and than the spread of the six
+  reproducing points, and both are insensitive to whether the rounded alpha or
+  the printed G matrix is used. The tests assert against the **recomputed**
+  values and additionally assert that the mismatch exceeds 1e-3 relative, so a
+  future change that accidentally "fixed" them would fail.
+- **Solver-behaviour note (asserted, not incidental):** successive substitution
+  `ln W_i = d_i - ln gamma_i(w)` converges to six of the seven non-trivial
+  roots but drifts to the trivial solution `w = z` for the near-plait-point
+  root of the z1 = 0.148 feed (printed D = +4.5711e-08, a saddle rather than a
+  minimum). That is precisely the initialization dependence the paper sets out
+  to eliminate. The reported stationary points are therefore obtained with a
+  damped Newton solve of the constrained stationarity system, whose Jacobian is
+  built by central differences and shares no derivative code with the model.
+- **Independent route:** published reference values plus a from-scratch
+  tangent-plane distance and stationary-point solve written in the test module
+  (no `thermo` dependency); cross-checked against `thermo` via Case N-2.
+- **Test path:** `tests/validation/test_nrtl_tessier2000.py`
+  (`test_published_G_matrix_is_reproduced_by_the_implied_alpha`,
+  `test_tessier2000_table2_stationary_points_are_reproduced`,
+  `test_successive_substitution_reaches_the_printed_minima`).
+- **Script:** `examples/validation/07_nrtl_tessier_stationary_points.py`
+  (golden path; prints printed vs recomputed points and D values with a
+  PASS / KNOWN-TYPO / FAIL line per point; no optional dependency).
+- **Data provenance caution (packaged defaults):** the pairs shipped in
+  `src/chemthermo/parameters/data/activity/nrtl.json` (Methane/Ethane,
+  Benzene/Water) are synthetic illustrative placeholders added ad hoc in
+  commits e5ccd8f and ecd476e with no source. They are now labelled as such in
+  the file's `provenance` block and per-pair `source` field, and in README /
+  `examples/README.md`. They must never be cited as physical parameters.
