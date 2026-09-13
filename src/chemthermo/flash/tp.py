@@ -31,7 +31,10 @@ ADR-0010). The flow is
    first-stage phase split - runs from there. For phi-phi, if the seeded
    K-values give no Rachford-Rice root the Wilson estimate is tried as a
    documented fallback, and ``diagnostics["k_seed"]`` records which seed was
-   actually used.
+   actually used. Inside that loop (phi-phi only) the vapor fraction is
+   allowed to leave ``[0, 1]`` - the "negative flash" of Whitson & Michelsen
+   (1989) on the Leibovici-Neoschil window - and a second-order stage finishes
+   the split when successive substitution does not; see ADR-0016.
 4. ``status == "inconclusive"``: a :class:`chemthermo.ConvergenceError` is
    raised. A stability search that could not converge must not silently produce
    a single-phase answer.
@@ -124,7 +127,8 @@ Module layout
 This module is the thin public orchestrator: it validates inputs, resolves the
 mode, and dispatches to the internal module that implements it - ``_detect``
 (phase detection and split seeding), ``_split`` (the shared K-loop), ``_second_order``
-(the liquid-liquid Newton stage), ``_multiphase_rr`` (the multiphase
+(the Newton stage shared by the liquid-liquid, modified-Raoult and phi-phi
+splits), ``_multiphase_rr`` (the multiphase
 Rachford-Rice), ``_multiphase`` (the multiphase split and the phase
 addition/removal loop), ``_verify`` (residuals and post-split stability),
 ``_assemble`` (``FlashResult`` construction) and ``_legacy`` (the
@@ -226,8 +230,14 @@ def flash_tp(
           ``post_split_stable``, ``post_split_status``,
           ``post_split_tpd_min``, ``phase_stability_<name>`` and
           ``phase_stability_tpd_min_<name>``. Phi-phi additionally reports
-          ``incipient_phase``, ``max_delta_k``, ``k_min`` and ``k_max``;
-          gamma-gamma additionally reports ``ssi_iterations``,
+          ``incipient_phase``, ``max_delta_k``, ``k_min`` and ``k_max``, plus -
+          **only when the ADR-0016 second-order stage actually ran** -
+          ``ssi_iterations``, ``second_order_iterations``, ``converged_stage``
+          and ``negative_flash_steps``. Those four keys are absent from a
+          phi-phi result that converged in the first stage, deliberately: such
+          a result carries the mapping it carried before ADR-0016, down to the
+          last bit. Use ``.get()`` for them. Gamma-gamma additionally reports
+          ``ssi_iterations``,
           ``second_order_iterations`` and ``converged_stage``. Modified-raoult
           reports ``incipient_phase``, ``k_min``, ``k_max``, the three stage
           keys, and ``antoine_valid_Tmin_K`` / ``antoine_valid_Tmax_K`` (the

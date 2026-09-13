@@ -433,6 +433,11 @@ def test_inconclusive_stability_raises_and_the_legacy_path_still_answers() -> No
 
 
 def test_split_iteration_limit_still_raises() -> None:
+    """With the ADR-0016 second-order stage switched off, the limit still bites.
+
+    ``second_order=False`` is the pre-ADR-0016 phi-phi split: successive
+    substitution alone, and a budget it cannot meet is a `ConvergenceError`.
+    """
     mixture = _mixture(("Methane", "Ethane"), (0.5, 0.5))
     with pytest.raises(ct.ConvergenceError, match="did not converge"):
         ct.flash_tp(
@@ -440,8 +445,44 @@ def test_split_iteration_limit_still_raises() -> None:
             temperature_K=240.0,
             pressure_Pa=3.0e6,
             eos=EOS,
-            settings=ct.FlashSettings(max_iter=1, tol=1e-12),
+            settings=ct.FlashSettings(max_iter=1, tol=1e-12, second_order=False),
         )
+
+
+def test_second_order_stage_finishes_a_starved_phi_phi_split() -> None:
+    """ADR-0016: the same starved budget now converges through the Newton stage.
+
+    The answer must be the one the unstarved successive substitution reaches,
+    not merely *an* answer. The comparison tolerance is the *reference's* own
+    accuracy: it stopped at ``tol = 1e-8`` on the K-update, which leaves it a
+    few times 1e-10 away from the equal-fugacity solution that the
+    second-order stage drives to 1e-12 on the residual.
+    """
+    mixture = _mixture(("Methane", "Ethane"), (0.5, 0.5))
+    starved = ct.flash_tp(
+        mixture,
+        temperature_K=240.0,
+        pressure_Pa=3.0e6,
+        eos=EOS,
+        settings=ct.FlashSettings(max_iter=1, tol=1e-12),
+    )
+    assert starved.diagnostics["converged_stage"] == "second-order"
+    assert starved.diagnostics["ssi_iterations"] == 1
+    assert int(starved.diagnostics["second_order_iterations"]) >= 1  # type: ignore[arg-type]
+
+    reference = ct.flash_tp(mixture, temperature_K=240.0, pressure_Pa=3.0e6, eos=EOS)
+    # The default result converged in the first stage, so it must carry the
+    # pre-ADR-0016 diagnostics mapping and none of the stage keys.
+    assert "converged_stage" not in reference.diagnostics
+    assert starved.vapor_fraction == pytest.approx(reference.vapor_fraction, abs=1e-8)
+    for name in reference.phase_names():
+        assert starved.phases[name].composition.fractions == pytest.approx(
+            reference.phases[name].composition.fractions, abs=1e-8
+        )
+    # The rescued split is the *better* converged of the two.
+    assert abs(float(starved.diagnostics["fugacity_residual"])) < abs(
+        float(reference.diagnostics["fugacity_residual"])
+    )
 
 
 def test_phase_detection_setting_is_validated() -> None:
