@@ -168,6 +168,7 @@ from ..exceptions import CompositionError, InputRangeError, ModelError
 from ..models._kij import KijInput, KijPairs, canonicalize_kij, kij_matrix
 from ..models.base import KAPPA_LIQUID_THRESHOLD, EquationOfState
 from ..parameters.pcsaft import (
+    PCSAFTAssociationRecord,
     PCSAFTParameterError,
     PCSAFTParameters,
     get_pcsaft_parameters,
@@ -178,6 +179,7 @@ from ..validation import (
     validate_pressure,
     validate_temperature,
 )
+from ._pcsaft_association import AssociationState, build_setup
 from ._pcsaft_density import DensityRoots, PCSAFTIsotherm, build_isotherm, solve_density_roots
 from .api import EOSProtocol
 from .registry import register_eos
@@ -280,9 +282,13 @@ class _PCSAFTState(NamedTuple):
     ``a_res`` is ``A^res/(R T)`` per mole, ``z_minus_one`` is
     ``rho (d a_res / d rho)_{T,x} = Z - 1`` and ``da_dx`` holds the
     unconstrained composition derivatives ``partial a_res / partial x_k`` at
-    fixed temperature and total density. ``z_hc`` and ``z_disp`` are the two
-    contributions to ``z_minus_one``; they are kept apart so each term's
-    density derivative can be finite-difference tested on its own.
+    fixed temperature and total density. ``z_hc``, ``z_disp`` and ``z_assoc``
+    are the three contributions to ``z_minus_one``; they are kept apart so each
+    term's density derivative can be finite-difference tested on its own.
+
+    ``a_assoc`` and ``z_assoc`` are ``0.0`` and ``site_fractions`` is ``None``
+    when no component associates - the association code never runs then
+    (ADR-0018), which is what keeps every ADR-0014 number bit-identical.
     """
 
     a_res: float
@@ -293,6 +299,9 @@ class _PCSAFTState(NamedTuple):
     a_disp: float
     z_hc: float
     z_disp: float
+    a_assoc: float = 0.0
+    z_assoc: float = 0.0
+    site_fractions: np.ndarray | None = None
 
 
 def _c1_terms(eta: float, mbar: float) -> tuple[float, float, float]:
@@ -324,11 +333,15 @@ def _evaluate(
     sigma_A: np.ndarray,
     epsilon_k_K: np.ndarray,
     kij: np.ndarray,
+    association: Sequence[PCSAFTAssociationRecord | None] | None = None,
 ) -> _PCSAFTState:
-    """Evaluate the non-associating PC-SAFT model at one state.
+    """Evaluate the PC-SAFT model at one state.
 
     Pure function of arrays; see the module docstring for every equation and
-    for the two chain rules that give the derivatives.
+    for the two chain rules that give the derivatives. ``association`` is one
+    record (or ``None``) per component; ``None`` for the argument itself, or a
+    sequence whose entries are all ``None``, skips the association term
+    entirely (ADR-0018).
     """
     rho_a3 = density_mol_m3 * AVOGADRO_PER_MOL * 1e-30  # molecules / Angstrom^3
 
@@ -445,15 +458,38 @@ def _evaluate(
         f_deta * dzeta_dx[3] + f_dmbar * m + f_dm2es3 * dm2es3_dx + f_dm2e2s3 * dm2e2s3_dx
     )
 
+    # Association (Gross & Sadowski 2002), ADR-0018. The setup is ``None``
+    # unless some component carries sites, and then nothing below runs.
+    setup = (
+        None
+        if association is None
+        else build_setup(temperature_K=temperature_K, sigma_A=sigma_A, d=d, association=association)
+    )
+    if setup is None:
+        return _PCSAFTState(
+            a_res=float(a_res),
+            z_minus_one=float(z_minus_one),
+            da_dx=dahc_dx + dadisp_dx,
+            eta=eta,
+            a_hc=float(a_hc),
+            a_disp=float(a_disp),
+            z_hc=float(dahc_drho),
+            z_disp=float(dadisp_drho),
+        )
+
+    assoc = AssociationState(setup, rho_a3=rho_a3, x=x, zeta_2=z2, eta=eta, dzeta_dx=dzeta_dx)
     return _PCSAFTState(
-        a_res=float(a_res),
-        z_minus_one=float(z_minus_one),
-        da_dx=dahc_dx + dadisp_dx,
+        a_res=float(a_res + assoc.a_assoc),
+        z_minus_one=float(z_minus_one + assoc.z_assoc),
+        da_dx=dahc_dx + dadisp_dx + assoc.da_dx,
         eta=eta,
         a_hc=float(a_hc),
         a_disp=float(a_disp),
         z_hc=float(dahc_drho),
         z_disp=float(dadisp_drho),
+        a_assoc=float(assoc.a_assoc),
+        z_assoc=float(assoc.z_assoc),
+        site_fractions=assoc.site_fractions,
     )
 
 
@@ -539,6 +575,65 @@ class PCSAFTEOS(EquationOfState, EOSProtocol):
         if not math.isfinite(volume) or volume <= 0.0:
             raise InputRangeError(f"Molar volume must be positive and finite (got {volume_m3!r}).")
         return self._state(temperature_K, 1.0 / volume, composition).a_res
+
+    def residual_helmholtz_terms(
+        self,
+        *,
+        temperature_K: float,
+        volume_m3: float,
+        composition: Sequence[float],
+    ) -> dict[str, float]:
+        """Return ``A^res/(R T)`` split into the terms that make it up (ADR-0018).
+
+        Keys: ``"hard-chain"`` (Eq. A.4, the Boublik-Mansoori hard-sphere
+        reference and the chain correction together, which is how the 2001
+        paper groups them), ``"dispersion"`` (Eq. A.10), ``"association"``
+        (Gross & Sadowski 2002; **0.0** for a non-associating mixture, where
+        the term is not evaluated at all) and ``"total"``, which is exactly
+        what :meth:`residual_helmholtz` returns.
+
+        This exists so the association contribution is *visible*: it is the
+        term this package validates against an external reference term by
+        term, and without an accessor a caller could only see the sum.
+
+        Args:
+            temperature_K: Temperature in K.
+            volume_m3: **Molar** volume in m^3/mol.
+            composition: Mole fractions, summing to 1 within
+                ``COMPOSITION_SUM_TOL``.
+        """
+        volume = float(volume_m3)
+        if not math.isfinite(volume) or volume <= 0.0:
+            raise InputRangeError(f"Molar volume must be positive and finite (got {volume_m3!r}).")
+        state = self._state(temperature_K, 1.0 / volume, composition)
+        return {
+            "hard-chain": state.a_hc,
+            "dispersion": state.a_disp,
+            "association": state.a_assoc,
+            "total": state.a_res,
+        }
+
+    def site_fractions(
+        self,
+        *,
+        temperature_K: float,
+        density_mol_m3: float,
+        composition: Sequence[float],
+    ) -> list[float]:
+        """Return the non-bonded association site fractions ``X`` at this state.
+
+        Two entries per associating component - its type-A site then its
+        type-B site - in the instance's component order, and an **empty list**
+        for a non-associating mixture. ``X`` is the fraction of sites of that
+        kind that are *not* hydrogen bonded: 1 in the ideal-gas limit and a few
+        per cent in liquid water. It is the inner unknown of the association
+        term (see :mod:`chemthermo.eos._pcsaft_association`), and it is solved
+        to a mass-action residual of ``1e-14``.
+        """
+        state = self._state(temperature_K, density_mol_m3, composition)
+        if state.site_fractions is None:
+            return []
+        return [float(value) for value in state.site_fractions]
 
     def compressibility_factor(
         self,
@@ -804,8 +899,35 @@ class PCSAFTEOS(EquationOfState, EOSProtocol):
                 "PC-SAFT requires at least one component: this instance was built without "
                 "'components', so the component order has to come from a Mixture."
             )
-        source = self.parameters if self.parameters is not None else get_pcsaft_parameters()
-        return source.for_components(names)
+        return self._source().for_components(names)
+
+    def association_parameters(
+        self, components: Sequence[str] | None = None
+    ) -> tuple[PCSAFTAssociationRecord | None, ...]:
+        """Return one association record (or ``None``) per component (ADR-0018).
+
+        An all-``None`` result means this instance is non-associating and the
+        association term is not evaluated at all, so its numbers are those of
+        ADR-0014 down to the last bit.
+
+        Args:
+            components: Optional explicit name order; defaults to the
+                instance's own ``components``.
+        """
+        names = self.components if components is None else tuple(components)
+        if not names:
+            raise ModelError(
+                "PC-SAFT requires at least one component: this instance was built without "
+                "'components', so the component order has to come from a Mixture."
+            )
+        return self._source().association_for_components(names)
+
+    def associates(self, components: Sequence[str] | None = None) -> bool:
+        """Return whether any of the named components carries association sites."""
+        return any(record is not None for record in self.association_parameters(components))
+
+    def _source(self) -> PCSAFTParameters:
+        return self.parameters if self.parameters is not None else get_pcsaft_parameters()
 
     def kij_matrix(self, components: Sequence[str] | None = None) -> np.ndarray:
         """Return the dense ``n x n`` kij matrix in the given (or instance) order."""
@@ -861,6 +983,7 @@ class PCSAFTEOS(EquationOfState, EOSProtocol):
             sigma_A=sigma_A,
             epsilon_k_K=epsilon_k_K,
             kij=self.kij_matrix(names),
+            association=self.association_parameters(names),
         )
 
     def _density_roots(
@@ -930,6 +1053,7 @@ class PCSAFTEOS(EquationOfState, EOSProtocol):
             sigma_A=sigma_A,
             epsilon_k_K=epsilon_k_K,
             kij=self.kij_matrix(names),
+            association=self.association_parameters(names),
         )
 
 
@@ -949,6 +1073,7 @@ __all__ = [
     "A_UNIVERSAL",
     "BOLTZMANN_J_PER_K",
     "B_UNIVERSAL",
+    "PCSAFTAssociationRecord",
     "PCSAFTEOS",
     "PCSAFTParameterError",
     "PCSAFTParameters",

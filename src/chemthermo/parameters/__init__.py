@@ -3,6 +3,7 @@
 from .activity import ActivityParameters
 from .nrtl import NRTLParameters
 from .pcsaft import (
+    PCSAFTAssociationRecord,
     PCSAFTParameterError,
     PCSAFTParameters,
     PCSAFTRecord,
@@ -12,6 +13,7 @@ from .pcsaft import (
 __all__ = [
     "ActivityParameters",
     "NRTLParameters",
+    "PCSAFTAssociationRecord",
     "PCSAFTParameterError",
     "PCSAFTParameters",
     "PCSAFTRecord",

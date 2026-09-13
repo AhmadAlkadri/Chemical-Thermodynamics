@@ -22,6 +22,7 @@ from .models import NRTL, ActivityModel, EquationOfState, PengRobinsonEOS
 from .parameters import (
     ActivityParameters,
     NRTLParameters,
+    PCSAFTAssociationRecord,
     PCSAFTParameterError,
     PCSAFTParameters,
     PCSAFTRecord,
@@ -54,6 +55,7 @@ __all__ = [
     "STANDARD_P_PA",
     "validate_fractions",
     "Composition",
+    "PCSAFTAssociationRecord",
     "PCSAFTParameterError",
     "PCSAFTParameters",
     "PCSAFTRecord",

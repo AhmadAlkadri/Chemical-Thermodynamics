@@ -166,6 +166,8 @@ from typing import NamedTuple, Sequence
 import numpy as np
 
 from ..exceptions import ModelError
+from ..parameters.pcsaft import PCSAFTAssociationRecord
+from ._pcsaft_association import AssociationIsotherm, build_setup
 
 #: Exact SI definitions, mirrored from :mod:`chemthermo.eos.pcsaft` (importing
 #: them from there would be circular: that module imports this one).
@@ -241,6 +243,7 @@ class PCSAFTIsotherm:
         sigma_A: np.ndarray,
         epsilon_k_K: np.ndarray,
         kij: np.ndarray,
+        association: Sequence[PCSAFTAssociationRecord | None] | None = None,
     ) -> None:
         self.temperature = float(temperature_K)
         x = np.asarray(composition, dtype=float)
@@ -282,6 +285,22 @@ class PCSAFTIsotherm:
         ratio_2 = ratio_1 * (self._mbar - 2.0) / self._mbar
         self._a_bar = A_UNIVERSAL[0] + ratio_1 * A_UNIVERSAL[1] + ratio_2 * A_UNIVERSAL[2]
         self._b_bar = B_UNIVERSAL[0] + ratio_1 * B_UNIVERSAL[1] + ratio_2 * B_UNIVERSAL[2]
+
+        # Association (ADR-0018), in the same single variable. ``None`` unless
+        # some component carries sites, and then no association code runs at
+        # all - which is what keeps the ADR-0014/ADR-0015 numbers bit-identical.
+        setup = (
+            None
+            if association is None
+            else build_setup(
+                temperature_K=self.temperature, sigma_A=sigma_A, d=d, association=association
+            )
+        )
+        self.association: AssociationIsotherm | None = (
+            None
+            if setup is None
+            else AssociationIsotherm(setup, x=x, ratio_2=float(ratios[2]), m3=m3)
+        )
 
     # -- the model in one variable -----------------------------------------
 
@@ -339,6 +358,10 @@ class PCSAFTIsotherm:
         a1 = a_hc1 + (f + eta * f1) / self._m3
 
         if not second:
+            if self.association is not None:
+                a_assoc, a1_assoc, _ = self.association.derivatives(eta, second=False)
+                a = a + a_assoc
+                a1 = a1 + a1_assoc
             return _EtaDerivatives(a=a, a1=a1, a2=np.zeros_like(a1))
 
         a_hs2 = (
@@ -372,6 +395,11 @@ class PCSAFTIsotherm:
             - math.pi * mbar * (c1_2 * i2 + 2.0 * c1_1 * i2_1 + c1 * i2_2) * self._m2e2s3
         )
         a2 = a_hc2 + (2.0 * f1 + eta * f2) / self._m3
+        if self.association is not None:
+            a_assoc, a1_assoc, a2_assoc = self.association.derivatives(eta, second=True)
+            a = a + a_assoc
+            a1 = a1 + a1_assoc
+            a2 = a2 + a2_assoc
         return _EtaDerivatives(a=a, a1=a1, a2=a2)
 
     def pressure(self, eta: np.ndarray) -> np.ndarray:
@@ -544,6 +572,7 @@ def build_isotherm(
     sigma_A: np.ndarray,
     epsilon_k_K: np.ndarray,
     kij: np.ndarray,
+    association: Sequence[PCSAFTAssociationRecord | None] | None = None,
 ) -> PCSAFTIsotherm:
     """Build a :class:`PCSAFTIsotherm` from already-validated inputs."""
     return PCSAFTIsotherm(
@@ -553,4 +582,5 @@ def build_isotherm(
         sigma_A=sigma_A,
         epsilon_k_K=epsilon_k_K,
         kij=kij,
+        association=association,
     )
