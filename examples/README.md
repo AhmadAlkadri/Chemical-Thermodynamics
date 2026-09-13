@@ -14,6 +14,9 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
   - Pure-component TP flash with Peng-Robinson EOS.
 - `examples/basic/tp_flash_pr_mixture.py`
   - Mixture TP flash with Peng-Robinson EOS.
+- `examples/basic/tp_flash_pr_kij_demo.py`
+  - Mixture TP flash with a per-pair `kij` mapping (`PengRobinsonEOS(kij={...})`),
+    contrasted with the default `kij=0.0` result on the same feed.
 - `examples/basic/tp_flash_nrtl_vle.py`
   - Gamma-phi TP flash with NRTL (liquid) + Peng-Robinson (vapor).
 - `examples/basic/flash_tp_peng_robinson_demo.py`

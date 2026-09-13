@@ -140,3 +140,77 @@ Rules:
 - **Follow-up:** if the original Hoteit and Firoozabadi (2006) or Nichita et al.
   tables become available, add the case here with the exact table values and the
   achieved tolerance.
+
+---
+
+## Case K-1: Per-pair `kij` cross-check against `thermo` 0.6.0 PRMIX
+
+- **Source:** Caleb Bell, `thermo` 0.6.0 (open source). `thermo.PRMIX` /
+  `CEOSGas` / `CEOSLiquid` / `FlashVL` / `FlashVL.stability_test_Michelsen`.
+- **Location:** `tests/validation/test_pr_kij_vs_thermo.py`.
+- **Assumptions:** The `thermo` PRMIX mixture is built from EXACTLY the Tc,
+  Pc, omega values carried by chemthermo's `Component` objects (not thermo's
+  own databank), with the SAME nonzero kij matrix passed to both codes, so
+  the comparison isolates the `pr-kij-matrix` mixing-rule fix rather than
+  component-data or kij-value differences.
+- **Components / units:** SI (K, Pa), mole fractions.
+  - Binary: Methane / n-Decane, kij(Methane, n-Decane) = 0.0411. States
+    (320 K, 2.0 MPa) and (380 K, 4.0 MPa); compositions
+    (0.3, 0.7) / (0.5, 0.5) / (0.7, 0.3); both vapor and liquid roots.
+  - Three-component (synthetic matrix, exercises the general n x n path):
+    Methane / Ethane / n-Decane with kij(Methane, Ethane) = -0.0026,
+    kij(Methane, n-Decane) = 0.0411, kij(Ethane, n-Decane) = 0.0170. Same two
+    states; compositions (0.5, 0.3, 0.2) / (0.3, 0.3, 0.4) / (0.2, 0.5, 0.3).
+  - End-to-end: Methane / n-Decane, z = 0.5 / 0.5, kij = 0.0411,
+    T = 350 K, P = 3.0 MPa (independently confirmed two-phase on both sides).
+- **Parameters and provenance:** Tc, Pc, omega from
+  `src/chemthermo/data/components.json` (Koretsky 2012), passed verbatim to
+  `thermo`. The kij value 0.0411 for Methane/n-Decane is an **illustrative,
+  literature-order-of-magnitude value for a light-heavy alkane pair, not
+  sourced from a specific publication read in this session** -- it must not
+  be read as a validated physical parameter. The 3x3 matrix's other two
+  entries are entirely synthetic (chosen only to give three distinct
+  off-diagonal values and exercise the matrix-building code); they carry no
+  physical claim at all.
+- **Expected outcome:** ln(phi) and Z agree with `thermo` up to the known
+  rounded-PR-constants gap (see below); `flash_tp` and `stability_tp` verdicts
+  and quantities agree with `thermo`'s `FlashVL` / `stability_test_Michelsen`
+  using the same kij.
+- **Tolerance:** asserted max \|d ln phi\| <= 1e-3, max \|dZ\| <= 2e-4 (phi/Z
+  cross-checks); asserted \|d beta\| <= 5e-4, max \|dx\|/\|dy\| <= 2e-3
+  (end-to-end flash). Achieved:
+  - Binary (2 states x 3 compositions x 2 roots): max \|d ln phi\| = 5.783e-4,
+    max \|dZ\| = 6.468e-5.
+  - Three-component: max \|d ln phi\| = 5.823e-4, max \|dZ\| = 1.833e-5.
+  - Pure-component limit within a kij != 0 binary (y = [1, 0]):
+    \|d ln phi\| well under 1e-3 -- this is exactly the check the pre-fix
+    diagonal bug would have failed (see "Known residual difference" below).
+  - End-to-end flash (T=350 K, P=3.0 MPa): \|d beta\| = 2.94e-6,
+    max \|dx\| = 5.27e-6, max \|dy\| = 8.32e-7.
+  - End-to-end stability: verdict "unstable" on both sides (matches).
+- **Known residual difference (explains the phi/Z gap):** as in Case S-4,
+  chemthermo uses the rounded Peng-Robinson constants 0.45724 / 0.07780,
+  while `thermo` uses the exact roots 0.4572355289213822 / 0.0777960739038885.
+  This is an EOS-implementation difference, not a kij-handling difference,
+  and ADR-0006 keeps the rounded constants unchanged.
+- **Pre-fix vs post-fix evidence (not asserted in a persisted test; measured
+  during development and reported alongside this slice):** at T=350 K,
+  P=2.0 MPa, Methane/n-Decane z=0.5/0.5, kij=0.0411, the pre-fix formula
+  (`aij = sqrt(outer(a_i,a_i)) * (1 - kij)` applied to the diagonal too) gave
+  max \|d ln phi\| = 0.365 against `thermo` (single-real-root state, vapor and
+  liquid branches identical); the post-fix formula gives max
+  \|d ln phi\| = 3.40e-4 at the same state -- roughly a 1000x reduction,
+  and the remainder is explained entirely by the rounded-constants gap above.
+- **Permutation invariance:** a positional-matrix alternative was rejected in
+  ADR-0006 partly because it would not be permutation-invariant. Verified
+  directly (no `thermo` dependency, since `thermo`'s own CEOSLiquid root
+  solver was observed to be numerically order-sensitive at some
+  near-critical-locus states tried during development, which is a property of
+  the reference solver, not of chemthermo):
+  `tests/test_pr_eos.py::test_pr_eos_kij_permutation_invariance` and
+  `tests/validation/test_pr_kij_vs_thermo.py::test_pr_eos_kij_permutation_invariance_with_matrix_kij`.
+- **Independent route:** external reference implementation.
+- **Test path:** `tests/validation/test_pr_kij_vs_thermo.py`;
+  regression/unit coverage in `tests/test_pr_eos.py`.
+- **Script:** `examples/basic/tp_flash_pr_kij_demo.py` (golden path; contrasts
+  kij=0.0 against the mapping form on the same feed, no `thermo` dependency).

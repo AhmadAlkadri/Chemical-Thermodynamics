@@ -1,6 +1,14 @@
 # Steering Brief
 
 ## What changed since last brief (files + bullets)
+- `src/chemthermo/models/peng_robinson.py`
+  - Fixed the diagonal-kij bug: `aij`'s diagonal is now always unaffected by `kij` (pure-component `a_ii` never corrupted). Added per-pair `kij` support (`float` or `Mapping[tuple[str, str], float]` keyed by normalized component names, canonicalized to a sorted tuple in `__post_init__`), plus two private helpers (`_kij_matrix`, `_mixture_parameters`) so `fugacity_coefficients`/`compressibility_factor` no longer duplicate the mixing-rule code. Public method signatures unchanged; `kij=0.0` (default) is bit-identical to before.
+- `tests/test_pr_eos.py`, `tests/validation/test_pr_kij_vs_thermo.py`
+  - Unit coverage (pure-component invariance, diagonal-not-corrupted, scalar-vs-mapping equivalence, name normalization/symmetry, conflicting/identical-pair `ModelError`, unknown-pair no-op, permutation invariance, flash regression unchanged) and a `thermo` 0.6.0 PRMIX cross-check (binary + synthetic 3-component kij matrix, pure-component limit, end-to-end `flash_tp`/`stability_tp` vs `FlashVL`/`stability_test_Michelsen`).
+- `examples/basic/tp_flash_pr_kij_demo.py`, `examples/README.md`, `README.md`
+  - Golden path contrasting `kij=0.0` against a per-pair mapping on the same feed; README "Binary interaction parameters (kij)" section.
+- `.agents/brain/adr/0006-pr-kij-matrix.md`, `.agents/brain/validation-cases.md`, `.agents/brain/brain.md`
+  - Recorded the per-pair kij API decision (ADR-0006) and added validation Case K-1 (pre-fix vs post-fix discrepancy against `thermo`: ~0.365 max |d ln phi| before, ~3.4e-4 after, at one representative state).
 - `pyproject.toml`, `tests/test_packaging_constraints.py`, `README.md`
   - Constrained the `bibtexparser` dependency to `>=1.4.0,<2`: a fresh (non-editable) install previously resolved `bibtexparser` 2.x, whose removed `bparser`/`customization` modules `src/chemthermo/citations.py` imports at module load time, breaking `import chemthermo` entirely; added a test that reads the specifier from `pyproject.toml` and a README "Common issues" bullet.
 - `src/chemthermo/stability/` (`__init__.py`, `tp.py`, `results.py`, `settings.py`), `src/chemthermo/__init__.py`
@@ -29,6 +37,7 @@
   - Recorded CLI API decision and updated architecture/public API status.
 
 ## Current architecture (8-12 lines)
+- `PengRobinsonEOS.kij` is a scalar (off-diagonal only) or a name-keyed per-pair `Mapping`; `flash_tp` and `stability_tp` results for nonzero kij are now trustworthy (ADR-0006).
 - Phase stability (`chemthermo.stability`) is a solver-independent sibling of `chemthermo.flash`; `flash_tp` does NOT consume it yet.
 - Canonical runtime DB path is `src/chemthermo/data/components.json`.
 - Runtime DB loading is package-resource based via `chemthermo.data` helpers.
@@ -43,6 +52,7 @@
 ## Public API status (stable vs experimental)
 - Stable:
   - `chemthermo` Python exports in `src/chemthermo/__init__.py`, including `stability_tp` / `StabilityResult` / `StabilitySettings` / `StabilityTrial` (ADR-0005).
+  - `PengRobinsonEOS(kij=...)` scalar-or-mapping constructor contract (ADR-0006).
   - `chemthermo.eos` and `chemthermo.vlle` documented public subpackages.
   - CLI script `chemthermo` with `tp-flash` subcommand and defined exit-code contract.
 - Experimental/placeholder:
@@ -51,17 +61,18 @@
 
 ## Risks / unknowns
 - `stability_tp` reporting "stable" is bounded by its deterministic trial set; it is not a global proof, and the docs must keep saying so.
-- `PengRobinsonEOS.kij` is a scalar applied to the diagonal of `aij` as well, which is wrong; only `kij = 0.0` is validated today. Fix in the `pr-kij-matrix` slice.
-- chemthermo uses the rounded PR constants 0.45724 / 0.07780 while `thermo` uses the exact roots; this bounds external agreement at ~2e-4 in ln(phi).
+- chemthermo uses the rounded PR constants 0.45724 / 0.07780 while `thermo` uses the exact roots; this bounds external agreement at a few times 1e-4 in ln(phi) (was ~2e-4 at the stability states, ~4-6e-4 at some nonzero-kij states -- see Case K-1).
+- The illustrative kij value used in docs/examples/tests (0.0411, Methane/n-Decane) is explicitly NOT a validated literature parameter -- do not let it drift into being read as one.
+- `thermo`'s own `CEOSLiquid`/`CEOSGas` root solver was observed to be numerically order-sensitive (not permutation-invariant) at some near-critical-locus states during `pr-kij-matrix` development; avoid cross-checking permutation invariance against `thermo` at such states (use chemthermo-internal invariance checks instead, as `tests/validation/test_pr_kij_vs_thermo.py` now does).
 - CLI JSON contract must remain backward-compatible or version-bumped.
 - DB builder currently assumes raw table column conventions stay unchanged.
 - Optional validation still depends on external `thermo` package availability.
 - (Removed) Unpinned `bibtexparser>=1.4.0` allowed a fresh/non-editable install to resolve `bibtexparser` 2.x, whose removed `bparser`/`customization` modules broke `import chemthermo`; this was invisible locally because the dev venv already had 1.4.4 installed. Now pinned to `>=1.4.0,<2` and covered by `tests/test_packaging_constraints.py`.
 
 ## Next 3 recommended actions
-- `pr-kij-matrix`: fix the diagonal-kij bug and accept a per-pair kij matrix.
 - `stability-tpd-nrtl`: activity-model (liquid-liquid) tangent-plane stability.
 - `flash-auto-phase-detection`: let `flash_tp` consume `stability_tp` instead of the K-bound heuristic.
+- (not yet scoped): define after `flash-auto-phase-detection` lands.
 
 ## One simplification / deletion candidate
 - Remove or archive deprecated `database/components.json` once all docs/tooling users are migrated.
@@ -72,6 +83,8 @@
 - CLI v1 scope remains TP flash with Peng-Robinson EOS and `--flash-mode {phi-phi,gamma-phi}`.
 
 ## How to validate quickly
+- `python examples/basic/tp_flash_pr_kij_demo.py`
+- `python -m pytest tests/validation/test_pr_kij_vs_thermo.py -q` (with `pip install -e ".[validation]"`)
 - `python examples/basic/stability_tp_peng_robinson_demo.py`
 - `python examples/validation/06_stability_vs_thermo.py` (with `pip install -e ".[validation]"`)
 - `python tools/build_database.py --check`
