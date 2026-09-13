@@ -34,6 +34,19 @@ class StabilityTrial:
             ``"liquid"`` / ``"vapor"`` for the modified-Raoult candidate pair
             (``vapor="ideal"``). None for a single-candidate evaluator (an
             activity-coefficient model on its own) or if unavailable.
+        surface: Label of the phase candidate this trial *iterated on*, held
+            fixed for every successive-substitution and Newton step (ADR-0012).
+            None when the trial re-selected the lowest-Gibbs candidate at every
+            iterate, which is every trial of an equation of state and of an
+            activity-coefficient model on its own. It normally equals
+            ``phase_branch``; a difference means the trial converged to a
+            stationary point of its own surface at a composition where the
+            *other* candidate has the lower Gibbs energy, and ``tpd`` is then
+            the (smaller) lowest-Gibbs value, not the surface's own.
+        surface_fallback: True when ``surface`` was named but the candidate was
+            not evaluable at some iterate and the lowest-Gibbs candidate had to
+            be used there instead. Always False for the modified-Raoult pair,
+            whose two candidates are both evaluable at every composition.
         composition: Normalized trial composition ``w`` at the final point.
         termination_reason: Short machine-readable reason string.
         ssi_iterations: Successive-substitution iterations performed.
@@ -57,6 +70,8 @@ class StabilityTrial:
     ssi_iterations: int = 0
     second_order_iterations: int = 0
     converged_stage: str | None = None
+    surface: str | None = None
+    surface_fallback: bool = False
 
     def __post_init__(self) -> None:
         if not self.label.strip():
@@ -94,7 +109,12 @@ class StabilityResult:
             modified-Raoult pair. None for an activity-coefficient model on its
             own (there is a single candidate, so no selection is performed).
         trials: Per-trial records in deterministic order.
-        diagnostics: Diagnostic metadata (implementation detail keys).
+        diagnostics: Diagnostic metadata (implementation detail keys). When any
+            trial was pinned to a phase-candidate surface (ADR-0012),
+            ``trial_surfaces`` holds the per-surface trial counts as a
+            deterministic ``"<label>:<count>"`` string in order of first
+            appearance, and ``minimizing_trial_surface`` names the surface the
+            minimizing trial ran on.
 
     Honesty note:
         ``stable`` means "no negative tangent-plane distance was found from the

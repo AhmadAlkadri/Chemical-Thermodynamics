@@ -137,6 +137,32 @@ liquid-liquid stability, and later robustness work (for example Li and
 Firoozabadi, AIChE J. 58 (2012) 2244-2258) reaches the same conclusion. Every
 trial set is deterministic; there are no randomized or adaptive restarts.
 
+Trial surfaces (ADR-0012)
+-------------------------
+An initial estimate may also name the phase *candidate* its trial belongs to,
+and the iteration then uses that candidate's terms at every step instead of
+re-selecting the lowest-Gibbs one. For a cubic equation of state no estimate
+names a surface: a compressibility root that does not exist at some composition
+is the same model failing to be evaluable there, and minimum-Gibbs root
+selection at every iterate is the established practice (ADR-0005). The
+modified-Raoult pair is different in kind - the activity liquid and the ideal
+gas are two *different* models, both evaluable everywhere - so re-selecting
+between them inside an iteration makes the successive-substitution map
+discontinuous where the surfaces cross, and a vapor-like trial can be dragged
+onto the liquid surface and collapse to the trivial solution even though a
+vapor stationary point with ``tpd < 0`` exists. Each modified-Raoult trial is
+therefore pinned to one surface.
+
+Two things are still reported off the pinned surface:
+
+- the stationarity residual (5) is measured on the trial's own surface, because
+  that is the equation the trial is solving, and
+- the tangent-plane distance (2) is evaluated with the **lowest-Gibbs**
+  candidate at the converged composition, because the distance from the Gibbs
+  surface to the tangent plane is by definition the minimum over candidates. A
+  trial records both: ``surface`` is what it iterated on, ``phase_branch`` is
+  the lowest-Gibbs candidate where it stopped. They normally agree.
+
 Two-stage solution
 ------------------
 Stage 1 is successive substitution on equation (5),
@@ -333,11 +359,12 @@ def stability_tp(
     d[active] = np.log(z[active]) + ln_f_feed[active]
 
     trials: list[StabilityTrial] = []
-    for label, w0 in evaluator.initial_estimates(z, active):
+    for estimate in evaluator.initial_estimates(z, active):
         trials.append(
             _run_trial(
-                label=label,
-                w0=w0,
+                label=estimate.label,
+                w0=estimate.composition,
+                surface=estimate.surface,
                 z=z,
                 d=d,
                 active=active,
@@ -358,10 +385,46 @@ def stability_tp(
     )
 
 
+def _terms(
+    evaluator: _TangentPlaneEvaluator, w: np.ndarray, surface: str | None
+) -> tuple[np.ndarray, str | None, bool]:
+    """Terms used *inside* a trial iteration: the trial's surface, or min-Gibbs.
+
+    ``surface is None`` reproduces the pre-ADR-0012 call exactly, so evaluators
+    that name no surface run bit-identically to before.
+    """
+    if surface is None:
+        terms, branch = evaluator.ln_fugacity_terms(w)
+        return terms, branch, False
+    return evaluator.ln_terms_on_surface(w, surface)
+
+
+def _reported_terms(
+    evaluator: _TangentPlaneEvaluator,
+    w: np.ndarray,
+    surface: str | None,
+    surface_terms: np.ndarray,
+    surface_branch: str | None,
+) -> tuple[np.ndarray, str | None]:
+    """Terms used to *report* a converged trial: always the lowest-Gibbs ones.
+
+    The tangent-plane distance is the distance from the Gibbs surface, which is
+    the lower envelope of the candidates, so it is evaluated with the
+    minimum-Gibbs candidate at the converged composition even when the trial
+    iterated on a pinned surface. For ``surface is None`` the terms already in
+    hand *are* the minimum-Gibbs ones and are reused, which keeps those families
+    bit-identical and spares a model call.
+    """
+    if surface is None:
+        return surface_terms, surface_branch
+    return evaluator.ln_fugacity_terms(w)
+
+
 def _run_trial(
     *,
     label: str,
     w0: np.ndarray,
+    surface: str | None,
     z: np.ndarray,
     d: np.ndarray,
     active: np.ndarray,
@@ -375,6 +438,7 @@ def _run_trial(
     residual = math.inf
     sum_w_capital = 1.0
     iterations = 0
+    fell_back = False
 
     ssi_budget = (
         min(settings.ssi_iterations, settings.max_iter)
@@ -385,13 +449,18 @@ def _run_trial(
     for iteration in range(1, ssi_budget + 1):
         iterations = iteration
         try:
-            ln_f, branch = evaluator.ln_fugacity_terms(w)
+            ln_f, branch, stepped_back = _terms(evaluator, w, surface)
         except ModelError as exc:
-            return _failed_trial(label, iterations, f"model_error: {exc}")
+            return _failed_trial(label, iterations, f"model_error: {exc}", surface)
+        fell_back = fell_back or stepped_back
 
         residual = float(np.max(np.abs(ln_w_capital[active] + ln_f[active] - d[active])))
         if residual < settings.tol:
-            tpd = _tpd(w, ln_f, d, active)
+            try:
+                report_f, branch = _reported_terms(evaluator, w, surface, ln_f, branch)
+            except ModelError as exc:
+                return _failed_trial(label, iterations, f"model_error: {exc}", surface)
+            tpd = _tpd(w, report_f, d, active)
             return StabilityTrial(
                 label=label,
                 converged=True,
@@ -406,41 +475,47 @@ def _run_trial(
                 ssi_iterations=iterations,
                 second_order_iterations=0,
                 converged_stage="successive-substitution",
+                surface=surface,
+                surface_fallback=fell_back,
             )
 
         # Equation (8): ln W_i <- d_i - ln phi_i(w).
         ln_w_new = np.full(z.shape, -np.inf, dtype=float)
         ln_w_new[active] = np.clip(d[active] - ln_f[active], _LN_W_MIN, _LN_W_MAX)
         if np.any(~np.isfinite(ln_w_new[active])):
-            return _failed_trial(label, iterations, "non_finite_ln_W")
+            return _failed_trial(label, iterations, "non_finite_ln_W", surface)
 
         w_capital = np.where(active, np.exp(np.where(active, ln_w_new, 0.0)), 0.0)
         sum_w_capital = float(np.sum(w_capital))
         if not math.isfinite(sum_w_capital) or sum_w_capital <= 0.0:
-            return _failed_trial(label, iterations, "degenerate_sum_W")
+            return _failed_trial(label, iterations, "degenerate_sum_W", surface)
 
         ln_w_capital = ln_w_new
         w = w_capital / sum_w_capital
 
         if _is_trivial(ln_w_capital, z, active, settings.trivial_tol):
             try:
-                ln_f, branch = evaluator.ln_fugacity_terms(w)
+                ln_f, branch, stepped_back = _terms(evaluator, w, surface)
+                report_f, report_branch = _reported_terms(evaluator, w, surface, ln_f, branch)
             except ModelError as exc:
-                return _failed_trial(label, iterations, f"model_error: {exc}")
+                return _failed_trial(label, iterations, f"model_error: {exc}", surface)
+            fell_back = fell_back or stepped_back
             return StabilityTrial(
                 label=label,
                 converged=True,
                 iterations=iterations,
-                tpd=_tpd(w, ln_f, d, active),
+                tpd=_tpd(w, report_f, d, active),
                 sum_W=sum_w_capital,
                 trivial=True,
                 residual=float(np.max(np.abs(ln_w_capital[active] + ln_f[active] - d[active]))),
-                phase_branch=branch,
+                phase_branch=report_branch,
                 composition=tuple(w.tolist()),
                 termination_reason="trivial_solution",
                 ssi_iterations=iterations,
                 second_order_iterations=0,
                 converged_stage="successive-substitution",
+                surface=surface,
+                surface_fallback=fell_back,
             )
 
     if not settings.second_order:
@@ -458,10 +533,14 @@ def _run_trial(
             ssi_iterations=iterations,
             second_order_iterations=0,
             converged_stage=None,
+            surface=surface,
+            surface_fallback=fell_back,
         )
 
     return _second_order_stage(
         label=label,
+        surface=surface,
+        surface_fallback=fell_back,
         ln_w_capital=ln_w_capital,
         z=z,
         d=d,
@@ -475,6 +554,8 @@ def _run_trial(
 def _second_order_stage(
     *,
     label: str,
+    surface: str | None,
+    surface_fallback: bool,
     ln_w_capital: np.ndarray,
     z: np.ndarray,
     d: np.ndarray,
@@ -498,8 +579,10 @@ def _second_order_stage(
     """
     index = np.flatnonzero(active)
     d_active = d[index]
+    fell_back = surface_fallback
 
     def evaluate(u: np.ndarray) -> tuple[np.ndarray, np.ndarray, str | None]:
+        nonlocal fell_back
         ln_w_full = np.full(z.shape, -np.inf, dtype=float)
         ln_w_full[index] = u
         w_capital = np.zeros(z.shape, dtype=float)
@@ -508,7 +591,8 @@ def _second_order_stage(
         if not math.isfinite(total) or total <= 0.0:
             raise ModelError("Second-order stage produced a degenerate sum of mole numbers.")
         w_local = w_capital / total
-        terms, branch_local = evaluator.ln_fugacity_terms(w_local)
+        terms, branch_local, stepped_back = _terms(evaluator, w_local, surface)
+        fell_back = fell_back or stepped_back
         return u + terms[index] - d_active, w_local, branch_local
 
     u = ln_w_capital[index].copy()
@@ -518,7 +602,7 @@ def _second_order_stage(
     try:
         g, w, branch = evaluate(u)
     except ModelError as exc:
-        return _failed_trial(label, ssi_iterations, f"model_error: {exc}")
+        return _failed_trial(label, ssi_iterations, f"model_error: {exc}", surface)
     residual = float(np.max(np.abs(g)))
 
     for iteration in range(1, settings.second_order_max_iter + 1):
@@ -538,7 +622,7 @@ def _second_order_stage(
                 g_minus, _, _ = evaluate(minus)
                 jacobian[:, column] = (g_plus - g_minus) / (2.0 * _JACOBIAN_STEP)
         except ModelError as exc:
-            return _failed_trial(label, ssi_iterations + iterations, f"model_error: {exc}")
+            return _failed_trial(label, ssi_iterations + iterations, f"model_error: {exc}", surface)
 
         try:
             step = np.linalg.solve(jacobian, -g)
@@ -589,9 +673,11 @@ def _second_order_stage(
     trivial = converged and _is_trivial(ln_w_capital_final, z, active, settings.trivial_tol)
 
     try:
-        ln_f, branch = evaluator.ln_fugacity_terms(w)
+        ln_f, branch, stepped_back = _terms(evaluator, w, surface)
+        ln_f, branch = _reported_terms(evaluator, w, surface, ln_f, branch)
     except ModelError as exc:
-        return _failed_trial(label, ssi_iterations + iterations, f"model_error: {exc}")
+        return _failed_trial(label, ssi_iterations + iterations, f"model_error: {exc}", surface)
+    fell_back = fell_back or stepped_back
 
     return StabilityTrial(
         label=label,
@@ -607,10 +693,14 @@ def _second_order_stage(
         ssi_iterations=ssi_iterations,
         second_order_iterations=iterations,
         converged_stage="second-order" if converged else None,
+        surface=surface,
+        surface_fallback=fell_back,
     )
 
 
-def _failed_trial(label: str, iterations: int, reason: str) -> StabilityTrial:
+def _failed_trial(
+    label: str, iterations: int, reason: str, surface: str | None = None
+) -> StabilityTrial:
     return StabilityTrial(
         label=label,
         converged=False,
@@ -625,6 +715,7 @@ def _failed_trial(label: str, iterations: int, reason: str) -> StabilityTrial:
         ssi_iterations=iterations,
         second_order_iterations=0,
         converged_stage=None,
+        surface=surface,
     )
 
 
@@ -702,10 +793,25 @@ def _summarize(
         "second_order_trial_count": sum(1 for trial in trials if trial.second_order_iterations > 0),
         **evaluator.diagnostics,
     }
+
+    surface_counts: dict[str, int] = {}
+    for trial in trials:
+        if trial.surface is not None:
+            surface_counts[trial.surface] = surface_counts.get(trial.surface, 0) + 1
+    if surface_counts:
+        # Deterministic: insertion order is the deterministic trial order.
+        diagnostics["trial_surfaces"] = ",".join(
+            f"{name}:{count}" for name, count in surface_counts.items()
+        )
+        diagnostics["surface_fallback_trial_count"] = sum(
+            1 for trial in trials if trial.surface_fallback
+        )
     if feed_branch is not None:
         diagnostics["feed_branch"] = feed_branch
     if best is not None:
         diagnostics["minimizing_trial"] = best.label
+        if best.surface is not None:
+            diagnostics["minimizing_trial_surface"] = best.surface
         diagnostics["minimizing_trial_iterations"] = best.iterations
         diagnostics["minimizing_trial_ssi_iterations"] = best.ssi_iterations
         diagnostics["minimizing_trial_second_order_iterations"] = best.second_order_iterations

@@ -18,7 +18,8 @@ two things differ:
 Those two differences are the whole contract:
 
     ln_fugacity_terms(w) -> (ndarray, str | None)
-    initial_estimates(z, active) -> list[(label, w0)]
+    ln_terms_on_surface(w, surface) -> (ndarray, str | None, bool)
+    initial_estimates(z, active) -> list[_InitialEstimate]
 
 The solver in :mod:`chemthermo.stability.tp` sees nothing else, so it does not
 know which model family it is serving.
@@ -57,6 +58,28 @@ liquid or a vapor.
 The one-candidate case reports ``None`` as its label: there was no choice to
 make, so there is nothing to report.
 
+Trial surfaces (ADR-0012)
+-------------------------
+Re-selecting the lowest-Gibbs candidate *inside* a trial iteration is right for
+the cubic roots and wrong for the heterogeneous modified-Raoult pair, so an
+initial estimate may name the candidate its trial belongs to:
+
+    initial_estimates(z, active) -> list[_InitialEstimate(label, w0, surface)]
+
+``surface`` is None for the EOS and activity-only evaluators, which keeps their
+iteration exactly the min-Gibbs one they have always used. When it is a
+candidate label the solver calls :meth:`ln_terms_on_surface` at every iteration
+instead, so the trial walks one fixed Gibbs surface. ADR-0012 gives the reason:
+a missing cubic root is the *same* model failing to exist at that composition,
+whereas the liquid and the ideal vapor are two different models whose surfaces
+both exist everywhere, so swapping between them mid-iteration makes the
+successive-substitution map discontinuous and non-monotone.
+
+The tangent-plane distance *reported* for a trial is always the min-Gibbs one
+at the converged composition: the true distance to the tangent plane is the
+minimum over candidates, and a trial that iterated on the vapor surface must
+not claim a vapor distance if the liquid lies lower there.
+
 A future PC-SAFT model (several density roots) or a user-supplied Gibbs-energy
 phase model would enter as further candidates behind the same two methods,
 without a solver change.
@@ -65,7 +88,7 @@ without a solver change.
 from __future__ import annotations
 
 import math
-from typing import Mapping, Protocol, Sequence
+from typing import Mapping, NamedTuple, Protocol, Sequence
 
 import numpy as np
 
@@ -82,6 +105,24 @@ _PURE_TRIAL_TRACE = 1e-3
 #: Candidate labels used by the modified-Raoult pair and by the cubic roots.
 _LIQUID = "liquid"
 _VAPOR = "vapor"
+
+
+class _InitialEstimate(NamedTuple):
+    """One deterministic trial-phase start.
+
+    Attributes:
+        label: Deterministic identifier of the estimate, reported as
+            ``StabilityTrial.label``.
+        composition: Normalized initial trial composition ``w0``.
+        surface: Label of the phase candidate the trial is pinned to, or None
+            to iterate on the lowest-Gibbs candidate re-selected at every
+            iterate (the pre-ADR-0012 behavior, kept for the EOS and
+            activity-only families).
+    """
+
+    label: str
+    composition: np.ndarray
+    surface: str | None = None
 
 
 class _PhaseCandidate(Protocol):
@@ -145,8 +186,28 @@ class _TangentPlaneEvaluator(Protocol):
         """
         ...
 
-    def initial_estimates(self, z: np.ndarray, active: np.ndarray) -> list[tuple[str, np.ndarray]]:
-        """Return deterministic ``(label, w0)`` trial-phase initial estimates."""
+    def ln_terms_on_surface(
+        self, composition: np.ndarray, surface: str
+    ) -> tuple[np.ndarray, str | None, bool]:
+        """Return the terms of the *named* candidate at ``w`` (ADR-0012).
+
+        Args:
+            composition: Normalized mole fractions ``w``.
+            surface: Label of the candidate to evaluate.
+
+        Returns:
+            ``(terms, label, fell_back)``. ``fell_back`` is True when the named
+            candidate was optional and unavailable at ``w``, in which case the
+            lowest-Gibbs candidate was used instead and ``label`` names it.
+
+        Raises:
+            ModelError: If the named candidate is unknown, or if it is
+                mandatory and unusable at ``w``, or if no candidate is usable.
+        """
+        ...
+
+    def initial_estimates(self, z: np.ndarray, active: np.ndarray) -> list[_InitialEstimate]:
+        """Return deterministic trial-phase initial estimates."""
         ...
 
 
@@ -303,6 +364,51 @@ def _select_min_gibbs(
     return best_terms, best_label
 
 
+def _select_surface(
+    candidates: Sequence[_PhaseCandidate],
+    composition: np.ndarray,
+    surface: str,
+    *,
+    failure_message: str,
+) -> tuple[np.ndarray, str, bool]:
+    """Return the terms of the candidate labelled ``surface`` at ``composition``.
+
+    A trial pinned to one candidate iterates on that candidate's Gibbs surface
+    (ADR-0012). Two things can still go wrong and they are treated differently:
+
+    - the label is not one this evaluator holds. That is a programming error in
+      the evaluator's own trial set, so it raises rather than guessing;
+    - the candidate is ``optional`` and not evaluable at ``composition`` (an
+      absent compressibility root). Then there is no surface to walk, and the
+      only defined thing left is the lowest-Gibbs candidate; the caller is told
+      through the returned flag so the fallback is recorded rather than hidden.
+
+    A *mandatory* candidate that fails re-raises, exactly as in
+    :func:`_select_min_gibbs`.
+    """
+    for candidate in candidates:
+        if candidate.label != surface:
+            continue
+        try:
+            terms = candidate.ln_fugacity_terms(composition)
+        except ModelError:
+            if not candidate.optional:
+                raise
+            break
+        if math.isfinite(float(np.sum(composition * terms))):
+            return terms, candidate.label, False
+        break
+    else:
+        raise ModelError(
+            f"Unknown phase-candidate surface {surface!r}; this evaluator holds "
+            + ", ".join(repr(candidate.label) for candidate in candidates)
+            + "."
+        )
+
+    terms, label = _select_min_gibbs(candidates, composition, failure_message=failure_message)
+    return terms, label, True
+
+
 # ---------------------------------------------------------------------------
 # Evaluators
 # ---------------------------------------------------------------------------
@@ -343,13 +449,33 @@ class _EOSTangentPlane:
             failure_message="No usable fugacity-coefficient branch for stability analysis",
         )
 
-    def initial_estimates(self, z: np.ndarray, active: np.ndarray) -> list[tuple[str, np.ndarray]]:
-        """Two Wilson estimates plus one pure-component-dominant estimate each."""
-        estimates: list[tuple[str, np.ndarray]] = []
+    def ln_terms_on_surface(
+        self, composition: np.ndarray, surface: str
+    ) -> tuple[np.ndarray, str | None, bool]:
+        """Terms of one named compressibility branch.
+
+        Implemented for contract completeness only: this evaluator's trial set
+        names no surface (ADR-0012 keeps minimum-Gibbs root selection at every
+        iterate for cubics), so the solver never calls it.
+        """
+        return _select_surface(
+            self._candidates,
+            composition,
+            surface,
+            failure_message="No usable fugacity-coefficient branch for stability analysis",
+        )
+
+    def initial_estimates(self, z: np.ndarray, active: np.ndarray) -> list[_InitialEstimate]:
+        """Two Wilson estimates plus one pure-component-dominant estimate each.
+
+        No estimate names a surface: a cubic's trials keep re-selecting the
+        minimum-Gibbs root at every iterate (ADR-0005, ADR-0012).
+        """
+        estimates: list[_InitialEstimate] = []
 
         k = wilson_k(self._mixture, self._temperature, self._pressure)
-        estimates.append(("wilson-vapor", _normalized(k * z, active)))
-        estimates.append(("wilson-liquid", _normalized(z / k, active)))
+        estimates.append(_InitialEstimate("wilson-vapor", _normalized(k * z, active)))
+        estimates.append(_InitialEstimate("wilson-liquid", _normalized(z / k, active)))
         estimates.extend(_pure_component_estimates(self._mixture, z, active))
         return estimates
 
@@ -385,7 +511,22 @@ class _ActivityTangentPlane:
     def ln_fugacity_terms(self, composition: np.ndarray) -> tuple[np.ndarray, str | None]:
         return self._candidate.ln_fugacity_terms(composition), None
 
-    def initial_estimates(self, z: np.ndarray, active: np.ndarray) -> list[tuple[str, np.ndarray]]:
+    def ln_terms_on_surface(
+        self, composition: np.ndarray, surface: str
+    ) -> tuple[np.ndarray, str | None, bool]:
+        """There is one candidate, so the only admissible surface is that one.
+
+        Implemented for contract completeness only: this evaluator's trial set
+        names no surface, so the solver never calls it.
+        """
+        return _select_surface(
+            (self._candidate,),
+            composition,
+            surface,
+            failure_message="No usable activity-model candidate for stability analysis",
+        )
+
+    def initial_estimates(self, z: np.ndarray, active: np.ndarray) -> list[_InitialEstimate]:
         """Pure-component-dominant estimates only.
 
         Wilson K-values are a vapor-liquid construction built from Tc, Pc and
@@ -399,7 +540,7 @@ class _ActivityTangentPlane:
         if int(np.count_nonzero(active)) <= 1:
             names = self._mixture.component_names
             index = int(np.argmax(active))
-            return [(f"pure-{names[index]}", _normalized(z, active))]
+            return [_InitialEstimate(f"pure-{names[index]}", _normalized(z, active))]
         return _pure_component_estimates(self._mixture, z, active)
 
 
@@ -452,26 +593,71 @@ class _ModifiedRaoultTangentPlane:
             failure_message="No usable phase candidate for modified-Raoult stability analysis",
         )
 
-    def initial_estimates(self, z: np.ndarray, active: np.ndarray) -> list[tuple[str, np.ndarray]]:
-        """Raoult vapor-like and liquid-like estimates plus pure-component ones.
+    def ln_terms_on_surface(
+        self, composition: np.ndarray, surface: str
+    ) -> tuple[np.ndarray, str | None, bool]:
+        return _select_surface(
+            self._candidates,
+            composition,
+            surface,
+            failure_message="No usable phase candidate for modified-Raoult stability analysis",
+        )
+
+    def initial_estimates(self, z: np.ndarray, active: np.ndarray) -> list[_InitialEstimate]:
+        """The trial set, one fixed candidate surface per trial (ADR-0012).
+
+        For ``n`` active components the set is ``n + 2`` trials:
+
+        ==================  ========  =====================================
+        label               surface   initial estimate ``W0``
+        ==================  ========  =====================================
+        ``raoult-vapor``    vapor     ``z K^Raoult``
+        ``raoult-liquid``   liquid    ``z / K^Raoult``
+        ``pure-<name>``     liquid    component ``<name>`` dominant
+        ==================  ========  =====================================
 
         ``K_i^Raoult = Psat_i / P`` is the ideal K-value of the same model with
         ``gamma = 1``, so ``W = z K^Raoult`` is a vapor-like estimate and
         ``W = z / K^Raoult`` a liquid-like one (the estimate a vapor feed needs
         in order to find its incipient liquid). The pure-component-dominant
         estimates are what finds a liquid-liquid split, exactly as for the
-        activity-only evaluator. Every estimate is then iterated on **both**
-        candidates: the lowest-Gibbs one is re-selected at each iterate.
+        activity-only evaluator.
+
+        **The vapor surface needs exactly one trial, and its starting point is
+        irrelevant.** The ideal-gas term is identically zero, so the
+        successive-substitution map (equation (8) of
+        :mod:`chemthermo.stability.tp`) on that surface is the *constant* map
+        ``ln W_i <- d_i - 0 = d_i``: one substitution lands on the vapor
+        surface's unique stationary point from any start, with an exactly zero
+        residual at the next evaluation. Adding the pure-component estimates on
+        the vapor surface would therefore add ``n`` trials that all return the
+        same point as ``raoult-vapor``. They are deliberately not run, and this
+        is why the trial count did not grow when the surfaces were fixed.
+
+        The liquid surface has no such structure - ``ln gamma`` is a genuine
+        function of ``w`` - so it keeps the liquid-like and the
+        pure-component-dominant starts.
         """
-        estimates: list[tuple[str, np.ndarray]] = []
+        estimates: list[_InitialEstimate] = []
         if int(np.count_nonzero(active)) > 1:
-            estimates.append(("raoult-vapor", _normalized(self._k_raoult * z, active)))
-            estimates.append(("raoult-liquid", _normalized(z / self._k_raoult, active)))
-            estimates.extend(_pure_component_estimates(self._mixture, z, active))
+            estimates.append(
+                _InitialEstimate("raoult-vapor", _normalized(self._k_raoult * z, active), _VAPOR)
+            )
+            estimates.append(
+                _InitialEstimate("raoult-liquid", _normalized(z / self._k_raoult, active), _LIQUID)
+            )
+            estimates.extend(_pure_component_estimates(self._mixture, z, active, surface=_LIQUID))
         else:
+            # One active component: there is no composition degree of freedom,
+            # so the feed itself is the only admissible trial and it must be
+            # evaluated on the candidate the *feed* sits on. Naming a surface
+            # here would pin the trial to the wrong one for half the feeds (a
+            # pure vapor tested on the liquid surface can never meet the
+            # stationarity condition), so this degenerate trial keeps the
+            # minimum-Gibbs selection.
             names = self._mixture.component_names
             index = int(np.argmax(active))
-            estimates.append((f"pure-{names[index]}", _normalized(z, active)))
+            estimates.append(_InitialEstimate(f"pure-{names[index]}", _normalized(z, active)))
         return estimates
 
 
@@ -544,8 +730,12 @@ def _ln_phi_min_gibbs(
 
 
 def _pure_component_estimates(
-    mixture: Mixture, z: np.ndarray, active: np.ndarray
-) -> list[tuple[str, np.ndarray]]:
+    mixture: Mixture,
+    z: np.ndarray,
+    active: np.ndarray,
+    *,
+    surface: str | None = None,
+) -> list[_InitialEstimate]:
     """One pure-component-dominant estimate per active component."""
     n_active = int(np.count_nonzero(active))
     if n_active <= 1:
@@ -553,13 +743,13 @@ def _pure_component_estimates(
 
     trace = _PURE_TRIAL_TRACE / (n_active - 1)
     names: Sequence[str] = mixture.component_names
-    estimates: list[tuple[str, np.ndarray]] = []
+    estimates: list[_InitialEstimate] = []
     for index in range(z.size):
         if not active[index]:
             continue
         w = np.where(active, trace, 0.0)
         w[index] = 1.0 - _PURE_TRIAL_TRACE
-        estimates.append((f"pure-{names[index]}", _normalized(w, active)))
+        estimates.append(_InitialEstimate(f"pure-{names[index]}", _normalized(w, active), surface))
     return estimates
 
 
