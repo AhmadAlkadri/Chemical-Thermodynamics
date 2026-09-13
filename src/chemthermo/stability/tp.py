@@ -820,7 +820,16 @@ def _summarize(
             diagnostics["minimizing_trial_stage"] = best.converged_stage
         diagnostics["sum_W"] = best.sum_W
         if best.sum_W > 0.0 and math.isfinite(best.sum_W):
-            # Equation (7); agrees with tpd at a stationary point.
+            # Equation (7), evaluated on the surface the trial iterated on. It
+            # equals `tpd_min` whenever the trial's surface is also the
+            # lowest-Gibbs candidate where it stopped - always so for a cubic
+            # or a lone activity liquid, and measured to 3.0e-12 over every
+            # *unstable* verdict of the ternary grid of validation Case V-5.
+            # Where a pinned surface's stationary point lies above the other
+            # candidate (only seen on stable verdicts, whose `tpd_min` is a
+            # positive number that decides nothing) the two differ, and
+            # `tpd_min` is the smaller, correct one: the tangent-plane distance
+            # is measured to the lower envelope of the candidates.
             diagnostics["tpd_from_sum_W"] = -math.log(best.sum_W)
             diagnostics["tm_at_stationary_point"] = 1.0 - best.sum_W
 

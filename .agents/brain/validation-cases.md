@@ -1698,6 +1698,19 @@ Rules:
   line searches, plus the NRTL equations and the Antoine form rewritten there.
 - **Test path:** `tests/validation/test_vlle_verdict_map.py`.
 - **Script:** `examples/validation/12_vlle_verdict_map.py`.
+- **Side measurement taken on the same grid (ADR-0012 diagnostics).** Over the
+  227 feeds, the minimizing stability trial is `raoult-vapor` on the vapor
+  surface for 193 of them, a `pure-<name>` trial on the liquid surface for 26,
+  and `raoult-liquid` on the liquid surface for 8. In 99 of the 193 vapor-surface
+  cases the *lowest-Gibbs* candidate at the converged point is the liquid, so
+  `surface != phase_branch` there and `tpd` is correctly taken from the liquid;
+  `|tpd_from_sum_W - tpd_min|` is then non-zero (worst 0.370) but only ever on a
+  **stable** verdict, whose `tpd_min` is a positive number that decides nothing.
+  Restricted to the unstable verdicts - the ones that seed a split - the two
+  agree to **3.0e-12**, so equation (7) still holds where it is load bearing.
+  The only unconverged trials anywhere on the grid are `pure-Water` on the
+  liquid surface: 7 with `second_order_no_progress` and 3 with
+  `second_order_max_iter`, all near the plait point, none changing a verdict.
 - **Honesty note:** this case is evidence that the phase-count verdict is right
   *on this grid, for this model*. It is not a proof of global correctness, and
   it is not a comparison against measurement.
