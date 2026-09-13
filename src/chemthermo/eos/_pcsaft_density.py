@@ -124,8 +124,19 @@ How the roots are found
    (Newton step when it stays inside the bracket and makes progress, bisection
    otherwise) on ``g(eta) = P_model(eta) - P`` with the analytic
    ``dP/deta = K dP/drho``. It stops when the bracket is at machine width or
-   the residual is below ``1e-14 P``; the returned residual is asserted below
-   ``1e-12 P`` by the tests.
+   the residual is below ``1e-14 P``.
+
+   **How small the residual can get is a property of the state, not of the
+   iteration.** On a dense liquid branch at a low pressure the pressure is a
+   near-total cancellation: at n-hexane's 300 K saturation state
+   ``Z = 1 + eta a'(eta)`` is ``1.17e-3``, so a relative error of ``1e-14`` in
+   ``a'`` is a relative error of ``1e-11`` in ``P``. The measured worst
+   ``|P_model - P|/P`` over the returned roots is therefore ``2e-14`` at
+   10 MPa but ``6.5e-12`` at 21.9 kPa on the liquid root and ``1.1e-7`` at
+   1 Pa. The *root* is unaffected - it agrees with teqp's own saturation
+   density to 2.2e-16 relative - and the density, not the residual, is what
+   the tests pin. :attr:`DensityRoots.max_relative_residual` reports the
+   number rather than hiding it.
 
 3. **Filter.** A refined root is kept only if ``dP/drho > 0``. The spinodal
    branch - the middle root, where ``dP/drho < 0`` - is discarded, never
@@ -488,13 +499,23 @@ def _refine(isotherm: PCSAFTIsotherm, low: float, high: float, target: float) ->
     otherwise the step is a bisection. The bracket therefore never widens and
     the iteration cannot leave the root, which plain Newton can do on the steep
     liquid branch.
+
+    The iterate with the smallest ``|residual|`` is what is returned, not the
+    last one. On the steep liquid branch one ``ulp`` of ``eta`` is already
+    worth a few times ``1e-12 P`` at a low target pressure, so the last two
+    iterates straddle the root with different residuals and there is no reason
+    to keep the worse one.
     """
     lo, hi = low, high
     f_lo = float(isotherm.pressure(np.array([lo]))[0]) - target
     eta = 0.5 * (lo + hi)
+    best_eta = eta
+    best_residual = math.inf
     for _ in range(_MAX_REFINE_ITERATIONS):
         value, slope = isotherm.pressure_and_slope(eta)
         residual = value - target
+        if abs(residual) < best_residual:
+            best_eta, best_residual = eta, abs(residual)
         if residual == 0.0:
             return eta
         if (f_lo < 0.0) == (residual < 0.0):
@@ -504,15 +525,15 @@ def _refine(isotherm: PCSAFTIsotherm, low: float, high: float, target: float) ->
         if abs(residual) <= _ROOT_RTOL * target:
             return eta
         width = hi - lo
-        if width <= 4.0 * np.finfo(float).eps * max(abs(eta), 1e-300):
-            return eta
+        if width <= 2.0 * np.finfo(float).eps * max(abs(eta), 1e-300):
+            break
         derivative = slope * isotherm.density_per_eta
         step = eta - residual / derivative if derivative != 0.0 else math.nan
         if math.isfinite(step) and lo < step < hi:
             eta = step
         else:
             eta = 0.5 * (lo + hi)
-    return eta
+    return best_eta
 
 
 def build_isotherm(
