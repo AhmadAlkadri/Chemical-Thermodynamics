@@ -187,6 +187,66 @@ def test_canonical_ternary_is_unstable_and_matches_the_flash_split_direction() -
     assert np.all(np.diff(flash_k) < 0.0)
 
 
+def test_canonical_ternary_numbers_are_pinned_to_the_pre_activity_slice() -> None:
+    """Bit-level regression pin for the Peng-Robinson path.
+
+    The `stability-tpd-nrtl` slice re-plumbed this solver through an internal
+    tangent-plane evaluator and added a second-order stage. Neither may move a
+    single digit of the EOS results, so the canonical 240 K / 3 MPa ternary is
+    pinned here to 1e-12 together with its per-trial iteration counts, measured
+    at commit b342540 (before that slice). The second-order stage must stay
+    dormant: every trial here finishes inside the default 50-iteration
+    successive-substitution budget.
+    """
+    mixture = _mixture(TERNARY, TERNARY_Z)
+    result = ct.stability_tp(
+        mixture, temperature_K=UNSTABLE_T_K, pressure_Pa=UNSTABLE_P_PA, eos=EOS
+    )
+
+    assert result.status == "unstable"
+    assert result.tpd_min == pytest.approx(-0.34927702066775673, abs=1e-12)
+    assert result.trial_composition is not None
+    assert np.allclose(
+        result.trial_composition,
+        (0.8806836820185336, 0.10057663206852038, 0.018739685912945978),
+        rtol=0.0,
+        atol=1e-12,
+    )
+    assert result.k_values is not None
+    assert np.allclose(
+        result.k_values,
+        (1.7613673640370673, 0.3352554402284013, 0.09369842956472989),
+        rtol=0.0,
+        atol=1e-12,
+    )
+    assert result.feed_branch == "liquid"
+    assert result.phase_branch == "vapor"
+
+    expected = {
+        "wilson-vapor": (9, False, "stationarity_met"),
+        "wilson-liquid": (17, True, "trivial_solution"),
+        "pure-Methane": (9, False, "stationarity_met"),
+        "pure-Ethane": (17, True, "trivial_solution"),
+        "pure-Propane": (17, True, "trivial_solution"),
+    }
+    assert [trial.label for trial in result.trials] == list(expected)
+    for trial in result.trials:
+        iterations, trivial, reason = expected[trial.label]
+        assert trial.converged is True
+        assert trial.iterations == iterations, trial.label
+        assert trial.ssi_iterations == iterations, trial.label
+        assert trial.second_order_iterations == 0, trial.label
+        assert trial.converged_stage == "successive-substitution", trial.label
+        assert trial.trivial is trivial, trial.label
+        assert trial.termination_reason == reason, trial.label
+
+    assert result.diagnostics["model_family"] == "eos"
+    assert result.diagnostics["pressure_dependent"] is True
+    assert result.diagnostics["second_order_trial_count"] == 0
+    assert result.diagnostics["minimizing_trial"] == "pure-Methane"
+    assert result.diagnostics["sum_W"] == pytest.approx(1.418041962867881, abs=1e-12)
+
+
 def test_hot_dilute_binary_is_stable() -> None:
     """450 K, 1 bar methane/ethane is far above both critical temperatures."""
     mixture = _mixture(("Methane", "Ethane"), (0.5, 0.5))
@@ -358,6 +418,9 @@ def test_stability_settings_validation() -> None:
         {"tol": 0.0},
         {"trivial_tol": -1.0},
         {"tpd_tol": 0.0},
+        {"ssi_iterations": -1},
+        {"second_order_max_iter": 0},
+        {"second_order_max_step": -1.0},
     ):
         with pytest.raises(ct.InputRangeError):
             ct.StabilitySettings(**kwargs)  # type: ignore[arg-type]

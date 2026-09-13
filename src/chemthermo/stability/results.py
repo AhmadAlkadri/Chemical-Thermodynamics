@@ -20,17 +20,26 @@ class StabilityTrial:
             ``"wilson-vapor"``, ``"wilson-liquid"`` or ``"pure-Methane"``.
         converged: True when the stationarity residual met ``settings.tol`` or
             the iteration collapsed onto the trivial solution.
-        iterations: Successive-substitution iterations actually performed.
+        iterations: Total iterations performed, ``ssi_iterations +
+            second_order_iterations``.
         tpd: Reduced tangent-plane distance at the final trial composition
             (dimensionless, units of RT). ``nan`` when the trial failed.
         sum_W: Sum of the unnormalized trial mole numbers ``sum_i W_i`` at the
             final point. At a stationary point ``tpd = -ln(sum_W)``.
         trivial: True when the trial collapsed onto the feed composition.
-        residual: Final stationarity residual ``max_i |ln W_i + ln phi_i(w) - d_i|``.
+        residual: Final stationarity residual ``max_i |ln W_i + ln phi_i(w) - d_i|``
+            (``ln gamma_i`` for an activity model).
         phase_branch: Minimum-Gibbs root branch selected at the final trial
-            composition (``"vapor"`` or ``"liquid"``), or None if unavailable.
+            composition (``"vapor"`` or ``"liquid"``), None for an
+            activity-coefficient model (single branch) or if unavailable.
         composition: Normalized trial composition ``w`` at the final point.
         termination_reason: Short machine-readable reason string.
+        ssi_iterations: Successive-substitution iterations performed.
+        second_order_iterations: Second-order (Newton) iterations performed;
+            0 when the trial finished during successive substitution or when
+            the second-order stage is disabled.
+        converged_stage: ``"successive-substitution"`` or ``"second-order"``
+            for a converged trial, None otherwise.
     """
 
     label: str
@@ -43,12 +52,17 @@ class StabilityTrial:
     phase_branch: str | None
     composition: tuple[float, ...] | None
     termination_reason: str
+    ssi_iterations: int = 0
+    second_order_iterations: int = 0
+    converged_stage: str | None = None
 
     def __post_init__(self) -> None:
         if not self.label.strip():
             raise ValueError("Trial label must be non-empty.")
         if self.iterations < 0:
             raise InputRangeError("Trial iterations must be non-negative.")
+        if self.ssi_iterations < 0 or self.second_order_iterations < 0:
+            raise InputRangeError("Trial stage iteration counts must be non-negative.")
 
 
 @dataclass(frozen=True)
@@ -70,9 +84,11 @@ class StabilityResult:
             Values > 1 mean the incipient phase is enriched in component ``i``
             relative to the feed; the incipient phase is the *new* phase, so
             ``k_values`` maps feed -> incipient, never the reverse.
-        phase_branch: Minimum-Gibbs root branch of the minimizing trial.
+        phase_branch: Minimum-Gibbs root branch of the minimizing trial, None
+            for an activity-coefficient model.
         feed_branch: Minimum-Gibbs root branch used for the feed fugacity
-            coefficients.
+            coefficients, None for an activity-coefficient model (there is a
+            single branch, so no root selection is performed).
         trials: Per-trial records in deterministic order.
         diagnostics: Diagnostic metadata (implementation detail keys).
 
@@ -92,7 +108,7 @@ class StabilityResult:
     trial_composition: tuple[float, ...] | None = None
     k_values: tuple[float, ...] | None = None
     phase_branch: str | None = None
-    feed_branch: str = "vapor"
+    feed_branch: str | None = None
     trials: tuple[StabilityTrial, ...] = ()
     diagnostics: Mapping[str, float | int | str | bool] = field(default_factory=dict)
 
