@@ -38,7 +38,7 @@ validation = [
 
 [tool.pytest.ini_options]
 markers = [
-  "slow: exercises a full validation grid (e.g. the 188-state PC-SAFT grid of Case F-4); deselected by default (see addopts below), opt in with `pytest -q -m slow`",
+  "slow: a full validation grid whose representative subset runs by default (e.g. the 188-state PC-SAFT grid of Case F-4), or a repetition of a capability the default run already covers (ADR-0020); deselected by default (see addopts below), opt in with `pytest -q -m slow`. Never the only test of a capability - see `.agents/dev-contract.md`",
 ]
 # Deselected, not skipped, by default: `-m slow` on the command line overrides
 # this addopts entry (pytest keeps the last `-m` value), so `pytest -q -m slow`

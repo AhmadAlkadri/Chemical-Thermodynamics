@@ -653,7 +653,7 @@ def test_a_feed_inside_the_binodal_is_two_liquids() -> None:
 
 
 def test_no_bit_identity_fixture_state_carries_a_phase_search_key() -> None:
-    """ADR-0020 decision 2: the search is never entered on the pinned states.
+    """ADR-0020 decision 6: the search is never entered on the pinned states.
 
     `tests/test_flash_refactor_bit_identity.py` compares every float of all 155
     states with `==`, so a state that started entering the search would fail

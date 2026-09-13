@@ -2421,7 +2421,11 @@ here: **CI's default `pytest -q` does not fit the full grid**, so
 - `examples/validation/15_flash_split_robustness.py` defaults to the same
   16-state idea (its own list, not imported, matching this repository's
   "duplicate small grids for self-containment" convention) with `--full` for
-  the complete grid.
+  the complete grid. **Amended by ADR-0020:** its four previously-failing
+  states moved behind `--full` as well (they run in
+  `tests/test_flash_phi_phi_second_order.py` on every default `pytest -q`),
+  which took the example from ~26.9 s to ~16.5 s. The grid subset is
+  unchanged at 16 states.
 
 Measured on this machine: `pytest -q` **~389 s -> ~188 s** (553 passed, 1
 deselected). The full grid, run explicitly (`pytest -q -m slow`), still
@@ -2435,7 +2439,8 @@ slow examples out of this slice's scope -
 `examples/validation/12_vlle_verdict_map.py` (~16.5 s) and
 `examples/validation/14_pcsaft_flash_vs_teqp.py` (~16.3 s), both present
 before this slice and neither touching the PC-SAFT-grid-duplication
-regression this slice fixes.
+regression this slice fixes. (Both gained a `--full` flag of their own in
+ADR-0020: 16.4 -> 7.0 s and 16.2 -> 4.6 s; see Case P-9's runtime note.)
 
 - **Not covered:** whether `0.5` is optimal in any formal sense (it is a
   value that separates the two measured grids with a wide margin, not a
@@ -2916,15 +2921,23 @@ regression this slice fixes.
   considered"; the shipped rule pins the branch and lets the post-split
   stability test enforce the lowest-Gibbs condition at the solution.
 
-### Still not covered
+### Still not covered (at the time of ADR-0019; resolved by ADR-0020)
 
-A three-phase (vapour + two liquids) EOS state. **Bracketed, measured with
+~~A three-phase (vapour + two liquids) EOS state. **Bracketed, measured with
 this slice's code**, water / n-hexane at 1 atm, `z = (0.5, 0.5)`: 322, 324,
 326 and 328 K return a stable two-liquid result; 335, 336, 340 and 350 K
 return a stable vapour-liquid result; **330 K and 334 K raise**
 `ConvergenceError` because the post-split stability test finds a converged
 phase unstable. That window is the target of the next slice,
-`flash-phase-addition-eos`.
+`flash-phase-addition-eos`.~~
+
+**Resolved by ADR-0020**, and the diagnosis of the window turned out to be the
+Case R-3 one rather than a three-phase region: a binary at fixed pressure has
+no three-phase region at all (Gibbs' phase rule), and below `T3` the search
+runs `V -> LV -> LLV -> LL`, reaching the two conjugate liquids by *removing*
+a phase that addition had to add first. 330 K and 334 K now return verified
+two-liquid answers. Genuine three-phase EOS states are ternary and are
+recorded in Case P-10; the binary window is Case P-9.
 
 - **Tolerance:** asserted 1e-8 absolute on compositions and phase fractions
   against FeOs's flash (achieved <= 6.47e-09), 1e-6 relative on densities
@@ -2943,3 +2956,272 @@ phase unstable. That window is the target of the next slice,
   `tests/validation/test_pcsaft_lle_vs_feos.py` (skipped without `feos`).
 - **Script:** `examples/basic/flash_tp_pcsaft_lle_demo.py`,
   `examples/validation/17_pcsaft_lle_vs_feos.py`.
+
+## Case P-9: The three-phase neighbourhood of water / n-hexane (binary)
+
+- **Source:** an independent 4-equation Newton written in the test and in
+  `examples/validation/18_pcsaft_vlle_water_hexane.py` (two separate copies,
+  agreeing to 1e-09 K), independent two-equation Newtons for each two-phase
+  pair, reduced Gibbs energies computed from the public
+  `EquationOfState.fugacity_coefficients`, and **FeOs 0.10.1** (feos-org/feos,
+  MIT OR Apache-2.0): `State.chemical_potential(Contributions.Residual)`
+  evaluated at chemthermo's converged phases and densities, and `State.tp_flash`.
+- **Location:** `flash_tp(mixture, ..., eos=PCSAFTEOS())` on the tangent-plane
+  path. The slice is `flash-phase-addition-eos` (ADR-0020); it changes
+  `chemthermo/flash/_multiphase.py` and `_detect.py` and nothing else in `src/`.
+- **Assumptions:** 2B association for water; `k_ij = 0`; the packaged Gross &
+  Sadowski (2002) / (2001) parameters. As in Cases P-6 to P-8, every comparison
+  that evaluates **FeOs** at **chemthermo's own densities** is run twice - with
+  the shipped ten-figure universal constants and with FeOs's fourteen-figure
+  ones - because that table difference, not either solver, floors the residual.
+- **Components / units:** water / n-hexane at 101,325 Pa, `z_water` of 0.3, 0.5
+  and 0.7. Temperatures in K, densities in mol/m^3, compositions in mole
+  fractions.
+
+### The three-phase point
+
+- **Expected outcome:** none available from a source. `T3` and the three
+  coexisting compositions are *computed* by a 4-equation Newton in
+  `(x^I, x^II, y, T)` - two liquids on the model's liquid branch, a vapour on
+  its vapour branch - started from a coarse bracket `(0.9999, 0.02, 0.20,
+  334.5)`.
+- **Achieved:** residual **1.74e-12** in 7 iterations.
+  `T3 = 334.807826336 K` (61.6578 C); `x_water(I) = 0.999935973994`
+  (water-rich liquid), `x_water(II) = 0.022598600659` (hexane-rich liquid),
+  `y_water = 0.213124406737`.
+- **Why per-phase roots are needed:** at `T3` every one of the three
+  compositions has **two** mechanically stable density roots - I (37.91,
+  49,987.86), II (37.93, 7,289.79), V (37.59, 8,795.95) mol/m^3. A split that
+  pins one phase to the liquid branch and another to the vapour branch cannot
+  describe two liquids and a vapour at once (ADR-0019).
+- **Weak external sanity check, not a reference value:** the water / n-hexane
+  heteroazeotrope at 1 atm is commonly tabulated near 61.6 C with
+  `y_water ~ 0.21`. No primary source was verified, and the test asserts only
+  `330 K < T3 < 340 K` and `0.15 < y_water < 0.28`.
+
+### (i) Below T3: the refusal window, resolved by add-then-remove
+
+- **Premise, measured with ADR-0019's code:** 330 K and 334 K raised
+  `ConvergenceError` (post-split test finds a converged phase unstable).
+- **Expected outcome:** the two conjugate liquids, from an independent
+  two-equation Newton on the liquid branch, with the amounts the lever rule
+  gives.
+- **Achieved** at `T = T3 - 0.05 K = 334.757826 K`, `z = (0.5, 0.5)`:
+  `phases = {"liquid1", "liquid2"}`, `vapor_fraction = None`,
+  `phase_regime = "LLE"`, `phase_label_method = "compressibility"`,
+  `phase_set_history = "V -> LV -> LLV -> LL"`, `phases_added = 1`,
+  `phases_removed = 1`, `post_split_status = "stable"`.
+  `liquid1 = (0.999936079895, 6.392010504959e-05)` at `beta = 0.4884895575`;
+  `liquid2 = (0.022563892766, 0.977436107234)` at `beta = 0.5115104425`.
+  `equilibrium_residual = 8.0e-13`, `mass_balance_residual = 0.0`,
+  `delta_g_split_rt = -0.196766`.
+- **Against the independent Newton:** `|dx| = 2.285e-13`; against the lever
+  rule `|d beta| = 1.198e-13`.
+- **Gibbs ordering:** `G(LL)/RT = -0.916796623689 < G(VL)/RT = -0.915715633921
+  < G(feed)/RT = -0.720030204244`, and
+  `delta_g_vs_two_phase_rt = -1.080990e-03` equals `G(LL) - G(VL)` to better
+  than 1e-09 - i.e. the diagnostics key *is* the comparison against the
+  two-phase pair the search started from.
+- **FeOs's chemical potentials at chemthermo's two phases:**
+  `max_i |mu_i^I - mu_i^II| / RT` = **6.828e-11** with matched constants and
+  **2.193e-06** as shipped, against an asserted 1e-8.
+- **What the reference's own flash does here, recorded not worked around:**
+  FeOs's `State.tp_flash` converges on the **vapour-liquid** pair
+  (`x_water = 0.999935940756` at 49,989.45 mol/m^3 against
+  `y_water = 0.212638848885` at 37.60 mol/m^3, vapour fraction 0.6350029054),
+  which is exactly the pair chemthermo converges first and then refuses:
+  `FlashSettings(post_split_stability=False)` reproduces it to **6.35e-10**.
+  Both are stationary states of the same model; the Gibbs comparison above is
+  what decides between them, and it prefers the two liquids by 1.081e-03 RT.
+- **`max_phases = 2`** reproduces the pre-ADR-0020 refusal at this state.
+
+### (ii) Above T3: the vapour-liquid answer, and the search is not entered
+
+- **Achieved** at `T = T3 + 0.05 K = 334.857826 K`, `z = (0.5, 0.5)`:
+  `phases = {"liquid", "vapor"}`, `phase_regime = "VLE"`, **no**
+  `phase_set_history` key, `post_split_status = "stable"`.
+  `liquid = (0.999936007302, 6.399269782050e-05)`,
+  `vapor = (0.213610914465, 0.786389085535)`, `vapor_fraction = 0.6357879354`.
+- **Against the independent VL Newton:** `|dx| = 6.612e-12`.
+- **Gibbs ordering:** `G(VL)/RT = -0.914057391035 < G(LL)/RT = -0.912975942037`,
+  so the vapour-liquid pair is the equilibrium here and the two-liquid pair -
+  which still exists as a stationary state - is not.
+- **FeOs's chemical potentials:** **4.078e-11** matched, **2.498e-06** as
+  shipped.
+
+### (iii) At T3: what is and is not claimed
+
+- Gibbs' phase rule gives `F = 2 - 3 + 2 = 1`, so on a binary at fixed pressure
+  three phases coexist at **one** temperature, and there the three phase
+  *amounts* solve an underdetermined system (three unknowns, two independent
+  balances). **No three-phase `FlashResult` is produced or claimed for the
+  binary**, and none should be.
+- **Achieved** at `T = T3`: `flash_tp` returns the vapour-liquid edge of the
+  tie triangle - `liquid = 0.999935974`, `vapor = 0.213124406` - matching
+  vertices I and V of the 4-equation Newton to better than **1e-06**. The third
+  vertex is a **zero** of the tangent-plane distance from the returned liquid
+  (`|tpd| < 1e-09`, computed in the test), which is "three phases coexist here"
+  written in the stability test's own terms, and is why the post-split test
+  reports the pair stable rather than unstable.
+- **The verdict boundary locates T3.** Bisecting the `LLE` / `VLE` verdict of
+  `flash_tp` over `T3 +/- 0.05 K` puts the switch at **334.8078261 K**, which is
+  **2.4e-07 K** below the independently computed `T3` (45-step bisection,
+  scratch measurement). The shipped test bisects a `+/- 1e-03 K` bracket ten
+  times and asserts agreement to 1e-05 K.
+
+### (iv) The scan across the window, and one honest miss
+
+- **Expected outcome:** no `ConvergenceError` anywhere in `[T3 - 1 K, T3 + 1 K]`,
+  and a verdict that switches once.
+- **Achieved:** 41 temperatures at `z_water = 0.3` and 41 at `z_water = 0.7`,
+  **82 states, zero `ConvergenceError`**. At `z_water = 0.3`: 20 `LLE` then 21
+  `VLE`, exactly one switch, at `T3`. A third scan at `z_water = 0.5` (scratch,
+  not shipped) gives the same shape.
+- **The miss, measured and pinned.** At `z_water = 0.7` the verdict is `LLE`
+  at all 41 temperatures, including above `T3` where it should be `VLE`. At
+  335 K the returned two-liquid pair has `G/RT = -1.1618107137` against the
+  vapour-liquid pair's `-1.1643059308`: the answer is **metastable by
+  2.495e-03 RT**. The cause is the *stability* test, not the search: all four
+  deterministic trials from the hexane-rich liquid `(0.02273, 0.97727)`
+  converge to the trivial solution or to its partner
+  (`tpd_min = -3.007e-09`, verdict `"stable"`), while the vapour stationary
+  point at `y = (0.21500, 0.78500)` has `tpd = -6.530e-03`. That is
+  `_EOSTangentPlane`'s trial set, which ADR-0012 deliberately left with
+  per-iterate minimum-Gibbs root selection and no fixed surfaces, and it is the
+  invariant "a phase count is never better than the stability test that
+  produced it" made concrete again.
+
+### Negative controls
+
+- `T = T3 + 20 K = 354.81 K`, `z = (0.5, 0.5)` -> a single `"vapor"`,
+  `phase_regime = "single-phase"`, no search key.
+- `z_water = 0.99999`, 300 K -> a single `"liquid"`. **`z_water = 0.999` is
+  not a valid negative control for this model**: it puts 1e-03 mole fraction
+  n-hexane into a water-rich phase whose binodal composition is 1.67e-05
+  (Case P-8), so two liquids is the correct answer there and the test records
+  that instead of calling it a miss.
+- The 155-state bit-identity fixture carries **no** `phase_set_history`,
+  `phases_added`, `phases_removed`, `rachford_rice_iterations` or
+  `delta_g_vs_two_phase_rt` key, asserted directly on the JSON, so the search
+  is provably not entered by any pinned state.
+
+- **Tolerance:** asserted 1e-09 absolute on compositions and phase amounts
+  against the independent Newtons (achieved <= 6.61e-12), 1e-09 on the
+  equal-fugacity residual (achieved <= 8.0e-13), 1e-12 on the mass balance
+  (achieved 0.0), 1e-06 K at `T3` on the verdict boundary (achieved 2.4e-07 K),
+  1e-08 on FeOs's chemical potentials with matched constants (achieved
+  <= 6.83e-11).
+- **Independent route:** the 4-equation and 2-equation Newtons written in the
+  test and in the example; the lever rule; reduced Gibbs energies from the
+  public fugacity-coefficient interface; FeOs's chemical potentials and its own
+  two-phase flash.
+- **Negative control:** perturbing water's `epsilon^AB / k` by 1 % moves
+  `x_water` in the hexane-rich phase by more than 1e-04 (slow-marked).
+- **Test path:** `tests/test_flash_vlle_eos.py` (no optional dependency) and
+  `tests/validation/test_pcsaft_vlle_water_hexane.py` (skipped without `feos`).
+- **Script:** `examples/basic/flash_tp_pcsaft_vlle_demo.py`,
+  `examples/validation/18_pcsaft_vlle_water_hexane.py`.
+
+## Case P-10: Three-phase equation-of-state tie triangles (ternary)
+
+- **Source:** independent 6-equation Newton solves written in the test (equal
+  fugacity across three phases, each on its own named density branch,
+  parameterized by `ln(x_k / x_last)` so every iterate stays inside the
+  simplex), an independent mass-balance solve for the phase amounts, and
+  **FeOs 0.10.1** chemical potentials at chemthermo's three phases.
+- **Location:** `flash_tp(mixture, ..., eos=...)` on the tangent-plane path,
+  slice `flash-phase-addition-eos` (ADR-0020).
+- **Assumptions:** `k_ij = 0` throughout; 2B association for water and ethanol;
+  packaged parameters. **Nothing here is compared against measurement**, and
+  neither model is claimed to be right for these systems - what is checked is
+  that the returned phase set is a verified equilibrium *of that model*,
+  discovered rather than assumed.
+- **Components / units:** water / ethanol / n-hexane at 101,325 Pa.
+
+### (i) PC-SAFT vapour-liquid-liquid at 333 K
+
+- **Expected outcome:** a tie triangle - the same three vertices from every
+  feed inside it, with amounts fixed by the mass balance alone.
+- **Achieved:** `phases = {"liquid1", "liquid2", "vapor"}`,
+  `phase_regime = "VLLE"`, `phase_count = 3`,
+  `phase_set_history = "L -> LL -> LLV"`, `phases_added = 1`,
+  `phases_removed = 0`, `phase_label_method = "compressibility"`,
+  `post_split_status = "stable"`, `vapor_fraction` = the vapour's fraction.
+  Vertices:
+  `liquid1 = (0.9613879781718806, 0.03842241608698442, 1.8960574113e-04)`,
+  `liquid2 = (0.2553513856079896, 0.3913146548516096, 0.35333395954040087)`,
+  `vapor = (0.194162215411462, 0.19904827565750266, 0.6067895089310353)`;
+  densities 46,638.36 / 12,961.80 / 37.83 mol/m^3.
+  `equilibrium_residual = 6.795e-12`, `mass_balance_residual = 0.0`,
+  `delta_g_split_rt = -0.034026`, `delta_g_vs_two_phase_rt = -2.893e-04`
+  (so `G3 < G2 < G1`).
+- **Against the independent 6-equation Newton:** `|dx| <= 2.6e-11` on all
+  three vertices, residual 1.7e-12.
+- **Against the independent mass balance:** over nine feeds inside the
+  triangle, `|d beta| <= 5.5e-11` and `|dx| <= 2.6e-11`; every feed returns the
+  same three vertices.
+- **FeOs's chemical potentials across the three phases:**
+  `max |mu_i^a - mu_i^b| / RT` = **1.418e-11** with matched constants and
+  **2.232e-06** as shipped, against an asserted 1e-8.
+- **The region is finite, and it was scanned.** A 36-feed grid (mole fractions
+  in steps of 0.1) at 333 K gives 9 `VLLE`, 7 `VLE`, 6 `LLE`, 13 single-phase
+  and **1 `ConvergenceError`**; at 335 K, 9 `VLLE`, 13 `VLE`, 2 `LLE`, 12
+  single-phase and **0** errors; at 337 K, 10 `VLLE`, 15 `VLE`, 11 single-phase
+  and 0 errors; at 328 K and 331 K there is **no** three-phase region at all
+  (22 `LLE`, 14 single-phase), which is consistent with the binary `T3` of
+  334.81 K being the top of the two-liquid band.
+- **The failing feed, recorded not worked around.** `z = (0.1, 0.1, 0.8)` at
+  333 K raises `ConvergenceError` ("a two-phase set converged to a non-positive
+  phase fraction"): the three-phase solve from the stability seed does not
+  converge (residual 0.59 after the budget, fractions `(-0.76, -4.31, 6.07)`),
+  and the two-phase set its removal leaves does not converge either. **That
+  feed also raised before this slice** - with `max_phases = 2` it still does -
+  so it is not a regression. It sits near the edge of the triangle where the
+  water-rich liquid's amount is tiny.
+
+### (ii) Peng-Robinson three *liquid* phases at 280 K
+
+- **Premise:** ADR-0019 and Case P-8 recorded "no pure Peng-Robinson
+  three-phase case found in the databank with `k_ij = 0`". A scan over 15
+  ternaries x 6 temperatures x 3 pressures x 28 feeds found one.
+- **Achieved:** water / ethanol / n-hexane, 280 K, 1 atm, `k_ij = 0` ->
+  `phases = {"liquid1", "liquid2", "liquid3"}`, `vapor_fraction = None`,
+  `phase_regime = "LLE"`, `phase_set_history = "L -> LL -> LLL"`,
+  `phases_added = 1`, `phases_removed = 0`, `phase_label_method =
+  "compressibility"`, `post_split_status = "stable"`, in **0.097 s**.
+  `liquid1 = (0.9988087221058589, 1.1912778940878e-03, 5.324007536133e-14)`,
+  `liquid2 = (0.10277098734252052, 0.8598745315402574, 0.037354481117222046)`,
+  `liquid3 = (0.018917958864194933, 0.41169611644509935, 0.5693859246907057)`.
+  `equilibrium_residual = 8.303e-09`, `mass_balance_residual = 1.11e-16`,
+  `delta_g_split_rt = -0.250606`, `delta_g_vs_two_phase_rt = -2.905e-03`.
+- **Against the independent 6-equation Newton:** residual 8.4e-15 and
+  `|dx| <= 9.1e-09`; against the independent mass balance over four feeds,
+  `|d beta| <= 1.2e-08`. Both are floored by chemthermo's own
+  `equilibrium_residual` of 8.3e-09 (successive substitution stopped at
+  `tol = 1e-8`; the second-order stage could not improve it, because
+  `liquid1`'s n-hexane mole fraction of 5.3e-14 makes the Hessian nearly
+  singular).
+- **Model versus reality, stated and not asserted:** `k_ij = 0` between water
+  and a hydrocarbon is not a serious parameterization and a three-liquid split
+  for this ternary at 280 K is not a claim about the real system. What this
+  sub-case establishes is that the search is model-agnostic and that a **cubic**
+  reaches it, at a cost small enough for the default test suite.
+
+- **Tolerance:** asserted 1e-08 absolute on the PC-SAFT vertices and amounts
+  (achieved <= 5.5e-11), 1e-07 on the Peng-Robinson ones (achieved <= 1.2e-08),
+  1e-09 on the PC-SAFT equal-fugacity residual (achieved 6.8e-12), 1e-08 on the
+  Peng-Robinson one (achieved 8.3e-09), 1e-08 on FeOs's chemical potentials
+  with matched constants (achieved 1.42e-11).
+- **Independent route:** 6-equation Newton solves and a mass-balance solve
+  written in the test; FeOs's chemical potentials.
+- **Negative control:** at 328 K and 331 K the same ternary has **no**
+  three-phase region, so the 333 K result is not something the search produces
+  everywhere.
+- **Test path:** `tests/test_flash_vlle_eos.py`
+  (`test_peng_robinson_returns_three_liquid_phases` and
+  `test_the_peng_robinson_triangle_matches_an_independent_newton` run by
+  default; `test_the_pcsaft_ternary_returns_a_vapor_liquid_liquid_tie_triangle`
+  is `slow`), `tests/validation/test_pcsaft_vlle_water_hexane.py`
+  (`slow`, skipped without `feos`).
+- **Script:** `examples/basic/flash_tp_pcsaft_vlle_demo.py --full`,
+  `examples/validation/18_pcsaft_vlle_water_hexane.py --full`.
