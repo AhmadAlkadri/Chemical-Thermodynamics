@@ -208,6 +208,23 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
     `kij = 0.03` (not a literature-validated parameter). Requires
     `pip install -e ".[validation]"`; prints a message and exits 0 without
     teqp. Runs in about 25 s. See validation Cases P-3 and P-5.
+- `examples/validation/15_flash_split_robustness.py`
+  - Phi-phi **split robustness** with PC-SAFT, with PASS/FAIL per check
+    (ADR-0016, validation Case F-4). Successive substitution oscillates on some
+    feeds - the K-values cross 1 back and forth, the implied vapor fraction
+    leaves `[0, 1]` and then no vapor fraction exists at all - and four states
+    of the grid below used to end in
+    `ConvergenceError("Rachford-Rice failed to bracket a vapor fraction.")`
+    despite the tangent-plane test having proved them two-phase. The script
+    checks the reference state (CO2 / n-decane, `z = (0.9, 0.1)`, 240 K,
+    1.0 MPa) against a damped Newton on the equal-fugacity system **written
+    inside the script**, agreeing to `|d beta| = 7.8e-13` and
+    `|d composition| = 1.2e-13`; scans the 188-state Case F-4 grid and reports
+    the `ConvergenceError` count (0, against 4 before ADR-0016) together with
+    the worst invariant on every two-phase answer; and shows that the four
+    rescued states still fail with `second_order=False` and on the legacy
+    `wilson-heuristic` path, which is deliberate. Needs no optional
+    dependency. Runs in about 100 s. See validation Case F-4.
 - `examples/validation/*.py`
   - Optional validation sweeps against `thermo` (requires `pip install -e ".[validation]"`).
   - CSV output is disabled by default; pass `--outdir <dir>` or set `CHEMTHERMO_OUTDIR`.
