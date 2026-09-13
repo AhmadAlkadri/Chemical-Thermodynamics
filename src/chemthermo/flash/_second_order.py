@@ -1,11 +1,17 @@
-"""The liquid-liquid split's second-order stage: a damped Newton minimization.
+"""The two-phase split's second-order stage: a damped Newton minimization.
 
 Successive substitution on the equal-activity condition converges linearly
 with a ratio close to one near a plait point, so a second-order stage is
 required for the gamma-gamma (liquid-liquid) split (ADR-0009); see
-:func:`_second_order_split` for the full derivation. This stage applies to
-the liquid-liquid split only - the phi-phi and gamma-phi splits never call
-it, which is what keeps every phi-phi and gamma-phi number unchanged.
+:func:`_second_order_split` for the full derivation.
+
+The stage is model-agnostic: it consumes each phase's tangent-plane fugacity
+terms as a callable, so it serves the liquid-liquid split (``ln gamma``,
+ADR-0009), the modified-Raoult split (two different candidates, ADR-0010) and,
+since ADR-0016, the phi-phi split (``ln phi`` on the liquid and vapor root
+branches). Only gamma-phi never calls it. The phi-phi path enters the stage
+exclusively where successive substitution has already failed, which is what
+keeps every previously converging phi-phi number unchanged.
 """
 
 from __future__ import annotations
@@ -126,7 +132,8 @@ def _second_order_split(
         terms_i: Callable returning phase I's tangent-plane fugacity terms at a
             normalized composition (``ln gamma`` for a liquid-liquid split,
             ``ln gamma + ln(Psat/P)`` for a modified-Raoult liquid, ``0`` for a
-            modified-Raoult ideal vapor).
+            modified-Raoult ideal vapor, ``ln phi`` on one density/root branch
+            for a phi-phi split).
         settings: Flash settings (``second_order_tol``,
             ``second_order_max_iter``).
         terms_ii: Phase II's terms; defaults to ``terms_i``, which is the

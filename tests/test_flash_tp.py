@@ -40,7 +40,9 @@ def test_flash_tp_two_phase_split() -> None:
 def test_flash_tp_convergence_failure() -> None:
     mix = ct.Mixture.from_database(["Methane", "Ethane"], [0.5, 0.5], normalize=True)
     eos = ct.PengRobinsonEOS()
-    settings = ct.FlashSettings(max_iter=1, tol=1e-12)
+    # second_order=False is the pre-ADR-0016 phi-phi split: successive
+    # substitution alone, so an impossible budget is still a ConvergenceError.
+    settings = ct.FlashSettings(max_iter=1, tol=1e-12, second_order=False)
 
     with pytest.raises(ct.ConvergenceError):
         ct.flash_tp(

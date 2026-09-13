@@ -63,20 +63,28 @@ class FlashSettings:
             reproduce pre-ADR-0008 behavior unchanged. Those two paths report
             ``diagnostics["post_split_checked"] = False`` and a
             ``post_split_skipped_reason``.
-        second_order: Run a second-order stage after successive substitution in
-            the **liquid-liquid** (``"gamma-gamma"``) split and in the
-            ``"modified-raoult"`` split. The stage is a damped Newton
-            minimization of the two-phase Gibbs energy whose gradient is the
-            equal-activity residual (ADR-0009, generalized to two different
-            phase candidates in ADR-0010). Near a plait point successive
-            substitution needs thousands of iterations, so the stage is what
-            makes those feeds solvable at all. The phi-phi and gamma-phi splits
-            are unchanged by this release and never enter it.
+        second_order: Run a second-order stage after successive substitution.
+            The stage is a damped Newton minimization of the two-phase Gibbs
+            energy whose gradient is the equal-activity (or equal-fugacity)
+            residual (ADR-0009, generalized to two different phase candidates
+            in ADR-0010 and to the phi-phi split in ADR-0016). Near a plait
+            point successive substitution needs thousands of iterations, so the
+            stage is what makes those liquid-liquid feeds solvable at all.
+
+            **When it runs differs by path.** The liquid-liquid
+            (``"gamma-gamma"``) and ``"modified-raoult"`` splits hand over
+            after ``ssi_iterations``. The phi-phi split hands over only when
+            successive substitution has spent the whole ``max_iter`` budget
+            without converging, or when an updated set of K-values admits no
+            vapor fraction at all - so that every phi-phi state that converged
+            before ADR-0016 still converges through the first stage alone, bit
+            for bit. ``second_order=False`` is the pre-ADR-0016 phi-phi split.
+            The gamma-phi split never enters the stage.
         ssi_iterations: Successive-substitution iterations performed in the
             liquid-liquid and modified-Raoult splits before the second-order
-            stage takes over. Capped by ``max_iter``.
-        second_order_max_iter: Maximum second-order iterations in the
-            liquid-liquid and modified-Raoult splits.
+            stage takes over. Capped by ``max_iter``. Deliberately **not**
+            consulted by the phi-phi split; see ``second_order`` and ADR-0016.
+        second_order_max_iter: Maximum second-order iterations.
         max_phases: Largest number of phases :func:`chemthermo.flash_tp` may
             return (ADR-0011). Validated ``>= 1``.
 
@@ -95,7 +103,8 @@ class FlashSettings:
             unstable into a single-phase answer.
 
             The phi-phi and gamma-gamma paths still stop at two phases whatever
-            this is set to; see ADR-0011 "What remains".
+            this is set to; see ADR-0011 "What remains" and ADR-0016
+            "Next slice".
         second_order_tol: Target for the second-order stage, measured on the
             equal-activity residual ``max_i |ln(x_i^I gamma_i^I)
             - ln(x_i^II gamma_i^II)|``. It is tighter than ``tol`` because the

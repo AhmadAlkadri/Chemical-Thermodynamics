@@ -328,6 +328,37 @@ def test_cli_tp_flash_invalid_mode_returns_exit_code_2() -> None:
 
 
 def test_cli_tp_flash_nonconvergence_returns_exit_code_3() -> None:
+    """A flash that cannot converge exits 3 and says so on stderr.
+
+    The starved state is run in ``gamma-phi`` mode because that mode goes
+    through the legacy Wilson-heuristic path, which ADR-0016 deliberately left
+    alone. The same starved ``phi-phi`` state is now *rescued* by the
+    second-order stage (see the companion test below), so it is no longer a
+    non-convergence example; the exit-code contract itself is unchanged.
+    """
+    proc = _run_cli(
+        "tp-flash",
+        "--components",
+        "Methane,Ethane",
+        "--z",
+        "0.5,0.5",
+        "--temperature-k",
+        "240",
+        "--pressure-pa",
+        "3000000",
+        "--flash-mode",
+        "gamma-phi",
+        "--max-iter",
+        "1",
+        "--tol",
+        "1e-12",
+    )
+    assert proc.returncode == 3
+    assert "did not converge" in proc.stderr
+
+
+def test_cli_tp_flash_phi_phi_survives_a_starved_iteration_budget() -> None:
+    """ADR-0016: the phi-phi second-order stage finishes a starved split."""
     proc = _run_cli(
         "tp-flash",
         "--components",
@@ -342,6 +373,10 @@ def test_cli_tp_flash_nonconvergence_returns_exit_code_3() -> None:
         "1",
         "--tol",
         "1e-12",
+        "--format",
+        "json",
     )
-    assert proc.returncode == 3
-    assert "did not converge" in proc.stderr
+    assert proc.returncode == 0, proc.stderr
+    payload = json.loads(proc.stdout)
+    assert payload["diagnostics"]["converged_stage"] == "second-order"
+    assert payload["diagnostics"]["ssi_iterations"] == 1

@@ -30,7 +30,13 @@ from ._assemble import _single_phase_result, _two_phase_result
 from ._common import wilson_k
 from ._multiphase import _flash_tp_phase_addition, _phase_set_label
 from ._second_order import _second_order_split
-from ._split import _ln_gamma_function, _rachford_rice, _solve_k_loop
+from ._split import (
+    _ln_gamma_function,
+    _ln_phi_function,
+    _rachford_rice,
+    _solve_k_loop,
+    _SplitSolution,
+)
 from ._verify import (
     _equilibrium_residual,
     _post_split_report,
@@ -163,18 +169,54 @@ def _flash_tp_tangent_plane(
         z=z,
         K=k_seed,
         vapor_fraction=vapor_fraction,
+        # The full pre-ADR-0016 budget is spent on successive substitution
+        # before the second-order stage is allowed to touch anything, so every
+        # state that converged before this slice converges identically now.
+        # ``FlashSettings.ssi_iterations`` is deliberately *not* consulted here;
+        # see ADR-0016.
+        max_iter=settings.max_iter,
+        allow_unconverged=settings.second_order,
+        extended_rachford_rice=True,
     )
+
+    x, y, beta = split.x, split.y, split.vapor_fraction
+    ln_f_x, ln_f_y = split.ln_f_x, split.ln_f_y
+    stage_diagnostics: dict[str, float | int | str | bool] = {}
+
+    if not split.converged:
+        # Successive substitution ran out of budget (ADR-0016). The extra keys
+        # are added only on this branch: a converged first stage must produce
+        # the diagnostics mapping it produced before this slice, bit for bit.
+        x, y, beta, ln_f_x, ln_f_y, stage_diagnostics = _phi_phi_second_order(
+            mixture,
+            temperature,
+            pressure,
+            eos=eos,
+            settings=settings,
+            z=z,
+            split=split,
+        )
+
+    if not 0.0 < beta < 1.0:
+        raise ConvergenceError(
+            "The phi-phi split converged to a vapor fraction outside (0, 1) "
+            f"(beta={beta:.6e}), i.e. to a single phase, while the tangent-plane "
+            f"stability test reports the feed unstable (tpd_min={stability.tpd_min:.6e}). "
+            "The extended (negative-flash) Rachford-Rice window admits such a root "
+            "during iteration, but it cannot be an answer: it contradicts the "
+            "stability verdict. This is a solver failure, not a single-phase state."
+        )
 
     ln_phi_feed, _feed_branch = _ln_phi_min_gibbs(
         eos, mixture=mixture, temperature=temperature, pressure=pressure, composition=z
     )
     checks = _verify_split(
         z=z,
-        x=split.x,
-        y=split.y,
-        beta=split.vapor_fraction,
-        ln_f_x=split.ln_f_x,
-        ln_f_y=split.ln_f_y,
+        x=x,
+        y=y,
+        beta=beta,
+        ln_f_x=ln_f_x,
+        ln_f_y=ln_f_y,
         ln_f_feed=ln_phi_feed,
         residual_key="fugacity_residual",
     )
@@ -185,7 +227,7 @@ def _flash_tp_tangent_plane(
         pressure,
         eos=eos,
         activity_model=None,
-        phases=((("liquid"), split.x), ("vapor", split.y)),
+        phases=((("liquid"), x), ("vapor", y)),
         settings=settings,
     )
 
@@ -193,14 +235,15 @@ def _flash_tp_tangent_plane(
         mixture,
         temperature,
         pressure,
-        split.x,
-        split.y,
-        split.vapor_fraction,
+        x,
+        y,
+        beta,
         names=("liquid", "vapor"),
-        vapor_fraction=split.vapor_fraction,
+        vapor_fraction=beta,
         diagnostics={
             **base,
-            "iterations": split.iterations,
+            "iterations": split.iterations
+            + int(stage_diagnostics.get("second_order_iterations", 0)),
             "converged": True,
             "termination_reason": "tolerance_met",
             "max_delta_k": split.max_delta,
@@ -211,10 +254,99 @@ def _flash_tp_tangent_plane(
             "phase_regime": "VLE",
             "k_seed": seed_label,
             "incipient_phase": incipient_phase,
+            **stage_diagnostics,
             **checks,
             **post_split,
         },
     )
+
+
+def _phi_phi_second_order(
+    mixture: Mixture,
+    temperature: float,
+    pressure: float,
+    *,
+    eos: EquationOfState,
+    settings: FlashSettings,
+    z: np.ndarray,
+    split: _SplitSolution,
+) -> tuple[
+    np.ndarray,
+    np.ndarray,
+    float,
+    np.ndarray,
+    np.ndarray,
+    dict[str, float | int | str | bool],
+]:
+    """Finish an unconverged phi-phi split with the ADR-0009 Newton stage.
+
+    The same Gibbs-energy minimization the liquid-liquid and modified-Raoult
+    splits use, given the EOS tangent-plane terms: ``ln phi`` on the liquid
+    root branch for phase I and on the vapor root branch for phase II, exactly
+    the branches the successive-substitution loop evaluated
+    (:func:`chemthermo.flash._split._solve_k_loop`). The derivation in
+    :func:`chemthermo.flash._second_order._second_order_split` is unchanged -
+    equation (2) there holds phase by phase, and holds for ``ln phi`` for the
+    same reason it holds for ``ln gamma``: the Gibbs-Duhem relation at fixed
+    ``T, P``.
+
+    Returns:
+        ``(x, y, beta, ln_f_x, ln_f_y, diagnostics)`` for the better of the two
+        stages.
+
+    Raises:
+        ConvergenceError: If neither stage reached ``settings.tol`` on the
+            equal-fugacity residual.
+    """
+    terms_x = _ln_phi_function(eos, mixture, temperature, pressure, "liquid")
+    terms_y = _ln_phi_function(eos, mixture, temperature, pressure, "vapor")
+
+    x, y, beta = split.x, split.y, split.vapor_fraction
+    ln_f_x, ln_f_y = split.ln_f_x, split.ln_f_y
+    residual = _equilibrium_residual(x, y, ln_f_x, ln_f_y)
+    converged_stage = "successive-substitution"
+    second_order_iterations = 0
+
+    if settings.second_order and residual > settings.second_order_tol:
+        # The stage parameterizes the split by phase-II mole numbers
+        # ``n = beta y``, which must satisfy ``0 < n_i < z_i``. A negative-flash
+        # iterate does not, so the starting vapor fraction is pulled back into
+        # the physical range first; only the *starting point* moves, and the
+        # stage is a descent method from wherever it starts.
+        seed_beta = beta
+        if not 0.0 < seed_beta < 1.0 or np.any(seed_beta * y >= z):
+            seed_beta = float(np.min(np.where(y > 0.0, z / np.maximum(y, 1e-300), 1.0))) * 0.5
+            seed_beta = min(max(seed_beta, 1e-8), 1.0 - 1e-8)
+        refined = _second_order_split(
+            z=z,
+            x_ii=y,
+            beta=seed_beta,
+            terms_i=terms_x,
+            terms_ii=terms_y,
+            settings=settings,
+        )
+        second_order_iterations = refined.iterations
+        if refined.residual < residual:
+            x, y, beta = refined.x_i, refined.x_ii, refined.beta
+            ln_f_x, ln_f_y = terms_x(x), terms_y(y)
+            residual = _equilibrium_residual(x, y, ln_f_x, ln_f_y)
+            converged_stage = "second-order"
+
+    if residual > settings.tol:
+        raise ConvergenceError(
+            "flash_tp did not converge the phi-phi split; equal-fugacity residual="
+            f"{residual:.3e} after {split.iterations} successive-substitution "
+            f"(max_delta_k={split.max_delta:.3e}) and {second_order_iterations} "
+            "second-order iterations."
+        )
+
+    diagnostics: dict[str, float | int | str | bool] = {
+        "ssi_iterations": split.iterations,
+        "second_order_iterations": second_order_iterations,
+        "converged_stage": converged_stage,
+        "negative_flash_steps": split.negative_flash_steps,
+    }
+    return x, y, float(beta), ln_f_x, ln_f_y, diagnostics
 
 
 def _flash_tp_liquid_liquid(
