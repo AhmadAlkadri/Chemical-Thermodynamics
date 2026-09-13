@@ -38,18 +38,31 @@ What is checked here
    equal-fugacity system in vapor mole numbers, a different formulation of the
    same equilibrium. Plus the phase densities from `density_roots`, and the
    Gibbs-energy reduction recomputed from the public API.
-2. The Case F-4 grid: 188 PC-SAFT states over two binaries. Every state must
-   answer; every two-phase answer must carry its four invariants; every
-   single-phase answer must be a stability verdict.
+2. The Case F-4 grid. By default a fixed 16-state representative subset,
+   including all four states that need the second-order stage; pass `--full`
+   for the complete 188-state grid. Every state must answer; every two-phase
+   answer must carry its four invariants; every single-phase answer must be a
+   stability verdict.
 3. The four previously failing states, each of which must still fail on the
    legacy `phase_detection="wilson-heuristic"` path (ADR-0016 left it alone,
    deliberately) and must still fail with `second_order=False`.
 
 This script needs no optional dependency. The teqp cross-check of the same
 state lives in `tests/validation/test_flash_split_robustness_pcsaft.py`.
+
+Runtime (slice `flash-phase-labels-by-compressibility`): the full 188-state
+grid takes ~2 minutes and used to run here *and* in
+`tests/validation/test_flash_split_robustness_pcsaft.py::test_the_whole_grid_answers_and_every_answer_is_verified`
+on every `pytest -q`, which is most of why the suite grew from ~116 s to
+~389 s. That test is now `@pytest.mark.slow` (opt in with `pytest -q -m
+slow`), and this script defaults to the 16-state subset below so the
+`tests/test_examples.py` smoke test that runs it stays cheap; `--full` still
+exercises the whole grid on demand.
 """
 
 from __future__ import annotations
+
+import argparse
 
 import numpy as np
 
@@ -84,6 +97,40 @@ PREVIOUSLY_FAILING = (
     (("Carbon dioxide", "n-Decane"), 0.9, 250.0, 1.0e6),
     (("Carbon dioxide", "n-Decane"), 0.9, 260.0, 1.5e6),
 )
+
+
+def _grid_states() -> tuple[tuple[tuple[str, str], float, float, float], ...]:
+    return tuple(
+        (components, z1, temperature_K, pressure_Pa)
+        for components, feeds, temperatures, pressures in GRID
+        for z1 in feeds
+        for temperature_K in temperatures
+        for pressure_Pa in pressures
+    )
+
+
+#: 16 states spread over both binaries and the full temperature/pressure
+#: range of the grid, always including the four `PREVIOUSLY_FAILING` states -
+#: the default run (slice `flash-phase-labels-by-compressibility`; see the
+#: "Runtime" note above). `--full` runs the complete `_grid_states()` instead.
+#: Membership in the full grid is asserted at import time, not trusted.
+SUBSET: tuple[tuple[tuple[str, str], float, float, float], ...] = PREVIOUSLY_FAILING + (
+    (("Carbon dioxide", "n-Decane"), 0.6, 230.0, 1.0e6),
+    (("Carbon dioxide", "n-Decane"), 0.6, 260.0, 2.5e6),
+    (("Carbon dioxide", "n-Decane"), 0.8, 230.0, 2.0e6),
+    (("Carbon dioxide", "n-Decane"), 0.9, 230.0, 2.5e6),
+    (("Methane", "n-Hexane"), 0.5, 170.0, 0.5e6),
+    (("Methane", "n-Hexane"), 0.5, 200.0, 3.5e6),
+    (("Methane", "n-Hexane"), 0.8, 180.0, 1.5e6),
+    (("Methane", "n-Hexane"), 0.9, 190.0, 2.0e6),
+    (("Methane", "n-Hexane"), 0.9, 195.0, 3.0e6),
+    (("Methane", "n-Hexane"), 0.95, 170.0, 0.5e6),
+    (("Methane", "n-Hexane"), 0.95, 200.0, 3.5e6),
+    (("Methane", "n-Hexane"), 0.5, 195.0, 2.5e6),
+)
+assert len(SUBSET) == 16, len(SUBSET)
+assert len(set(SUBSET)) == 16, "SUBSET must not contain duplicates"
+assert set(SUBSET) <= set(_grid_states()), "every SUBSET state must belong to GRID"
 
 failures: list[str] = []
 
@@ -304,8 +351,11 @@ def check_reference_state() -> None:
     )
 
 
-def check_grid() -> None:
-    print("\n2) The Case F-4 grid: every state must answer, every answer must verify")
+def check_grid(
+    states: tuple[tuple[tuple[str, str], float, float, float], ...], *, full: bool
+) -> None:
+    kind = f"the complete {len(states)}-state grid" if full else f"a {len(states)}-state subset"
+    print(f"\n2) The Case F-4 grid: {kind} - every state must answer, every answer must verify")
     print("-" * 78)
     errors: list[str] = []
     two_phase = 0
@@ -317,46 +367,39 @@ def check_grid() -> None:
     worst_delta_g = -np.inf
     worst_post_split = np.inf
 
-    for components, feeds, temperatures, pressures in GRID:
-        for z1 in feeds:
-            mixture = mixture_of(components, z1)
-            for temperature_K in temperatures:
-                for pressure_Pa in pressures:
-                    label = (
-                        f"{'/'.join(components)} z1={z1} "
-                        f"T={temperature_K:.0f}K P={pressure_Pa / 1e6:.2f}MPa"
-                    )
-                    try:
-                        result = ct.flash_tp(
-                            mixture,
-                            temperature_K=temperature_K,
-                            pressure_Pa=pressure_Pa,
-                            eos=ct.PCSAFTEOS(),
-                        )
-                    except ct.ConvergenceError as error:
-                        errors.append(f"{label}: {error}")
-                        continue
-                    diagnostics = result.diagnostics
-                    if diagnostics["phase_count"] == 1:
-                        single_phase += 1
-                        if diagnostics["stability_status"] != "stable":
-                            errors.append(f"{label}: single phase without a stable verdict")
-                        continue
-                    two_phase += 1
-                    worst_mass_balance = max(
-                        worst_mass_balance, float(diagnostics["mass_balance_residual"])
-                    )
-                    worst_fugacity = max(worst_fugacity, float(diagnostics["fugacity_residual"]))
-                    worst_delta_g = max(worst_delta_g, float(diagnostics["delta_g_split_rt"]))
-                    worst_post_split = min(
-                        worst_post_split, float(diagnostics["post_split_tpd_min"])
-                    )
-                    if diagnostics["post_split_status"] != "stable":
-                        errors.append(f"{label}: post-split {diagnostics['post_split_status']}")
-                    if diagnostics.get("converged_stage") == "second-order":
-                        rescued += 1
-                    if int(diagnostics.get("negative_flash_steps", 0)) > 0:
-                        negative_flash += 1
+    for components, z1, temperature_K, pressure_Pa in states:
+        mixture = mixture_of(components, z1)
+        label = (
+            f"{'/'.join(components)} z1={z1} "
+            f"T={temperature_K:.0f}K P={pressure_Pa / 1e6:.2f}MPa"
+        )
+        try:
+            result = ct.flash_tp(
+                mixture,
+                temperature_K=temperature_K,
+                pressure_Pa=pressure_Pa,
+                eos=ct.PCSAFTEOS(),
+            )
+        except ct.ConvergenceError as error:
+            errors.append(f"{label}: {error}")
+            continue
+        diagnostics = result.diagnostics
+        if diagnostics["phase_count"] == 1:
+            single_phase += 1
+            if diagnostics["stability_status"] != "stable":
+                errors.append(f"{label}: single phase without a stable verdict")
+            continue
+        two_phase += 1
+        worst_mass_balance = max(worst_mass_balance, float(diagnostics["mass_balance_residual"]))
+        worst_fugacity = max(worst_fugacity, float(diagnostics["fugacity_residual"]))
+        worst_delta_g = max(worst_delta_g, float(diagnostics["delta_g_split_rt"]))
+        worst_post_split = min(worst_post_split, float(diagnostics["post_split_tpd_min"]))
+        if diagnostics["post_split_status"] != "stable":
+            errors.append(f"{label}: post-split {diagnostics['post_split_status']}")
+        if diagnostics.get("converged_stage") == "second-order":
+            rescued += 1
+        if int(diagnostics.get("negative_flash_steps", 0)) > 0:
+            negative_flash += 1
 
     total = two_phase + single_phase + len(errors)
     print(f"  states scanned        : {total}")
@@ -375,10 +418,18 @@ def check_grid() -> None:
     record("every two-phase mass balance below 1e-12", worst_mass_balance < 1e-12)
     record("every two-phase equal-fugacity residual below 1e-6", worst_fugacity < 1e-6)
     record("every two-phase split lowers the Gibbs energy", worst_delta_g < 0.0)
-    record(
-        "exactly the four previously failing states needed the stage",
-        rescued == len(PREVIOUSLY_FAILING),
-    )
+    if full:
+        record(
+            "exactly the four previously failing states needed the stage",
+            rescued == len(PREVIOUSLY_FAILING),
+        )
+        record("the measured 123/65 two-phase/single-phase split is reproduced", (two_phase, single_phase) == (123, 65))
+    else:
+        record(
+            "every previously-failing state in this subset needed the stage",
+            rescued >= sum(1 for state in states if state in PREVIOUSLY_FAILING),
+        )
+        print(f"  (pass --full for the complete {len(_grid_states())}-state grid)")
 
 
 def check_previously_failing() -> None:
@@ -425,12 +476,24 @@ def check_previously_failing() -> None:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--full",
+        action="store_true",
+        help=f"run the complete {len(_grid_states())}-state Case F-4 grid instead of the "
+        f"{len(SUBSET)}-state representative subset",
+    )
+    # `parse_known_args`, not `parse_args`: `tests/test_examples.py` runs this
+    # script via `runpy.run_path` with pytest's own `sys.argv` still in place,
+    # so an unrecognized pytest flag must be ignored rather than raising.
+    args, _unknown = parser.parse_known_args()
+
     print("=" * 78)
     print("Phi-phi split robustness with PC-SAFT (validation Case F-4, ADR-0016)")
     print("=" * 78)
 
     check_reference_state()
-    check_grid()
+    check_grid(_grid_states() if args.full else SUBSET, full=args.full)
     check_previously_failing()
 
     print("\n" + "=" * 78)

@@ -31,6 +31,16 @@ validation = [
   "teqp>=0.23",
 ]
 
+[tool.pytest.ini_options]
+markers = [
+  "slow: exercises a full validation grid (e.g. the 188-state PC-SAFT grid of Case F-4); deselected by default (see addopts below), opt in with `pytest -q -m slow`",
+]
+# Deselected, not skipped, by default: `-m slow` on the command line overrides
+# this addopts entry (pytest keeps the last `-m` value), so `pytest -q -m slow`
+# runs exactly the slow-marked tests and nothing else. See
+# `.agents/dev-contract.md` for the full-grid command and CI's choice.
+addopts = "-m 'not slow'"
+
 [tool.setuptools]
 package-dir = { "" = "src" }
 

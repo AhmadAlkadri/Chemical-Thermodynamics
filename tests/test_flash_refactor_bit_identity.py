@@ -1,20 +1,41 @@
-"""Bit-identity regression for the ``flash-module-split`` refactor.
+"""Bit-identity regression for the ``flash-module-split`` refactor, and the
+ADR-0017 relabeling audit.
 
 This is not a behavior test in the usual sense: it exists purely to prove that
 splitting ``src/chemthermo/flash/tp.py`` into single-purpose internal modules
-moved code without changing a single floating-point operation.
+moved code without changing a single floating-point operation - and, since the
+``flash-phase-labels-by-compressibility`` slice, to prove that switching phase
+naming from the min-Gibbs tie-break / Wilson ranking to
+``EquationOfState.phase_identity`` (ADR-0017) moved *only* names and the
+``vapor_fraction`` values that follow them, nothing numeric.
 
 Every field a caller of ``flash_tp`` can observe - phase names, every phase's
 composition, phase fractions, ``vapor_fraction`` and the full ``diagnostics``
 mapping - is captured for a fixed set of states and pinned, bit-for-bit
 (floats compared with ``==``, ints/bools/strings exact), against
-``tests/fixtures/flash/refactor_bit_identity_v1.json``. That fixture was
-generated from this repository at HEAD ``e927623`` (the commit immediately
-before the module split) and is committed in its own commit, before the
-refactor commit, so the git history itself proves the fixture predates the
-code move: see the ``test(flash): capture pre-refactor bit-identity fixture``
-commit versus ``refactor(flash): split tp.py into single-purpose internal
-modules``.
+``tests/fixtures/flash/refactor_bit_identity_v2.json``.
+
+Fixture history:
+
+- ``refactor_bit_identity_v1.json`` was generated from this repository at HEAD
+  ``e927623`` (the commit immediately before the ``flash-module-split``
+  refactor) and is committed in its own commit, before the refactor commit, so
+  the git history itself proves the fixture predates the code move: see the
+  ``test(flash): capture pre-refactor bit-identity fixture`` commit versus
+  ``refactor(flash): split tp.py into single-purpose internal modules``. It
+  stayed the active fixture through ADR-0008 - ADR-0016.
+- ``refactor_bit_identity_v2.json`` (this test) was regenerated for ADR-0017:
+  every one of the 155 states was audited state by state against v1 first (see
+  validation Case F-5 in ``.agents/brain/validation-cases.md`` for the full
+  table) - 46 phi-phi grid states changed, all single-phase, all a min-Gibbs
+  tie-break ``"vapor"`` (dense/supercritical, one real compressibility root)
+  becoming a compressibility-measured ``"liquid"`` with ``vapor_fraction``
+  ``1.0 -> 0.0`` and a new ``diagnostics["phase_label_method"] =
+  "compressibility"`` key; every other field of every one of the 155 states -
+  compositions, phase-fraction *values*, every other diagnostics number - is
+  unchanged. ``refactor_bit_identity_v1.json`` is kept in the repository
+  (unreferenced by this test) so that history - what ADR-0008's tie-break
+  actually produced - stays inspectable.
 
 States captured (see :func:`_build_states`):
 
@@ -28,12 +49,15 @@ States captured (see :func:`_build_states`):
 - The two ``phase_detection="wilson-heuristic"`` cases pinned in
   ``tests/test_flash_phase_detection.py::test_legacy_path_reproduces_the_pre_slice_numbers_exactly``.
 
-If this fixture ever legitimately needs to change (a deliberate, reviewed
-numerical change - never to make a refactor "pass"), regenerate it with a
-throwaway script that imports :func:`_build_states` and :func:`_encode` from
-this module, builds the Tessier ``(names, model)`` pair the way
-``tests/conftest.py`` does, runs every state, and writes the JSON from the
-commit *before* the change.
+If this fixture ever legitimately needs to change again (a deliberate,
+reviewed numerical or labeling change - never to make a refactor "pass"),
+regenerate it with a throwaway script that imports :func:`_build_states` and
+:func:`_encode` from this module, builds the Tessier ``(names, model)`` pair
+the way ``tests/conftest.py`` does, runs every state, diffs it against the
+current fixture state by state (composition set, fraction set, and every
+diagnostics key other than the ones the change is *about* must be provably
+unchanged before regenerating), and writes the new versioned JSON plus a
+validation-cases.md entry recording exactly what changed and why.
 """
 
 from __future__ import annotations
@@ -45,7 +69,7 @@ from typing import Any, Callable, Sequence
 import chemthermo as ct
 
 FIXTURE_PATH = (
-    Path(__file__).resolve().parent / "fixtures" / "flash" / "refactor_bit_identity_v1.json"
+    Path(__file__).resolve().parent / "fixtures" / "flash" / "refactor_bit_identity_v2.json"
 )
 
 EOS = ct.PengRobinsonEOS()
@@ -229,9 +253,10 @@ def _build_states(
     return states
 
 
-def test_flash_tp_is_bit_identical_to_the_pre_refactor_capture(
+def test_flash_tp_is_bit_identical_to_the_v2_capture(
     tessier2000_names: list[str], tessier2000_model: ct.NRTL
 ) -> None:
+    """Pinned against ``refactor_bit_identity_v2.json`` (ADR-0017; see module docstring)."""
     with FIXTURE_PATH.open("r", encoding="utf-8") as handle:
         fixture: dict[str, dict[str, Any]] = json.load(handle)
 
