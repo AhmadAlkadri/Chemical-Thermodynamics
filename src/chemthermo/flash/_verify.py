@@ -117,11 +117,11 @@ def _verify_split(
       which must be negative for the split to be an improvement on the
       single-phase feed. For phi-phi the feed term uses the *minimum-Gibbs*
       branch (the stability module's convention, i.e. the lowest single-phase
-      Gibbs energy available), while each split phase uses the branch the solver
-      actually converged on. Since the min-Gibbs branch is never higher in Gibbs
-      energy, this combination is a conservative (upper-bound) estimate of the
-      true reduction. An activity model has one branch, so for gamma-gamma the
-      quantity is exact.
+      Gibbs energy available), and since ADR-0019 each split phase uses its own
+      minimum-Gibbs root as well, so all three terms are on the same footing
+      and the quantity is exact rather than the upper bound it was while the
+      two phases were pinned to fixed branches. An activity model has one
+      branch, so for gamma-gamma the quantity was always exact.
     """
     beta = float(beta)
     balance = float(np.max(np.abs(z - (beta * y + (1.0 - beta) * x))))

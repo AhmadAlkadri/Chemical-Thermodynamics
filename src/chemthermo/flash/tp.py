@@ -198,7 +198,8 @@ def flash_tp(
 
     Returns:
         FlashResult with phase compositions and fractions. Phase names follow:
-        VLE -> ``"liquid"``/``"vapor"``, LLE -> ``"liquid1"``/``"liquid2"``,
+        VLE -> ``"liquid"``/``"vapor"``, LLE -> ``"liquid1"``/``"liquid2"``
+        (on the phi-phi path too, since ADR-0019),
         VLLE -> ``"liquid1"``/``"liquid2"``/``"vapor"``, single phase ->
         ``"liquid"`` or ``"vapor"``. ``vapor_fraction`` is ``None`` for every
         gamma-gamma result and for any result with no ``"vapor"`` phase in it:
@@ -235,6 +236,9 @@ def flash_tp(
           ``phase_stability_tpd_min_<name>``. Phi-phi additionally reports
           ``incipient_phase``, ``phase_label_method`` (``"compressibility"`` or
           ``"wilson-ranking"``), ``max_delta_k``, ``k_min`` and ``k_max``,
+          plus - **only when the two phases did not converge on the historical
+          ``("liquid", "vapor")`` pair of density roots** (ADR-0019) -
+          ``phase_i_branch`` and ``phase_ii_branch``,
           plus - **only when the ADR-0016 second-order stage actually ran** -
           ``ssi_iterations``, ``second_order_iterations``, ``converged_stage``
           and ``negative_flash_steps``. Those four keys are absent from a
@@ -292,9 +296,9 @@ def flash_tp(
         ``phase_detection="wilson-heuristic"`` it only means an initial-estimate
         heuristic said so.
 
-        **Vapor/liquid labelling by compressibility (ADR-0017).** A phi-phi
-        phase name comes from ``EquationOfState.phase_identity``, evaluated on
-        the root the phase actually converged on: a dimensionless
+        **Vapor/liquid labelling by compressibility (ADR-0017, ADR-0019).** A
+        phi-phi phase name comes from ``EquationOfState.phase_identity``,
+        evaluated on the root the phase actually converged on: a dimensionless
         isothermal-compressibility ratio (``kappa = -P / (V dP/dV)`` for
         Peng-Robinson, the analogous ``P / (rho dP/drho)`` for PC-SAFT) that is
         1 for an ideal gas and well below 1 for a liquid
@@ -303,32 +307,55 @@ def flash_tp(
         the case where the cubic has a single real root and both branches
         return identical fugacity coefficients, so no Gibbs comparison can
         distinguish them, is exactly the case ``kappa`` was added to settle.
-        For a two-phase result the phase with the lower ``kappa`` is named
-        ``"liquid"``; when both converged phases fall on the same side of the
-        threshold (near-critical states, where any label is a convention) the
-        historical volatility ordering is kept instead - the phase enriched
-        (relative to the feed) in the component with the largest Wilson K
-        relative to the one with the smallest is named ``"vapor"``.
-        ``diagnostics["phase_label_method"]`` records which rule decided:
-        ``"compressibility"``, ``"wilson-ranking"`` (a two-phase fallback) or
-        ``"tie-break"`` (a single-phase fallback, for a model that does not
-        implement ``phase_identity``). Neither rule ever decides the verdict,
-        the compositions or the vapor fraction's *magnitude* - only which
-        already-converged phase (or ``1 - vapor_fraction``) the name
-        ``"vapor"`` attaches to. See ADR-0008 decision 3 (superseded) and
-        ADR-0017.
+        For a two-phase result: one liquid and one vapor gives
+        ``"liquid"`` / ``"vapor"`` with a real ``vapor_fraction``; **two
+        liquids give** ``"liquid1"`` / ``"liquid2"`` with
+        ``vapor_fraction = None`` and ``phase_regime = "LLE"`` (ADR-0019);
+        and when both phases measure as vapors (near-critical states, where any
+        label is a convention) or the model does not implement
+        ``phase_identity``, the historical volatility ordering is kept instead
+        - the phase enriched (relative to the feed) in the component with the
+        largest Wilson K relative to the one with the smallest is named
+        ``"vapor"``. ``diagnostics["phase_label_method"]`` records which rule
+        decided: ``"compressibility"``, ``"wilson-ranking"`` (a two-phase
+        fallback) or ``"tie-break"`` (a single-phase fallback, for a model that
+        does not implement ``phase_identity``). Neither rule ever decides the
+        verdict, the compositions or the vapor fraction's *magnitude* - only
+        which already-converged phase (or ``1 - vapor_fraction``) each name
+        attaches to. See ADR-0008 decision 3 (superseded), ADR-0017 and
+        ADR-0019.
 
-        **Liquid-liquid phase names are roles, not identities.** ``"liquid1"``
-        is the phase the split was started from as feed-like and ``"liquid2"``
-        the one started from the tangent-plane minimizer. Nothing distinguishes
-        two liquids the way volatility distinguishes a vapor from a liquid, so
-        no attempt is made to name them by composition: two feeds on the same
-        tie-line can come back with the same pair of compositions under swapped
-        labels. Compare the phase *set*, not ``result.phases["liquid1"]``. The
-        same holds for the two liquids of a three-phase result, whose ordering
-        follows the order in which the search happened to create them; only the
-        ``"vapor"`` name carries a model-level meaning (it is the phase the
-        ideal-gas candidate describes).
+        **Which density root each phi-phi phase sits on (ADR-0019).** Each
+        phase is evaluated on the branch the tangent-plane stability test found
+        *that phase* on - ``feed_branch`` for the feed-like phase,
+        ``phase_branch`` for the incipient one - held for the whole split,
+        rather than one phase always on the model's liquid root and the other
+        always on its vapor root. That is what makes a liquid-liquid split from
+        an equation of state expressible at a pressure where a vapor root also
+        exists. The lowest-Gibbs rule applies where the pinned branch is not
+        evaluable, and the post-split stability test re-applies it to every
+        converged phase. ``diagnostics["phase_i_branch"]`` and
+        ``["phase_ii_branch"]`` report the measured identity of each converged
+        root, and are present **only** when that pair is not
+        ``("liquid", "vapor")``; use ``.get()``.
+
+        **Liquid-liquid phase names are roles, not identities - except on the
+        phi-phi path.** On the ``gamma-gamma`` and ``modified-raoult`` paths
+        ``"liquid1"`` is the phase the split was started from as feed-like and
+        ``"liquid2"`` the one started from the tangent-plane minimizer, so two
+        feeds on the same tie-line can come back with the same pair of
+        compositions under swapped labels. Compare the phase *set*, not
+        ``result.phases["liquid1"]``. The same holds for the two liquids of a
+        three-phase result, whose ordering follows the order in which the
+        search happened to create them; only the ``"vapor"`` name carries a
+        model-level meaning (it is the phase the ideal-gas candidate
+        describes). On the **phi-phi** path the two names are assigned by
+        composition instead (ADR-0019): ``"liquid1"`` is the phase with the
+        larger mole fraction of the **first** component, ties broken by the
+        second and so on. That order is deterministic and does not swap between
+        feeds on one tie line, which is what makes a lever-rule comparison
+        across feeds meaningful; permuting the mixture's components permutes
+        which phase is ``"liquid1"``, and the phase *set* is unchanged.
     """
 
     temperature = validate_temperature(temperature_K)

@@ -7,6 +7,13 @@ them (see :func:`_solve_k_loop`). Callers seed and interpret the loop
 differently (:mod:`chemthermo.flash._detect`, :mod:`chemthermo.flash._legacy`);
 this module owns none of that, only the shared numerics.
 
+The phi-phi update also owns one piece of physics rather than pure numerics:
+:class:`_PhaseRoot`, which puts each phase on the density/compressibility root
+the stability test found **that phase** on, instead of pinning phase I to the
+model's liquid branch and phase II to its vapour branch (ADR-0019). That is
+what makes a liquid-liquid split expressible from an equation of state at a
+state where a vapour root also exists.
+
 Two Rachford-Rice solvers live here, and the difference between them is the
 subject of ADR-0016:
 
@@ -101,13 +108,20 @@ def _solve_k_loop(
     extended_rachford_rice: bool = False,
     terms_x: Callable[[np.ndarray], np.ndarray] | None = None,
     terms_y: Callable[[np.ndarray], np.ndarray] | None = None,
+    roots_x: _PhaseRoot | None = None,
+    roots_y: _PhaseRoot | None = None,
 ) -> _SplitSolution:
     """Successive substitution on K with Rachford-Rice updates of ``beta``.
 
     This is the first-stage phase split, shared by every mode; only its
     initial ``K``, its ``beta`` and the model call that updates ``K`` differ:
 
-    - phi-phi: ``K = phi^L / phi^V`` (``x`` is the liquid, ``y`` the vapor);
+    - phi-phi: ``K = phi^x / phi^y``, each phase's ``phi`` evaluated on that
+      phase's **own** density/compressibility root when the caller supplies the
+      two :class:`_PhaseRoot` holders (``roots_x`` / ``roots_y``, the
+      tangent-plane path, ADR-0019), and on the fixed ``"liquid"`` /
+      ``"vapor"`` branches when it does not (the legacy ``wilson-heuristic``
+      path and gamma-phi, both unchanged);
     - gamma-phi: ``K = gamma^L phi^L / phi^V``;
     - gamma-gamma: ``K = gamma^I / gamma^II`` (``x`` is phase I, ``y`` phase II
       and ``vapor_fraction`` is the mole fraction of phase II);
@@ -164,24 +178,33 @@ def _solve_k_loop(
             ln_f_y = np.log(gamma_y)
         else:
             assert eos is not None
-            phi_v = as_float_array(
-                eos.fugacity_coefficients(
-                    mixture=mixture,
-                    temperature_K=temperature,
-                    pressure_Pa=pressure,
-                    composition=y.tolist(),
-                    phase="vapor",
+            if roots_x is not None and roots_y is not None:
+                # ADR-0019: each phase on the root the stability test put it
+                # on. The two calls keep the historical order (``y`` first) and
+                # the arithmetic below is untouched, so a state whose phases
+                # are pinned to the historical ``("liquid", "vapor")`` pair
+                # reproduces the pre-slice doubles exactly.
+                phi_v = roots_y.fugacity_coefficients(y)
+                phi_l = roots_x.fugacity_coefficients(x)
+            else:
+                phi_v = as_float_array(
+                    eos.fugacity_coefficients(
+                        mixture=mixture,
+                        temperature_K=temperature,
+                        pressure_Pa=pressure,
+                        composition=y.tolist(),
+                        phase="vapor",
+                    )
                 )
-            )
-            phi_l = as_float_array(
-                eos.fugacity_coefficients(
-                    mixture=mixture,
-                    temperature_K=temperature,
-                    pressure_Pa=pressure,
-                    composition=x.tolist(),
-                    phase="liquid",
+                phi_l = as_float_array(
+                    eos.fugacity_coefficients(
+                        mixture=mixture,
+                        temperature_K=temperature,
+                        pressure_Pa=pressure,
+                        composition=x.tolist(),
+                        phase="liquid",
+                    )
                 )
-            )
 
             if phi_v.shape != phi_l.shape or phi_v.shape != K.shape:
                 raise ModelError("EOS returned inconsistent fugacity coefficient shapes.")
@@ -305,40 +328,164 @@ def _ln_gamma_function(
     return ln_gamma
 
 
-def _ln_phi_function(
-    eos: EquationOfState,
-    mixture: Mixture,
-    temperature: float,
-    pressure: float,
-    phase: str,
-) -> Callable[[np.ndarray], np.ndarray]:
-    """Return ``ln phi(x)`` on one named density/root branch, as a callable.
+#: The density/compressibility branches an ``EquationOfState`` exposes, in the
+#: order :func:`chemthermo.stability._evaluator._cubic_root_candidates` builds
+#: them, which is the order the lowest-Gibbs fallback below tries them in.
+_ROOT_BRANCHES = ("vapor", "liquid")
 
-    The phi-phi second-order stage (ADR-0016) needs each phase's tangent-plane
-    fugacity term as a function of that phase's composition alone, on the same
-    branch the successive-substitution loop used: ``phase="liquid"`` for the
-    ``x`` phase and ``phase="vapor"`` for the ``y`` phase.
+
+class _PhaseRoot:
+    """The density/compressibility root **one** phase of a phi-phi split sits on.
+
+    ADR-0019. The pre-slice split hard-wired phase I to the model's
+    ``"liquid"`` branch and phase II to its ``"vapor"`` branch, which makes a
+    liquid-liquid split inexpressible at any state where a vapour root also
+    exists - the water / n-hexane defect of validation Case P-7(iii). What
+    replaces it is *per-phase*: each phase is pinned to the branch the
+    tangent-plane stability test found **that** phase on (``feed_branch`` for
+    the feed-like phase, ``phase_branch`` for the incipient one), so the pair
+    may legitimately be ``("liquid", "liquid")``.
+
+    The branch is then **held** for the whole split, which is ADR-0012's rule
+    for the stability module's own trials ("a trial pinned to one candidate
+    iterates on that candidate's Gibbs surface") applied to the split, and for
+    the same reason: re-selecting the lowest-Gibbs root at every *iterate*
+    lets successive substitution walk a phase onto its partner's branch and
+    collapse to the trivial solution. That is not hypothetical - it is measured
+    on the ADR-0016 reference state (PC-SAFT carbon dioxide / n-decane,
+    ``z = (0.9, 0.1)``, 240 K, 1.0 MPa), where per-iterate re-selection moves
+    the liquid phase onto the vapour root at the fifteenth iterate and the
+    split then runs away to ``beta = -3.2e+09``. See ADR-0019 "Alternatives
+    considered".
+
+    The lowest-Gibbs rule (Michelsen & Mollerup: each phase on the root of
+    lowest Gibbs energy) is the **fallback**, used only where the pinned branch
+    is not evaluable at a composition, and it is what the post-split stability
+    test independently re-applies to every converged phase - so a split that
+    did converge onto a higher-Gibbs root is refused there rather than
+    returned.
+
+    Attributes:
+        branch: The pinned branch, or None when the caller had none to pin.
+        selected: The branch actually used at the last call.
+        fallbacks: How often the pinned branch was unusable and the
+            lowest-Gibbs rule had to decide instead.
     """
 
-    def ln_phi(composition: np.ndarray) -> np.ndarray:
+    __slots__ = (
+        "_eos",
+        "_mixture",
+        "_pressure",
+        "_temperature",
+        "branch",
+        "fallbacks",
+        "selected",
+    )
+
+    def __init__(
+        self,
+        eos: EquationOfState,
+        mixture: Mixture,
+        temperature: float,
+        pressure: float,
+        *,
+        branch: str | None = None,
+    ) -> None:
+        self._eos = eos
+        self._mixture = mixture
+        self._temperature = temperature
+        self._pressure = pressure
+        self.branch = branch if branch in _ROOT_BRANCHES else None
+        self.selected = self.branch
+        self.fallbacks = 0
+
+    def fugacity_coefficients(self, composition: np.ndarray) -> np.ndarray:
+        """``phi(w)`` on this phase's root, as the model returned it.
+
+        ``composition`` must already be normalized - the split loop hands over
+        exactly the array it built with
+        :func:`chemthermo.flash._common.normalize_composition` and it reaches
+        the model unchanged, because re-normalizing a vector whose sum is one
+        only to the last bit would perturb the model's argument and with it
+        every double downstream. :meth:`ln_fugacity_terms` is the entry point
+        that does normalize.
+
+        The raw coefficients are returned rather than their logarithm so that
+        the caller's ``K = phi^x / phi^y`` update stays the floating-point
+        expression it was before ADR-0019.
+        """
+        w = np.asarray(composition, dtype=float)
+        failures: list[str] = []
+
+        if self.branch is not None:
+            phi = self._branch_coefficients(self.branch, w, failures)
+            if phi is not None:
+                self.selected = self.branch
+                return phi
+            self.fallbacks += 1
+
+        best: np.ndarray | None = None
+        best_label = ""
+        best_g = math.inf
+        for label in _ROOT_BRANCHES:
+            phi = self._branch_coefficients(label, w, failures)
+            if phi is None:
+                continue
+            g_res = float(np.sum(w * np.log(phi)))
+            if not math.isfinite(g_res):
+                failures.append(f"{label}: non-finite reduced residual Gibbs energy")
+                continue
+            if g_res < best_g:
+                best_g = g_res
+                best = phi
+                best_label = label
+
+        if best is None:
+            raise ModelError(
+                "No usable fugacity-coefficient root for this phase of the split ("
+                + "; ".join(failures)
+                + ")."
+            )
+        self.selected = best_label
+        return best
+
+    def ln_fugacity_terms(self, composition: np.ndarray) -> np.ndarray:
+        """``ln phi(w)`` on this phase's root, normalizing ``w`` first.
+
+        The tangent-plane fugacity term the second-order stage
+        (:func:`chemthermo.flash._second_order._second_order_split`) consumes,
+        with the same normalize-then-evaluate arithmetic the pre-ADR-0019
+        single-branch callable used.
+        """
         values = np.asarray(composition, dtype=float)
         total = float(np.sum(values))
         if total <= 0.0:
             raise ModelError("Equation of state called with a non-positive composition.")
-        phi = as_float_array(
-            eos.fugacity_coefficients(
-                mixture=mixture,
-                temperature_K=temperature,
-                pressure_Pa=pressure,
-                composition=(values / total).tolist(),
-                phase=phase,
-            )
-        )
-        if np.any(~np.isfinite(phi)) or np.any(phi <= 0.0):
-            raise ModelError("EOS returned non-positive fugacity coefficients.")
-        return np.log(phi)
+        return np.log(self.fugacity_coefficients(values / total))
 
-    return ln_phi
+    def _branch_coefficients(
+        self, branch: str, w: np.ndarray, failures: list[str]
+    ) -> np.ndarray | None:
+        """``phi`` on one branch, or None when that branch is unusable here."""
+        try:
+            values = as_float_array(
+                self._eos.fugacity_coefficients(
+                    mixture=self._mixture,
+                    temperature_K=self._temperature,
+                    pressure_Pa=self._pressure,
+                    composition=w.tolist(),
+                    phase=branch,
+                )
+            )
+        except Exception as exc:  # noqa: BLE001 - a root may be absent here
+            failures.append(f"{branch}: {exc}")
+            return None
+        if values.shape != w.shape:
+            raise ModelError("EOS returned inconsistent fugacity coefficient shapes.")
+        if np.any(~np.isfinite(values)) or np.any(values <= 0.0):
+            failures.append(f"{branch}: non-finite or non-positive fugacity coefficients")
+            return None
+        return values
 
 
 def _rachford_rice(z: np.ndarray, K: np.ndarray) -> tuple[float | None, float, float]:
