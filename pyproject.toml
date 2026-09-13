@@ -29,6 +29,11 @@ dev = [
 validation = [
   "thermo>=0.6.0",
   "teqp>=0.23",
+  # FeOs is the reference for the PC-SAFT **association** term (ADR-0018):
+  # teqp's PCSAFT kind does not implement association. It pulls in its own
+  # units package, whose PyPI name is `si-units` and whose import name is
+  # `si_units`; it is not listed separately because feos depends on it.
+  "feos>=0.10",
 ]
 
 [tool.pytest.ini_options]
