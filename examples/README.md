@@ -20,7 +20,17 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
 - `examples/basic/tp_flash_nrtl_vle.py`
   - Gamma-phi TP flash with NRTL (liquid) + Peng-Robinson (vapor).
 - `examples/basic/flash_tp_peng_robinson_demo.py`
-  - Existing TP flash demo (Peng-Robinson EOS).
+  - Existing TP flash demo (Peng-Robinson EOS). Its diagnostics block now also
+    prints the tangent-plane phase-detection keys (`phase_detection`,
+    `stability_status`, `tpd_min`, `k_seed`, `mass_balance_residual`,
+    `fugacity_residual`, `delta_g_split_rt`).
+- `examples/basic/flash_tp_auto_phase_demo.py`
+  - Automatic 1-vs-2 phase detection in `flash_tp` (ADR-0008): a stable feed, an
+    unstable feed whose split is seeded from the tangent-plane minimizer, and
+    the Methane / n-Pentane state at 175 K / 1.778 MPa where the legacy Wilson
+    heuristic returns a single liquid and the tangent-plane path returns two
+    phases. Prints both paths side by side plus the Gibbs-energy evidence.
+    Needs no optional dependency; see validation Cases F-1 and F-2.
 - `examples/basic/flash_tp_gamma_phi_demo.py`
   - Existing TP flash demo (gamma-phi, NRTL + Peng-Robinson).
   - Uses the packaged NRTL pairs, which are **synthetic illustrative placeholders**
@@ -38,6 +48,8 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
     packaged synthetic defaults. Needs no optional dependency.
 - `examples/validation/00_reference_case.py`
   - Deterministic single-case comparison against `thermo` (optional dependency).
+    Unchanged by the tangent-plane phase-detection slice: beta 0.46829044 vs
+    thermo 0.46976460, |delta| = 1.474e-03.
 - `examples/validation/06_stability_vs_thermo.py`
   - Deterministic stability cross-check against `thermo`'s Michelsen test over 7 states.
 - `examples/validation/07_nrtl_tessier_stationary_points.py`
