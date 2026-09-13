@@ -1414,15 +1414,55 @@ Rules:
     point.
   - None of (a)-(d) reports `phase_set_history`: the search was never entered,
     which is the correct signal that nothing was added or removed.
-  - **Recorded limitation, not accommodated.** At 363.0 K the two liquid
-    vertices differ by only 0.053 in x_1 (near the plait point). For the feed
-    at barycentric weights (0.5, 0.3, 0.2), z = (0.15493061, 0.04905728,
+  - **AMENDED (slice `stability-candidate-surfaces`, ADR-0012): the recorded
+    miss is resolved.** As first recorded: at 363.0 K the two liquid vertices
+    differ by only 0.053 in x_1 (near the plait point), and for the feed at
+    barycentric weights (0.5, 0.3, 0.2), z = (0.15493061, 0.04905728,
     0.79601210) - which **is** inside the triangle - every trial of the
-    deterministic stability set collapses onto the trivial solution,
-    `tpd_min = 0.0`, and `flash_tp` returns a single `"liquid"`. That is wrong
-    for this model. The failure is in the *stability* test, not in the phase
-    search, which is never entered. Pinned by test so that a future improvement
-    to the trial set is noticed rather than silently absorbed.
+    deterministic stability set collapsed onto the trivial solution,
+    `tpd_min = 0.0`, and `flash_tp` returned a single `"liquid"`, wrong for
+    this model.
+
+    The cause was diagnosed as candidate switching *inside* a trial, not a
+    reachability failure of the trial set. At that feed the lowest-Gibbs
+    candidate is the liquid, and the reduced tangent-plane distance is
+    **+8.07e-04** at x^I, **+1.33e-03** at x^II and **-9.92e-03** at the
+    equilibrium vapor y, so the feed was provably unstable. On the vapor
+    surface the stationary point is
+    w = (0.30324249, 0.05009844, 0.64665907) with
+    `tpd = -ln(sum W) = -1.1680295426e-02`, reachable in **one** successive
+    substitution because the ideal-gas term is zero (`ln W_i = d_i`). The old
+    iteration never got there: from the Raoult-vapor start the liquid
+    candidate has the lower Gibbs energy at the intermediate compositions, so
+    the update used the liquid terms and the iterate was dragged onto the
+    liquid surface and onto the trivial solution.
+
+    After ADR-0012 (one fixed candidate surface per trial, same starting
+    points, same trial count): `stability_tp(..., vapor="ideal")` reports
+    **unstable**, `tpd_min = -1.1680295426e-02`, `feed_branch = "liquid"`,
+    `phase_branch = "vapor"`, `minimizing_trial = "raoult-vapor"`,
+    `minimizing_trial_surface = "vapor"`, `trial_surfaces = "vapor:1,liquid:4"`;
+    the vapor trial converges in **2** successive-substitution iterations with
+    residual exactly 0.0. `flash_tp` then returns
+    `['liquid1', 'liquid2', 'vapor']` with compositions equal to the tie-triangle
+    above and fractions (0.5, 0.3, 0.2), both to **< 1e-8**. Pinned in
+    `tests/validation/test_vlle_water_propanol_butanol.py::test_the_thin_tie_triangle_at_363_k_is_found`
+    and `tests/test_flash_vlle.py::test_the_near_plait_ternary_feed_at_363_k_is_a_three_phase_state`.
+  - **What remains at that feed, recorded not accommodated.** The `pure-Water`
+    liquid-surface trial still does not converge: `converged = False`,
+    `tpd = nan` (the documented sentinel for a failed trial, not a number that
+    blew up - every iterate stays finite), `termination_reason =
+    "second_order_no_progress"`, residual **5.4e-04** at
+    w = (0.13762, 0.04163, 0.82075). The cause is the plait point, not
+    arithmetic: the stationarity Jacobian `dg/d(ln W)` there has eigenvalues
+    {**3.26e-09**, 1.106, 1.000}, condition number **8.2e+08**, so the Newton
+    direction is dominated by the near-null direction and the line search
+    cannot reduce the residual. Successive substitution on the same surface
+    *does* reach the trivial solution (residual 0.0) but needs ~1.2e+04
+    iterations, against `StabilitySettings.max_iter = 300`. The verdict does
+    not depend on it: 4 of the 5 trials converge and the instability is found
+    on the vapor surface. Pinned in
+    `tests/test_stability_candidates.py::test_the_pure_water_trial_stalls_near_the_plait_point`.
 - **Tolerance:** verdicts are exact (phase names and counts); the independent
   bubble and dew sums are compared against 1 with no tolerance needed
   (0.859-0.991 and 0.575).
@@ -1574,3 +1614,90 @@ Rules:
 - **Test path:** `tests/test_multiphase_rr.py`.
 - **Script:** none (a solver-level unit test; the flash-level scripts are
   Cases V-1 and V-3).
+
+---
+
+## Case V-5: The verdict map of the ternary VLLE region
+
+- **Source:** none external. This is a self-adjudicated case: the reference is
+  an independent lowest-Gibbs classifier written in the test and example files,
+  which share no code with `chemthermo.flash`. `thermo` 0.6.0 cannot hold two
+  distinct excess-Gibbs liquids over one model (Case L-2, re-checked directly
+  for this ternary in Case V-1), so no external three-phase reference exists
+  and none is claimed.
+- **Location:** `tests/validation/test_vlle_verdict_map.py` and
+  `examples/validation/12_vlle_verdict_map.py`.
+- **Assumptions:** modified Raoult (`f_i^0 = Psat_i(T)`, `phi^sat = 1`,
+  Poynting = 1, ideal vapor), as Case V-1. The adjudication rule is that the
+  equilibrium state is the admissible state of **least Gibbs energy**; equal
+  fugacities alone are satisfied by more than one of the candidates below.
+- **Components / units:** 1-Propanol(1) / n-Butanol(2) / Water(3),
+  P = 101325 Pa, T = 363.0, 364.0 and 365.0 K. Mole fractions; `G/RT`
+  dimensionless.
+- **Parameters and provenance:** as Case V-1 (Tessier et al. 2000 Table 1,
+  fixture `tests/fixtures/nrtl/tessier2000_problem1.json`; Antoine from the
+  packaged databank). **LLE-fitted, temperature independent, no experimental
+  ternary VLLE data is used.**
+- **Method:** for each feed, every state the model admits is built
+  independently and scored:
+  1. the tie-triangle (the six-equation Newton of Case V-1), admissible when
+     the feed's barycentric weights in it are all positive;
+  2. a vapor-liquid state, from a four-equation Newton solve of
+     `z_i - (1 - b) x_i - b K_i(x) x_i = 0`, `sum_i x_i = 1`, with
+     `K_i = gamma_i(x) Psat_i / P`, from five deterministic starts;
+  3. a liquid-liquid state, from a seven-equation Newton solve of the three
+     equal activities, two normalizations and two mass balances, from two
+     deterministic starts;
+  4. the single-phase state: the feed on its lowest-Gibbs candidate.
+
+  The lowest-Gibbs admissible state is the **expected** answer, compared feed
+  by feed against `flash_tp(..., flash_mode="modified-raoult")`.
+- **Grid:** per temperature, 21 feeds strictly inside the triangle (barycentric
+  lattice, all weights >= 1/8) plus every point of a 1/12 mole-fraction lattice
+  lying outside it by more than 1e-3 in barycentric coordinates - 55, 54 and 55
+  feeds respectively, so **76 / 75 / 76** feeds in total. Deterministic.
+- **Expected outcome and results:**
+  - **Zero disagreements at all three temperatures.** Confusion matrices
+    (rows expected, columns obtained; all off-diagonal entries are 0):
+
+    | T [K] | (1, 1) | (2, 2) | (3, 3) | feeds |
+    |---|---|---|---|---|
+    | 363.0 | 48 | 7 | 21 | 76 |
+    | 364.0 | 44 | 10 | 21 | 75 |
+    | 365.0 | 41 | 14 | 21 | 76 |
+
+    Every one of the 21 inside-feeds per temperature is three-phase and every
+    outside-feed is one or two phases, so the geometric statement "inside the
+    tie-triangle means three phases" is a *result* here, not an input.
+  - **Three-phase answers are the same triangle whatever the feed.** Worst
+    composition deviation from the independent tie-triangle over all 63
+    three-phase feeds: **9.50e-12** (363 K), 2.88e-12 (364 K), 1.03e-12
+    (365 K). Worst phase-fraction deviation from the feed's barycentric
+    weights: **1.63e-11**, 7.45e-12, 3.10e-12. Phase names are always
+    `liquid1`/`liquid2`/`vapor`.
+  - **Two-phase answers** satisfy `ln x_i + t_i` equal across the two phases to
+    **6.22e-15** (363 K), 3.78e-13 (364 K), 8.44e-15 (365 K), and mass balance
+    `sum_j beta_j x^j = z` to **1.11e-16** or better.
+  - **Single-phase answers** return the feed composition itself (to < 1e-12)
+    on the candidate of lower Gibbs energy, with
+    `diagnostics["phase_regime"] == "single-phase"`.
+  - **Two feeds needed the multi-start classifier, not the flash.** At 363 K,
+    z = (0.08333333, 0.16666667, 0.75) is liquid-liquid
+    (`flash_tp` G/RT = -0.8091073 against -0.8084371 for a single liquid) and
+    at 365 K, z = (0.16666667, 0.08333333, 0.75) is vapor-liquid
+    (-0.7234793 against -0.7214637 for a single vapor). A single-seed
+    independent solver missed both and would have recorded two false
+    disagreements; the seeds were widened, and the flash was right both times.
+- **Tolerance:** verdicts are exact (phase counts); 1e-8 asserted on
+  three-phase compositions and phase fractions (achieved 9.5e-12 and 1.6e-11);
+  1e-8 on the two-phase equilibrium residual (achieved 3.8e-13); 1e-10 on mass
+  balance (achieved 1.1e-16); 1e-12 on the single-phase composition;
+  1e-14 on the tie-triangle Newton residual (achieved 1.1e-15).
+- **Independent route:** the four solvers listed under **Method**, all written
+  in the test and example files with forward-difference Jacobians and their own
+  line searches, plus the NRTL equations and the Antoine form rewritten there.
+- **Test path:** `tests/validation/test_vlle_verdict_map.py`.
+- **Script:** `examples/validation/12_vlle_verdict_map.py`.
+- **Honesty note:** this case is evidence that the phase-count verdict is right
+  *on this grid, for this model*. It is not a proof of global correctness, and
+  it is not a comparison against measurement.
