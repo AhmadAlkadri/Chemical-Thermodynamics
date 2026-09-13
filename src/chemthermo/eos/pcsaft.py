@@ -1,15 +1,24 @@
-"""PC-SAFT equation of state (Gross & Sadowski 2001), non-associating.
+"""PC-SAFT equation of state (Gross & Sadowski 2001, 2002).
 
 Source
 ------
 J. Gross and G. Sadowski, "Perturbed-Chain SAFT: An Equation of State Based on
 a Perturbation Theory for Chain Molecules", Ind. Eng. Chem. Res. 40 (2001)
 1244-1260 (DOI 10.1021/ie0003887). Equation numbers below are that paper's
-appendix numbering. Only the hard-chain and dispersion contributions are
-implemented here; **association** (Gross & Sadowski, Ind. Eng. Chem. Res. 41
-(2002) 5510) and the **polar** terms are deliberately out of scope for this
-slice, so this module must not be used for associating or strongly polar
-fluids.
+appendix numbering, and the hard-chain and dispersion contributions written
+out below are its Eq. (A.4) and (A.10).
+
+The **association** contribution of J. Gross and G. Sadowski, "Application of
+the Perturbed-Chain SAFT Equation of State to Associating Systems", Ind. Eng.
+Chem. Res. 41 (2002) 5510-5515 (DOI 10.1021/ie010954d) is implemented too, in
+the sibling module :mod:`chemthermo.eos._pcsaft_association`, which carries
+its equations and its derivative route (ADR-0018). It is evaluated only when
+some component in the mixture carries association sites; when none does, the
+association code does not run at all and this module's numbers are those of
+ADR-0014 down to the last bit.
+
+Still out of scope: the **polar** (dipolar / quadrupolar) terms, so a strongly
+polar non-associating compound must not be modelled here.
 
 Units and conventions
 ---------------------
@@ -35,7 +44,7 @@ The equations, in the notation used below
 Reduced residual Helmholtz energy is the sum of a hard-chain and a dispersion
 contribution (Eq. A.3):
 
-    a_res = A^res / (N k T) = A^res / (R T) per mole = a_hc + a_disp
+    a_res = A^res / (N k T) = A^res / (R T) per mole = a_hc + a_disp [+ a_assoc]
 
 *Temperature-dependent segment diameter* (Eq. A.9):
 
@@ -150,8 +159,8 @@ branches as competing phase candidates and keeps the lowest-Gibbs one
 See ADR-0015 for why the fugacity interface, and not a new density-root
 candidate type, is the seam this slice uses.
 
-Still out of scope: association and polar terms, and any temperature
-derivative (so no caloric properties).
+Still out of scope: the polar terms, and any temperature derivative (so no
+caloric properties) - in the association contribution as in the rest.
 """
 
 from __future__ import annotations
@@ -495,7 +504,13 @@ def _evaluate(
 
 @dataclass(frozen=True)
 class PCSAFTEOS(EquationOfState, EOSProtocol):
-    """PC-SAFT equation of state for non-associating fluids (ADR-0014, ADR-0015).
+    """PC-SAFT equation of state (ADR-0014, ADR-0015, ADR-0018).
+
+    Hard chain plus dispersion (Gross & Sadowski 2001) and, for a component
+    whose parameter record carries an ``association`` block, the association
+    term of Gross & Sadowski (2002). :meth:`associates` reports whether the
+    term is active; :meth:`residual_helmholtz_terms` and :meth:`site_fractions`
+    expose it.
 
     Args:
         components: Component names, in the order every composition argument
