@@ -138,7 +138,8 @@ python examples/basic/flash_tp_auto_phase_demo.py
 - **Two phases at most.** A state that needs a third phase is now *reported* -
   the post-split check below raises rather than returning a two-phase answer the
   package has itself proved wrong - but it is not solved. Multiphase flash is
-  the next slice.
+  the next slice. The two phases may be **two liquids**; see "Liquid-liquid
+  equilibrium from an equation of state" below.
 - **The converged phases are re-tested for stability** (ADR-0009); see
   "Post-split stability" below.
 - **A split that successive substitution cannot finish is finished by a
@@ -164,14 +165,79 @@ python examples/basic/flash_tp_auto_phase_demo.py
   branch labels would otherwise coincide is exactly what `kappa` was added to
   settle, e.g. a compressed CO2-rich liquid now reports `"liquid"` with
   `vapor_fraction = 0.0` instead of a tie-broken `"vapor"`. For a two-phase
-  result the phase with the lower `kappa` is named `"liquid"`; when both
-  converged phases fall on the same side of the threshold (near-critical
-  states, where any label is a convention) the historical Wilson volatility
-  ranking is kept instead. `diagnostics["phase_label_method"]` records which
-  rule decided (`"compressibility"`, `"wilson-ranking"`, or `"tie-break"` for
-  a model without `phase_identity`). None of this ever decides the verdict or
-  the compositions - only which already-converged phase (or
-  `1 - vapor_fraction`) the name `"vapor"` attaches to.
+  result the phase measured as a vapor is named `"vapor"` and the other
+  `"liquid"`; when **both** measure as liquids the pair is named
+  `"liquid1"` / `"liquid2"` instead (ADR-0019, below); and when both measure as
+  vapors (near-critical states, where any label is a convention) or the model
+  does not implement `phase_identity`, the historical Wilson volatility ranking
+  is kept. `diagnostics["phase_label_method"]` records which rule decided
+  (`"compressibility"`, `"wilson-ranking"`, or `"tie-break"` for a model
+  without `phase_identity`). None of this ever decides the verdict or the
+  compositions - only which already-converged phase (or `1 - vapor_fraction`)
+  each name attaches to.
+
+### Liquid-liquid equilibrium from an equation of state
+
+`flash_tp(..., eos=...)` returns **two liquids** when that is what the state
+is, at any pressure (ADR-0019):
+
+```python
+import chemthermo as ct
+
+mixture = ct.Mixture.from_database(["Water", "n-Hexane"], [0.5, 0.5], normalize=True)
+result = ct.flash_tp(
+    mixture, temperature_K=298.15, pressure_Pa=101325.0, eos=ct.PCSAFTEOS()
+)
+
+print(result.phase_names())                 # ['liquid1', 'liquid2']
+print(result.vapor_fraction)                # None - neither phase is a vapor
+print(result.diagnostics["phase_regime"])   # 'LLE'
+print(result.phases["liquid1"].composition.fractions)
+# (0.999983257..., 1.674279...e-05)     the water-rich liquid
+print(result.phases["liquid2"].composition.fractions)
+# (0.006312223..., 0.993687776...)      the hexane-rich liquid
+```
+
+```bash
+python examples/basic/flash_tp_pcsaft_lle_demo.py
+```
+
+Until ADR-0019 that call raised. The split evaluated one phase on the model's
+`"liquid"` density root and the other on its `"vapor"` root, always - so
+wherever a vapor root still exists (water / n-hexane at 1 atm has one) the only
+pair it could offer was a vapor-liquid one, its Gibbs energy came out *above*
+the feed's, and the post-split stability test refused it. Each phase now sits
+on the branch the tangent-plane stability test found **that phase** on, so both
+may be liquids.
+
+What to expect from the result:
+
+- **Naming.** Both phases measured as liquids -> `"liquid1"` / `"liquid2"`,
+  `vapor_fraction = None` (reporting a vapor fraction for a set with no vapor
+  in it would be fiction), `diagnostics["phase_regime"] == "LLE"`. One of each
+  -> `"liquid"` / `"vapor"` with a real `vapor_fraction`, exactly as before.
+- **`liquid1` is the phase with the larger mole fraction of the first
+  component**, ties broken by the next component. That order is deterministic
+  and composition-based, so two feeds on one tie line come back with the same
+  labels on the same phases - unlike the `gamma-gamma` path's `liquid1` /
+  `liquid2`, which are roles assigned by the seed and may swap. Permuting the
+  mixture's components permutes which phase is `liquid1`; the phase *set* does
+  not change.
+- **`diagnostics["phase_i_branch"]` / `["phase_ii_branch"]`** report the
+  measured identity of the density root each phase converged on, and are
+  present **only** when that pair is not the historical `("liquid", "vapor")` -
+  read them with `.get()`.
+- Every verification residual is reported as usual: the split must be a Gibbs
+  decrease against the feed, must satisfy equal fugacities and the mass
+  balance, and every converged phase is re-tested for stability.
+
+Nothing about vapor-liquid results changed: the 155-state bit-identity fixture
+(`tests/test_flash_refactor_bit_identity.py`) passes unchanged, and a separate
+test replays all 144 Peng-Robinson phi-phi states in it to show that on every
+iterate each phase was evaluated on exactly the root the old fixed assignment
+would have used. A phi-phi state that needs **three** phases still raises; that
+is the next slice (validation Case P-8 brackets one, water / n-hexane at 1 atm
+between 328 K and 335 K).
 
 ### When successive substitution oscillates
 
@@ -262,13 +328,13 @@ Notes and limits:
 - **The number of liquid phases is an output.** The feed is tested with
   `stability_tp(..., activity_model=...)` first; a stable feed returns a single
   phase named `"liquid"`. There is no "assume two liquids" mode.
-- **`liquid1` / `liquid2` are roles, not identities.** `liquid1` is the phase
-  the split started from as feed-like, `liquid2` the one started from the
-  tangent-plane minimizer. Nothing distinguishes two liquids the way volatility
-  distinguishes a vapor from a liquid, so no attempt is made to name them by
-  composition: two feeds on the same tie-line can come back with the same two
-  compositions under swapped labels. Compare the phase *set*, not
-  `result.phases["liquid1"]`.
+- **`liquid1` / `liquid2` are roles, not identities, on this path.** `liquid1`
+  is the phase the split started from as feed-like, `liquid2` the one started
+  from the tangent-plane minimizer, so two feeds on the same tie-line can come
+  back with the same two compositions under swapped labels. Compare the phase
+  *set*, not `result.phases["liquid1"]`. (The **phi-phi** path's `liquid1` /
+  `liquid2` are ordered by composition instead and do not swap; see
+  "Liquid-liquid equilibrium from an equation of state" above.)
 - `vapor_fraction` is always `None` for a gamma-gamma result; use
   `result.phase_fractions`.
 - **Verification.** Every split reports `mass_balance_residual`,
@@ -899,8 +965,10 @@ Peng-Robinson convention verbatim. **One root is a normal answer**, not a
 failure: at a dense or supercritical state both labels name the same state,
 and the phase name that comes back is now a compressibility measurement, not
 a tie-break (ADR-0017) - see `eos.phase_identity(...)` and the "Vapor/liquid
-naming" note above. The spinodal-branch root is found and discarded, never
-returned.
+naming" note above. Which root a *split* phase sits on is decided per phase by
+the stability test (ADR-0019), which is what lets two liquids coexist at a
+pressure where a vapour root also exists. The spinodal-branch root is found and
+discarded, never returned.
 `PCSAFTEOS.molar_volume(..., phase=)` is the reciprocal of the selected root.
 
 Two roots close enough together to fall inside one step of the scan grid
@@ -1022,8 +1090,10 @@ from `chemthermo` if you prefer to build the block as an object.
 - **Two phases at most.** The phi-phi flash decides one phase versus two and
   stops there, whatever `FlashSettings(max_phases=...)` says (ADR-0009,
   ADR-0011). Automatic phase *addition* exists only on the `modified-raoult`
-  path. A three-phase PC-SAFT system is returned as one or two phases with no
-  error.
+  path. The two phases may be two liquids since ADR-0019, so a liquid-liquid
+  PC-SAFT state is now an answer rather than a refusal; a genuinely
+  **three**-phase state still raises (the post-split stability test proves the
+  two-phase set wrong rather than returning it).
 - **The `(T, rho, x)` methods still choose nothing.** `compressibility_factor`,
   `pressure_Pa` and `ln_fugacity_coefficients` take the density you give them.
   Between the two spinodals `Z` is negative, `pressure_Pa` returns the (real)
@@ -1064,6 +1134,13 @@ from `chemthermo` if you prefer to build the block as an object.
   phases give equal fugacities to 6.1e-10 (water/ethanol VLE) and 1.2e-11
   (water/n-hexane LLE). See validation Cases P-6 and P-7 and
   `examples/validation/16_pcsaft_association_vs_feos.py`.
+- The **liquid-liquid** tie line is validated against FeOs's own two-phase
+  flash as well as its chemical potentials: water / n-hexane at 298.15 K, at
+  1 atm and at 1 MPa, compositions to 6.5e-09 and phase amounts to 3.3e-09
+  absolute, densities to 5.6e-09 relative, and FeOs's chemical potentials at
+  chemthermo's phases equal to 1.2e-11 with matched universal constants
+  (2.6e-06 as shipped). See validation Case P-8 and
+  `examples/validation/17_pcsaft_lle_vs_feos.py`.
 
 ## EOS extension points
 

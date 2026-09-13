@@ -2687,7 +2687,17 @@ regression this slice fixes.
 
 ### (iii) Water / n-hexane at 298.15 K - what the phi-phi path can and cannot do
 
-- **At 1 atm, the documented failure.** `stability_tp` is **right**: the feed
+> **Amended 2026-09-13 by ADR-0019 (`flash-eos-per-phase-roots`), superseded by
+> Case P-8.** The limitation recorded below is **resolved**: the split no longer
+> pins one phase to the liquid root and the other to the vapour root, so at 1 atm
+> `flash_tp` returns the two liquids FeOs returns, and at 1 MPa the same tie line
+> comes back named `liquid1` / `liquid2` with `vapor_fraction = None` instead of
+> falling through to the Wilson ranking. Everything below is kept **as written**,
+> because it is the measured record of the defect and of what the pre-ADR-0019
+> code actually produced; Case P-8 carries the numbers that hold now. The two
+> tests named at the end of Case P-7 were renamed and rewritten accordingly.
+
+- **At 1 atm, the documented failure (pre-ADR-0019).** `stability_tp` is **right**: the feed
   is `unstable` with `tpd_min = -9.281926e-01`. `flash_tp` then **raises
   `ConvergenceError`** ("a third phase is required"). With
   `FlashSettings(post_split_stability=False)` the converged pair is a
@@ -2741,16 +2751,195 @@ regression this slice fixes.
 - **Tolerance:** asserted 1e-6 relative on the three saturation numbers
   (achieved <= 3.73e-10) and 1e-8 on both equal-fugacity residuals (achieved
   6.12e-10 and 1.22e-11).
-- **Not covered:** a three-phase (vapour + two liquids) EOS state, which this
-  system has at 1 atm and which no path in this package can return; any
-  liquid-liquid EOS split at a pressure where a vapour root still exists.
+- **Not covered (at the time of writing):** a three-phase (vapour + two
+  liquids) EOS state, which this system has at 1 atm near 330 K and which no
+  path in this package can return - **still not covered**, and now the only
+  remaining phi-phi phase-count gap (Case P-8 brackets the window); any
+  liquid-liquid EOS split at a pressure where a vapour root still exists -
+  **covered since ADR-0019**, see Case P-8.
 - **Independent route:** FeOs's own saturation Newton solve, its own two-phase
   flash, and its own chemical potentials evaluated at chemthermo's converged
   states.
 - **Test path:** `tests/validation/test_pcsaft_association_vs_feos.py`
   (`test_pure_water_saturation_matches_feos`,
   `test_water_ethanol_vapor_liquid_flash_matches_feos`,
-  `test_water_hexane_is_unstable_and_the_phi_phi_split_cannot_express_two_liquids`,
-  `test_water_hexane_liquid_liquid_split_above_the_vapour_root`)
+  `test_water_hexane_at_one_atm_is_two_liquids_and_feos_agrees` - renamed from
+  `test_water_hexane_is_unstable_and_the_phi_phi_split_cannot_express_two_liquids`
+  by ADR-0019, `test_water_hexane_liquid_liquid_split_above_the_vapour_root`)
 - **Script:** `examples/validation/16_pcsaft_association_vs_feos.py`,
   `examples/basic/pcsaft_association_demo.py`.
+
+---
+
+## Case P-8: Liquid-liquid equilibrium from an equation of state
+
+- **Source:** FeOs 0.10.1 (feos-org/feos, MIT OR Apache-2.0), as Cases P-6 and
+  P-7: `State.tp_flash()` (its own two-phase flash, with its own stability
+  analysis) and `State.chemical_potential(Contributions.Residual)` evaluated at
+  **chemthermo's** converged phases and densities.
+- **Location:** `flash_tp(mixture, ..., eos=PCSAFTEOS())` and
+  `flash_tp(mixture, ..., eos=PengRobinsonEOS())` on the tangent-plane path.
+  The slice is `flash-eos-per-phase-roots` (ADR-0019); it changes
+  `chemthermo/flash/_split.py` and `_detect.py` and nothing else in `src/`.
+- **Assumptions:** 2B association for water; `k_ij = 0`; the packaged Gross &
+  Sadowski (2002) / (2001) parameters. As in Case P-7, the comparisons that
+  evaluate **FeOs** at **chemthermo's own densities** are run twice - with the
+  shipped ten-figure universal constants and with FeOs's fourteen-figure ones -
+  because that table difference, not either solver, floors the residual. Both
+  numbers are recorded below.
+- **Components / units:** water / n-hexane at 298.15 K, at 101,325 Pa and at
+  1 MPa, `z = (0.5, 0.5)`, `(0.2, 0.8)` and `(0.8, 0.2)`. Pressures in Pa,
+  densities in mol/m^3, compositions in mole fractions.
+
+### (i) The state Case P-7(iii) could not express: 298.15 K, 1 atm, z = 0.5/0.5
+
+- **Premise, measured:** `stability_tp` -> `unstable`,
+  `tpd_min = -9.281926e-01`, `feed_branch = "liquid"`,
+  `phase_branch = "liquid"`; the isotherm still has **two** density roots at
+  the feed composition (43.01 and 13,419.37 mol/m^3), so the pre-ADR-0019 fixed
+  liquid/vapour pairing had a vapour root to land on and did (Case P-7(iii)).
+- **Expected outcome (FeOs `tp_flash`):** water-rich phase
+  `x = (0.9999832572043167, 1.6742795683233053e-05)` at
+  `rho = 51,174.64281417162`; hexane-rich phase
+  `x = (0.0063122298802306175, 0.9936877701197695)` at
+  `rho = 7,578.020786675787`; fraction of the hexane-rich phase
+  `0.5031677924139043`. FeOs's container calls the hexane-rich phase `vapor`;
+  **both densities are liquid densities**, which the test asserts rather than
+  trusting the names.
+- **Achieved (chemthermo, shipped constants):** `phases = {"liquid1",
+  "liquid2"}`, `vapor_fraction = None`, `phase_regime = "LLE"`,
+  `phase_label_method = "compressibility"`,
+  `phase_i_branch = phase_ii_branch = "liquid"`.
+  `liquid1 = (0.999983257204303, 1.6742795697016702e-05)` at
+  `rho = 51,174.64281031051`, fraction `0.49683221079476425`;
+  `liquid2 = (0.006312223543853401, 0.9936877764561466)` at
+  `rho = 7,578.020745569911`, fraction `0.5031677892052357`.
+  `delta_g_split_rt = -5.084812e-01`, `fugacity_residual = 7.09e-12`,
+  `mass_balance_residual = 9.33e-14`, `post_split_status = "stable"`.
+- **Agreement with FeOs's flash (shipped constants):** compositions
+  **1.38e-14** (water-rich) and **6.34e-09** (hexane-rich) absolute; densities
+  **7.54e-11** and **5.42e-09** relative; phase fraction **3.21e-09**. With
+  FeOs's constants substituted the water-rich numbers fall to **6.66e-16** and
+  **3.55e-15**; the hexane-rich ones do **not** (6.34e-09, 5.34e-09), because
+  they are FeOs's own flash tolerance rather than a model difference - see the
+  chemical-potential check next.
+- **FeOs's chemical potentials at chemthermo's phases:**
+  `max_i |mu_i^I - mu_i^II| / RT` = **5.265e-12** with matched constants and
+  **2.606e-06** as shipped, against an asserted 1e-8. This is the check that
+  does not depend on FeOs's flash converging: only the two compositions and
+  the two densities are chemthermo's.
+- **Both phases are liquids, independently:** `kappa = P / (rho dP/drho)`
+  recomputed from the public `PCSAFTEOS.pressure_Pa` by central difference (not
+  from `phase_identity`'s own analytic derivative) is **2.475e-05** for
+  `liquid1` and **2.081e-04** for `liquid2`, against
+  `KAPPA_LIQUID_THRESHOLD = 0.5` (ADR-0017).
+
+### (ii) The same tie line from three feeds (the lever rule)
+
+- **Expected outcome:** a tie line is a property of the state; changing the
+  feed must change only the amounts.
+- **Achieved:** `z = (0.2, 0.8)` and `(0.8, 0.2)` return the *same* two
+  compositions as `z = (0.5, 0.5)` to better than 1e-10, with fractions
+  `0.19492143 / 0.80507857` and `0.79874299 / 0.20125701`; the lever-rule
+  residual `max_i |z_i - ((1-beta) x_i^I + beta x_i^II)|` is **9.3e-14**,
+  **1.1e-16** and **0.0** respectively. `liquid1` is the water-rich phase at
+  every feed, because ADR-0019 orders the two names by the first component's
+  mole fraction rather than by seed role.
+- **Observed limit of the reference, recorded not worked around:** FeOs's own
+  `tp_flash` raises `"stability analysis did not converge"` at
+  `z = (0.2, 0.8)` on this binary (feos 0.10.1). `z = (0.8, 0.2)` converges. So
+  the three feeds are compared against the `z = 0.5/0.5` FeOs tie line, which
+  all three reproduce to 1e-8.
+
+### (iii) The 1 MPa tie line, now named `liquid1` / `liquid2`
+
+- **Expected outcome:** the same numbers Case P-7(iii) recorded at 1 MPa, with
+  the `wilson-ranking` fallback no longer firing.
+- **Achieved:** `liquid1 = (0.9999831809598392, 1.68190401608668e-05)` at
+  `rho = 51,185.848656244416`, fraction `0.4968359921458614`;
+  `liquid2 = (0.006304831246250744, 0.9936951687537494)` at
+  `rho = 7,591.861938295979`, fraction `0.5031640078541386`;
+  `vapor_fraction = None`, `phase_regime = "LLE"`,
+  `phase_label_method = "compressibility"` (it was `"wilson-ranking"` before),
+  `delta_g_split_rt = -5.079126e-01`, `fugacity_residual = 2.56e-13`,
+  `post_split_status = "stable"`. Against FeOs's flash: compositions 1.49e-14
+  and 6.47e-09, densities 7.54e-11 and 5.53e-09 relative, fraction 3.28e-09.
+  FeOs's chemical potentials at these phases: **1.222e-11** matched,
+  **2.620e-07** as shipped. The tie line moves by less than 1e-5 between 1 atm
+  and 1 MPa, as a liquid one should.
+
+### (iv) Peng-Robinson on the same binary (reported, not forced)
+
+- **Expected outcome:** none asserted. The question was only whether a cubic
+  with `k_ij = 0` shows a miscibility gap here, and whether whatever it returns
+  is a verified equilibrium **of that model**.
+- **Achieved:** at 298.15 K / 1 atm, `stability_tp` -> `unstable`,
+  `tpd_min = -2.481382`, both branches `"liquid"`. `flash_tp` returns
+  `liquid1 = (0.99999999999851219, 1.4878377535914647e-12)` (fraction
+  `0.49135398481939774`) and
+  `liquid2 = (0.016998098723775595, 0.98300190127622444)` (fraction
+  `0.5086460151806023`), `delta_g_split_rt = -1.121704189194578`,
+  `fugacity_residual = 6.59e-13`, `post_split_status = "stable"`, both phases
+  measured `"liquid"` by `phase_identity`. **Before this slice the same call
+  raised** `ConvergenceError` ("a third phase is required", post-split
+  `tpd = -1.523828`), which was confirmed by re-running with the pre-slice
+  branch pinning forced.
+- **Model versus experiment (remark, not an assertion):** Peng-Robinson with
+  `k_ij = 0` puts essentially **zero** hexane in the water-rich phase
+  (1.5e-12 mole fraction) and 1.70e-02 water in the hexane-rich phase. Neither
+  is a useful prediction and nothing asserts them; this sub-case records that
+  the machinery is model-agnostic, not that the cubic is right here.
+
+### Bit-identity and regression
+
+- **Expected outcome:** every previously pinned number unchanged.
+- **Achieved:** `tests/test_flash_refactor_bit_identity.py` passes **unchanged**
+  against `refactor_bit_identity_v2.json` (155 states, floats compared with
+  `==`); **no fixture regeneration was needed and none was done**, so the audit
+  policy's v3 path was not taken. Separately,
+  `test_the_pinned_root_is_the_historical_branch_on_the_whole_phi_phi_grid`
+  replays all 144 Peng-Robinson phi-phi states of that fixture with `_PhaseRoot`
+  instrumented and asserts that on all **47** two-phase states, at **every**
+  iterate, each phase's fugacity coefficients are exactly (`==`) the ones the
+  pre-slice `phase="liquid"` / `phase="vapor"` assignment would have produced
+  (the other 97 states are single-phase and build no `_PhaseRoot`). Cases
+  P-1..P-7, F-4 and its 16-state subset, the 188-state slow grid, the teqp
+  cross-checks, the modified-Raoult / VLLE / gamma-gamma numbers and the CLI
+  contract fixtures are unchanged.
+- **A rejected design, measured:** re-selecting the lowest-Gibbs root at every
+  *iterate* (rather than pinning the branch the stability test reported) breaks
+  the ADR-0016 reference state. PC-SAFT carbon dioxide / n-decane,
+  `z = (0.9, 0.1)`, 240 K, 1.0 MPa: the liquid phase reaches
+  `x = (0.99066, 0.00934)` at the fifteenth iterate, where the vapour root has
+  the lower Gibbs energy, both phases then collapse onto one root and the split
+  returns `beta = -3.247203e+09`. Recorded in ADR-0019 "Alternatives
+  considered"; the shipped rule pins the branch and lets the post-split
+  stability test enforce the lowest-Gibbs condition at the solution.
+
+### Still not covered
+
+A three-phase (vapour + two liquids) EOS state. **Bracketed, measured with
+this slice's code**, water / n-hexane at 1 atm, `z = (0.5, 0.5)`: 322, 324,
+326 and 328 K return a stable two-liquid result; 335, 336, 340 and 350 K
+return a stable vapour-liquid result; **330 K and 334 K raise**
+`ConvergenceError` because the post-split stability test finds a converged
+phase unstable. That window is the target of the next slice,
+`flash-phase-addition-eos`.
+
+- **Tolerance:** asserted 1e-8 absolute on compositions and phase fractions
+  against FeOs's flash (achieved <= 6.47e-09), 1e-6 relative on densities
+  (achieved <= 5.53e-09), 1e-8 on FeOs's chemical potentials at chemthermo's
+  phases with matched constants (achieved <= 1.22e-11), 1e-9 on the
+  fugacity residual (achieved <= 7.09e-12) and 1e-12 on the mass balance
+  (achieved <= 9.33e-14).
+- **Independent route:** FeOs's own two-phase flash and its own chemical
+  potentials; the lever rule; a `kappa` rebuilt from the public
+  `pressure_Pa` by finite difference; and, for Peng-Robinson, `stability_tp`
+  re-run on each converged phase from the public API.
+- **Negative control:** perturbing water's `epsilon^AB / k` by 1 % moves
+  `x_water` in the hexane-rich phase by **4.79e-04**, so the agreement is not a
+  statement about numbers that stopped depending on the model.
+- **Test path:** `tests/test_flash_eos_lle.py` (no optional dependency) and
+  `tests/validation/test_pcsaft_lle_vs_feos.py` (skipped without `feos`).
+- **Script:** `examples/basic/flash_tp_pcsaft_lle_demo.py`,
+  `examples/validation/17_pcsaft_lle_vs_feos.py`.
