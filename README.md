@@ -154,15 +154,24 @@ python examples/basic/flash_tp_auto_phase_demo.py
   gamma-phi stability test needs a consistent pure-liquid reference fugacity
   that this package does not yet carry; see ADR-0007 for why building one on the
   current gamma-phi flash would produce a silently wrong tangent plane.
-- **Vapor/liquid naming is a convention in two places.** For a single-phase
-  result the name is the minimum-Gibbs compressibility root branch; when the
-  cubic has a single real root (dense or supercritical fluids) both branches
-  coincide and the name is a tie-break, not a phase identification. For a
-  two-phase result the phase named `vapor` is the one enriched, relative to the
-  feed, in the component with the largest Wilson K over the one with the
-  smallest. `EquationOfState` exposes no molar volume, so no density-based
-  identification is available; this decides the *name* only, never the verdict
-  or the compositions.
+- **Vapor/liquid naming is measured by compressibility, not guessed** (ADR-0017).
+  `EquationOfState.phase_identity` computes a dimensionless isothermal
+  compressibility ratio (`kappa = P / (rho * dP/drho)`, 1 for an ideal gas and
+  well below 1 for a liquid) at the root a phase actually converged on, and
+  the model that has one implements it (Peng-Robinson and PC-SAFT both do).
+  For a single-phase result this replaces the pre-ADR-0017 min-Gibbs
+  tie-break - the case where the cubic has a single real root and both
+  branch labels would otherwise coincide is exactly what `kappa` was added to
+  settle, e.g. a compressed CO2-rich liquid now reports `"liquid"` with
+  `vapor_fraction = 0.0` instead of a tie-broken `"vapor"`. For a two-phase
+  result the phase with the lower `kappa` is named `"liquid"`; when both
+  converged phases fall on the same side of the threshold (near-critical
+  states, where any label is a convention) the historical Wilson volatility
+  ranking is kept instead. `diagnostics["phase_label_method"]` records which
+  rule decided (`"compressibility"`, `"wilson-ranking"`, or `"tie-break"` for
+  a model without `phase_identity`). None of this ever decides the verdict or
+  the compositions - only which already-converged phase (or
+  `1 - vapor_fraction`) the name `"vapor"` attaches to.
 
 ### When successive substitution oscillates
 
@@ -886,9 +895,11 @@ Only mechanically stable roots (`dP/drho > 0`) are returned, ascending, so the
 first is the vapour-like candidate and the last the liquid-like one -
 `phase="vapor"` and `phase="liquid"` pick exactly those, which is the
 Peng-Robinson convention verbatim. **One root is a normal answer**, not a
-failure: at a dense or supercritical state both labels name the same state and
-the phase name that comes back is the min-Gibbs tie-break convention. The
-spinodal-branch root is found and discarded, never returned.
+failure: at a dense or supercritical state both labels name the same state,
+and the phase name that comes back is now a compressibility measurement, not
+a tie-break (ADR-0017) - see `eos.phase_identity(...)` and the "Vapor/liquid
+naming" note above. The spinodal-branch root is found and discarded, never
+returned.
 `PCSAFTEOS.molar_volume(..., phase=)` is the reciprocal of the selected root.
 
 Two roots close enough together to fall inside one step of the scan grid

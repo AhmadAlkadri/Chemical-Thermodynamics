@@ -2215,3 +2215,245 @@ Rules:
   `tests/validation/test_flash_split_robustness_pcsaft.py`,
   `tests/test_rachford_rice_extended.py`.
 - **Script:** `examples/validation/15_flash_split_robustness.py`.
+
+## Case F-5: Phase identity by compressibility, and a runtime trim
+
+- **Source:** The criterion is internal (ADR-0017); the alternative it was
+  weighed against and rejected is published - G. Venkatarathnam and
+  L. R. Oellrich, "Identification of the phase of a fluid using partial
+  derivatives of pressure, volume, and temperature without reference to
+  saturation properties: Applications in phase equilibria calculations",
+  *Fluid Phase Equilibria* **301** (2011) 200-203 (the `Pi` criterion,
+  rejected for needing `(dP/dT)_v` and `Cp`, which this package's PC-SAFT
+  implementation does not have). All numbers below are produced by an
+  **independent route**: the analytic `kappa` the shipped code computes is
+  cross-checked against a finite difference built without reading the
+  package's private mixing-rule code (Peng-Robinson: rebuilt from
+  `Component.tc_k/pc_pa/omega` directly; PC-SAFT: a finite difference of the
+  already-public `pressure_Pa(T, rho, x)`).
+- **Location:** `tests/test_phase_identity.py`,
+  `tests/test_flash_refactor_bit_identity.py`,
+  `tests/validation/test_flash_split_robustness_pcsaft_subset.py`.
+- **Assumptions:** Peng-Robinson with `kij = 0`; PC-SAFT (Gross & Sadowski
+  2001) hard chain + dispersion, no association, `kij = 0`. Mole fractions; T
+  in K, P in Pa, densities in mol/m^3; `kappa` dimensionless.
+- **Components / units, grids:**
+  - Peng-Robinson: the 144-state grid of `tests/test_flash_phase_detection.py`
+    / `tests/test_flash_refactor_bit_identity.py` - 6 mixtures (Methane/Ethane,
+    Methane/Propane, Ethane/n-Heptane, Methane/n-Pentane,
+    Methane/Ethane/Propane, Propane/n-Butane/n-Pentane) x T in {170, 200, 240,
+    280, 320, 360} K x P in {0.2, 1.0, 3.0, 8.0} MPa.
+  - PC-SAFT: the 188-state Case F-4 grid of
+    `tests/validation/test_flash_split_robustness_pcsaft.py` - carbon dioxide /
+    n-decane and methane / n-hexane, as in Case F-4.
+- **Parameters and provenance:** Peng-Robinson `Tc`/`Pc`/`omega` from the
+  packaged databank (unchanged by this slice); PC-SAFT records as in Case F-4.
+
+### 1) The criterion and the threshold
+
+`kappa = P / (rho (dP/drho)_T)` (equivalently `-P / (V (dP/dV)_T)`): exactly 1
+for an ideal gas, well below 1 for a liquid. `KAPPA_LIQUID_THRESHOLD = 0.5`
+(`chemthermo.models.base`) labels a root `"liquid"` when `kappa < 0.5`, else
+`"vapor"`. Both derivatives are analytic in the shipped code (Peng-Robinson:
+`dP/dV` of the cubic's own `P = RT/(V-b) - a/(V^2+2bV-b^2)`; PC-SAFT: the
+`dP/drho` `PCSAFTIsotherm.pressure_and_slope` already computes for the
+density-root solver, ADR-0015) - no new root-finding, no finite difference in
+the shipped implementation.
+
+**Analytic vs. finite difference (Peng-Robinson).** Over 9 representative
+states (`tests/test_phase_identity.py::test_pr_analytic_dP_dV_matches_finite_difference`,
+parametrized), the shipped analytic `kappa` and an independently rebuilt
+central-difference `kappa` (step `1e-6` relative in `V`, `a_mix`/`b_mix` from
+`Component.tc_k/pc_pa/omega` alone, never the package's private
+`_mixture_parameters`) agree to **< 1e-8 relative** on every state, and
+`PengRobinsonEOS.phase_identity`'s returned label matches what the
+finite-difference `kappa` alone implies on every one.
+
+### 2) Kappa separation over both grids
+
+Full-grid measurements (script logic reproduced in
+`tests/test_phase_identity.py`'s docstrings; the pytest module itself uses a
+smaller, cheap fixed sample of each grid rather than re-scanning both in
+full on every `pytest -q`, to protect the runtime trim in part 4):
+
+| grid | class | n roots | kappa min | kappa max |
+|---|---|---:|---:|---:|
+| Peng-Robinson, 144-state | two-phase liquid root | 47 | 1.13e-04 | 2.30e-01 |
+| Peng-Robinson, 144-state | two-phase vapor root | 47 | 1.01e+00 | 1.48e+00 |
+| Peng-Robinson, 144-state | single-phase liquid root | 52 | 1.35e-04 | 1.95e-01 |
+| Peng-Robinson, 144-state | single-phase vapor root | 45 | 7.44e-01 | 1.76e+00 |
+| PC-SAFT, 188-state (Case F-4) | two-phase liquid root | 123 | 4.88e-04 | 8.50e-03 |
+| PC-SAFT, 188-state | two-phase vapor root | 123 | 1.04e+00 | 1.87e+00 |
+| PC-SAFT, 188-state | single-phase liquid root | 65 | 1.17e-03 | 3.20e-02 |
+| PC-SAFT, 188-state | single-phase vapor root | 0 | - | - |
+
+Over both grids combined: every liquid root has `kappa <= 0.230`; every vapor
+root has `kappa >= 0.744`. `0.5` separates every one of the 599 roots across
+both grids with a margin `>= 0.24` on each side - it is not a value chosen to
+make one state come out right. (PC-SAFT's grid has no single-phase vapor
+state: a property of its feed/T/P range, not of the criterion - the two-phase
+vapor roots on that same grid are still `>= 1.04`.)
+
+**Near-critical states**, where any label is a convention: none exist as a
+*two-phase* result on either validated grid.
+`phase_label_method == "compressibility"` on all 47 Peng-Robinson and all 123
+PC-SAFT two-phase states measured - the Wilson-ranking fallback
+(`_orient_two_phase_labels`, triggered when both converged phases land on the
+same side of the threshold) is not exercised by either grid, and is recorded
+as such rather than hidden.
+
+### 3) The two motivating states, and one that must not move
+
+| state | before (`32f693b`) | after |
+|---|---|---|
+| PC-SAFT, CO2/n-decane `z=(0.9,0.1)`, 230 K, 2.5 MPa (one density root, 18,676.8 mol/m^3) | `"vapor"`, `vapor_fraction=1.0` | `"liquid"`, `vapor_fraction=0.0`, `phase_label_method="compressibility"` |
+| PC-SAFT, methane/n-hexane `z=(0.5,0.5)`, 170 K, 2.0 MPa (one density root, 12,871.6 mol/m^3) | `"vapor"`, `vapor_fraction=1.0` | `"liquid"`, `vapor_fraction=0.0`, `phase_label_method="compressibility"` |
+| Peng-Robinson, methane/ethane `z=(0.5,0.5)`, 450 K, 1 bar (dilute, genuinely superheated) | `"vapor"`, `vapor_fraction=1.0` | unchanged: `"vapor"`, `vapor_fraction=1.0`, `phase_label_method="compressibility"` |
+
+### 4) Splits: the phase called "liquid" always has the higher density
+
+Checked over every two-phase result of both grids (47 Peng-Robinson, 123
+PC-SAFT, both measured via the kappa tables above using the same converged
+`x`/`y`): `Z(liquid) < Z(vapor)` on all 47 Peng-Robinson states (`Z(liquid)`
+in `[0.0069, 0.302]`, `Z(vapor)` in `[0.615, 0.990]` - lower `Z` is higher
+density at fixed `(T, P)`), and `rho(liquid) > rho(vapor)` on all 123 PC-SAFT
+states. Zero violations on either grid.
+
+### 5) The bit-identity audit: every changed state
+
+`tests/test_flash_refactor_bit_identity.py` pins 155 states, bit for bit
+(floats compared with `==`). Auditing the old fixture
+(`refactor_bit_identity_v1.json`, HEAD `e927623`-through-`32f693b`, kept for
+history) against the ADR-0017 code, state by state:
+
+- **46 of the 144 Peng-Robinson phi-phi grid states changed** - every one
+  single-phase, every one `feed_branch`/name `"vapor"` (tie-break) ->
+  `"liquid"` (measured), `vapor_fraction` `1.0 -> 0.0`,
+  `diagnostics["phase_state"]` mirrors the name change, and a new
+  `diagnostics["phase_label_method"] = "compressibility"` key. **Zero**
+  composition changes, **zero** fraction-*set* changes (a single-phase
+  result's fraction set `{1.0}` is unchanged regardless of which name it is
+  attached to), **zero** other diagnostics-number changes, checked
+  programmatically for every one of the 155 states before the v2 fixture was
+  written. The full table (mixture, T, P, the finite-difference `kappa` at
+  that state, old label, new label):
+
+  | mixture | T / K | P / MPa | kappa | old | new |
+  |---|---:|---:|---:|---|---|
+  | Ethane/n-Heptane | 170.0 | 1.00 | 8.04e-04 | vapor | liquid |
+  | Ethane/n-Heptane | 170.0 | 3.00 | 2.33e-03 | vapor | liquid |
+  | Ethane/n-Heptane | 170.0 | 8.00 | 5.74e-03 | vapor | liquid |
+  | Ethane/n-Heptane | 200.0 | 1.00 | 1.27e-03 | vapor | liquid |
+  | Ethane/n-Heptane | 200.0 | 3.00 | 3.65e-03 | vapor | liquid |
+  | Ethane/n-Heptane | 200.0 | 8.00 | 8.80e-03 | vapor | liquid |
+  | Ethane/n-Heptane | 240.0 | 1.00 | 2.38e-03 | vapor | liquid |
+  | Ethane/n-Heptane | 240.0 | 3.00 | 6.72e-03 | vapor | liquid |
+  | Ethane/n-Heptane | 240.0 | 8.00 | 1.56e-02 | vapor | liquid |
+  | Ethane/n-Heptane | 280.0 | 3.00 | 1.31e-02 | vapor | liquid |
+  | Ethane/n-Heptane | 280.0 | 8.00 | 2.83e-02 | vapor | liquid |
+  | Ethane/n-Heptane | 320.0 | 8.00 | 5.53e-02 | vapor | liquid |
+  | Ethane/n-Heptane | 360.0 | 8.00 | 1.24e-01 | vapor | liquid |
+  | Methane/Ethane | 170.0 | 3.00 | 1.03e-02 | vapor | liquid |
+  | Methane/Ethane | 170.0 | 8.00 | 2.31e-02 | vapor | liquid |
+  | Methane/Ethane | 200.0 | 3.00 | 2.52e-02 | vapor | liquid |
+  | Methane/Ethane | 200.0 | 8.00 | 4.88e-02 | vapor | liquid |
+  | Methane/Ethane | 240.0 | 8.00 | 1.95e-01 | vapor | liquid |
+  | Methane/Ethane/Propane | 170.0 | 3.00 | 8.00e-03 | vapor | liquid |
+  | Methane/Ethane/Propane | 170.0 | 8.00 | 1.84e-02 | vapor | liquid |
+  | Methane/Ethane/Propane | 200.0 | 3.00 | 1.72e-02 | vapor | liquid |
+  | Methane/Ethane/Propane | 200.0 | 8.00 | 3.58e-02 | vapor | liquid |
+  | Methane/Ethane/Propane | 240.0 | 8.00 | 1.09e-01 | vapor | liquid |
+  | Methane/Propane | 170.0 | 3.00 | 1.05e-02 | vapor | liquid |
+  | Methane/Propane | 170.0 | 8.00 | 2.35e-02 | vapor | liquid |
+  | Methane/Propane | 200.0 | 8.00 | 4.88e-02 | vapor | liquid |
+  | Methane/Propane | 240.0 | 8.00 | 1.81e-01 | vapor | liquid |
+  | Methane/n-Pentane | 170.0 | 3.00 | 4.18e-03 | vapor | liquid |
+  | Methane/n-Pentane | 170.0 | 8.00 | 1.00e-02 | vapor | liquid |
+  | Methane/n-Pentane | 200.0 | 8.00 | 1.66e-02 | vapor | liquid |
+  | Propane/n-Butane/n-Pentane | 170.0 | 1.00 | 6.67e-04 | vapor | liquid |
+  | Propane/n-Butane/n-Pentane | 170.0 | 3.00 | 1.94e-03 | vapor | liquid |
+  | Propane/n-Butane/n-Pentane | 170.0 | 8.00 | 4.81e-03 | vapor | liquid |
+  | Propane/n-Butane/n-Pentane | 200.0 | 1.00 | 1.03e-03 | vapor | liquid |
+  | Propane/n-Butane/n-Pentane | 200.0 | 3.00 | 2.96e-03 | vapor | liquid |
+  | Propane/n-Butane/n-Pentane | 200.0 | 8.00 | 7.22e-03 | vapor | liquid |
+  | Propane/n-Butane/n-Pentane | 240.0 | 1.00 | 1.83e-03 | vapor | liquid |
+  | Propane/n-Butane/n-Pentane | 240.0 | 3.00 | 5.21e-03 | vapor | liquid |
+  | Propane/n-Butane/n-Pentane | 240.0 | 8.00 | 1.23e-02 | vapor | liquid |
+  | Propane/n-Butane/n-Pentane | 280.0 | 1.00 | 3.41e-03 | vapor | liquid |
+  | Propane/n-Butane/n-Pentane | 280.0 | 3.00 | 9.47e-03 | vapor | liquid |
+  | Propane/n-Butane/n-Pentane | 280.0 | 8.00 | 2.12e-02 | vapor | liquid |
+  | Propane/n-Butane/n-Pentane | 320.0 | 3.00 | 1.88e-02 | vapor | liquid |
+  | Propane/n-Butane/n-Pentane | 320.0 | 8.00 | 3.83e-02 | vapor | liquid |
+  | Propane/n-Butane/n-Pentane | 360.0 | 3.00 | 4.64e-02 | vapor | liquid |
+  | Propane/n-Butane/n-Pentane | 360.0 | 8.00 | 7.54e-02 | vapor | liquid |
+
+  (Feed composition for each mixture is the one fixed value used throughout
+  the grid: Methane/Ethane (0.5, 0.5), Methane/Propane (0.7, 0.3),
+  Ethane/n-Heptane (0.7, 0.3), Methane/n-Pentane (0.6, 0.4),
+  Methane/Ethane/Propane (0.5, 0.3, 0.2), Propane/n-Butane/n-Pentane
+  (0.4, 0.3, 0.3).)
+
+- **Zero of the 47 two-phase Peng-Robinson grid states changed**: kappa
+  already agreed with the historical Wilson-ranking orientation on every one.
+- **The other 11 fixture states are untouched**: 5 gamma-gamma binary feeds, 1
+  gamma-gamma single-component feed, 1 Tessier (2000) near-plait feed, 2
+  gamma-phi cases, 2 legacy `wilson-heuristic` cases - none build an
+  `_EOSTangentPlane`, so `identity_label` is never reached for them.
+- **The CLI fixture** (`tests/fixtures/cli/tp_flash_v1.json`,
+  methane/ethane/propane 240 K/3 MPa, two-phase, well-separated) is
+  unaffected, confirmed by `tests/test_cli_tp_flash.py` (unchanged, passing).
+
+### 6) Runtime trim
+
+The 188-state Case F-4 grid ran twice on every `pytest -q` -
+`tests/validation/test_flash_split_robustness_pcsaft.py`'s own test and
+`examples/validation/15_flash_split_robustness.py`'s smoke test in
+`tests/test_examples.py` - which is most of why the suite grew from ~116 s to
+~389 s between when Case F-4 was added and this slice. Decision recorded
+here: **CI's default `pytest -q` does not fit the full grid**, so
+- the full-grid test is `@pytest.mark.slow`, deselected by default
+  (`pyproject.toml` `addopts = "-m 'not slow'"`) and run explicitly with
+  `pytest -q -m slow`;
+- a new fixed **16-state** subset (not the 24 first considered, trimmed for
+  runtime; always including the four states that need the ADR-0016
+  second-order stage) covers the grid in the default run
+  (`tests/validation/test_flash_split_robustness_pcsaft_subset.py`);
+- `examples/validation/15_flash_split_robustness.py` defaults to the same
+  16-state idea (its own list, not imported, matching this repository's
+  "duplicate small grids for self-containment" convention) with `--full` for
+  the complete grid.
+
+Measured on this machine: `pytest -q` **~389 s -> ~188 s** (553 passed, 1
+deselected). The full grid, run explicitly (`pytest -q -m slow`), still
+passes with the pre-slice counts unchanged: 188 states, 0
+`ConvergenceError`s, 123 two-phase, 65 single-phase, 4 rescued by the
+second-order stage, worst mass balance `1.86e-13`, worst fugacity residual
+`3.58e-08`, worst `delta_g_split_rt` `-3.95e-04` - identical to Case F-4's own
+numbers, since this slice changes no numeric result of that grid. The
+remaining ~8 s gap against the ~180 s target is two pre-existing, unrelated
+slow examples out of this slice's scope -
+`examples/validation/12_vlle_verdict_map.py` (~16.5 s) and
+`examples/validation/14_pcsaft_flash_vs_teqp.py` (~16.3 s), both present
+before this slice and neither touching the PC-SAFT-grid-duplication
+regression this slice fixes.
+
+- **Not covered:** whether `0.5` is optimal in any formal sense (it is a
+  value that separates the two measured grids with a wide margin, not a
+  fitted or globally optimal cut); any claim that the Wilson-ranking fallback
+  correctly orients a near-critical split, since no such state exists in
+  either validated grid to check it against.
+- **Tolerance:** analytic vs. finite-difference `kappa` (Peng-Robinson)
+  `< 1e-8` relative (achieved on 9 states); threshold separation with `>= 0.24`
+  margin on both sides over both full grids (599 roots).
+- **Independent route:** a finite-difference `kappa` built without the
+  package's private mixing-rule/isotherm code (Peng-Robinson: from
+  `Component.tc_k/pc_pa/omega`; PC-SAFT: from the public `pressure_Pa(T, rho,
+  x)`).
+- **Test path:** `tests/test_phase_identity.py`,
+  `tests/test_flash_refactor_bit_identity.py`,
+  `tests/validation/test_flash_split_robustness_pcsaft_subset.py`,
+  `tests/validation/test_flash_split_robustness_pcsaft.py` (the `slow`-marked
+  full grid).
+- **Script:** `examples/basic/flash_tp_pcsaft_demo.py`,
+  `examples/validation/15_flash_split_robustness.py` (`--full` for the
+  complete grid).
