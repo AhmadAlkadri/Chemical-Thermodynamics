@@ -41,6 +41,7 @@ PY
 
 - Editable install fails with an old pip: run `python -m pip install --upgrade pip` inside the active `.venv`, then retry.
 - Build backend errors mentioning setuptools/wheel: run `python -m pip install --upgrade setuptools wheel`, then retry `pip install -e ".[dev]"`.
+- `ModuleNotFoundError: No module named 'bibtexparser.bparser'`: your environment resolved `bibtexparser` 2.x; chemthermo's citation loader uses the 1.x API. Reinstall with a `bibtexparser<2` constraint (the pinned `pyproject.toml` requirement already enforces this for new installs).
 
 ## Current API usage
 

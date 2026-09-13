@@ -1,6 +1,8 @@
 # Steering Brief
 
 ## What changed since last brief (files + bullets)
+- `pyproject.toml`, `tests/test_packaging_constraints.py`, `README.md`
+  - Constrained the `bibtexparser` dependency to `>=1.4.0,<2`: a fresh (non-editable) install previously resolved `bibtexparser` 2.x, whose removed `bparser`/`customization` modules `src/chemthermo/citations.py` imports at module load time, breaking `import chemthermo` entirely; added a test that reads the specifier from `pyproject.toml` and a README "Common issues" bullet.
 - `src/chemthermo/stability/` (`__init__.py`, `tp.py`, `results.py`, `settings.py`), `src/chemthermo/__init__.py`
   - Added public `stability_tp` (Michelsen tangent-plane stability at fixed T, P, z) with `StabilityResult`, `StabilitySettings`, `StabilityTrial`; min-Gibbs compressibility root selected generically by minimizing `sum_i w_i ln phi_i(w)` over the existing `EquationOfState` interface.
 - `tests/test_stability_tp.py`, `tests/validation/test_stability_vs_thermo.py`
@@ -54,6 +56,7 @@
 - CLI JSON contract must remain backward-compatible or version-bumped.
 - DB builder currently assumes raw table column conventions stay unchanged.
 - Optional validation still depends on external `thermo` package availability.
+- (Removed) Unpinned `bibtexparser>=1.4.0` allowed a fresh/non-editable install to resolve `bibtexparser` 2.x, whose removed `bparser`/`customization` modules broke `import chemthermo`; this was invisible locally because the dev venv already had 1.4.4 installed. Now pinned to `>=1.4.0,<2` and covered by `tests/test_packaging_constraints.py`.
 
 ## Next 3 recommended actions
 - `pr-kij-matrix`: fix the diagonal-kij bug and accept a per-pair kij matrix.
