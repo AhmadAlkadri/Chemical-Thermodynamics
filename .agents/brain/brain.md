@@ -44,7 +44,8 @@ Definition of public API follows ADR-0001 (source of truth rules in `.agents/bra
 
 Stable (public) entry points
 - `chemthermo` top-level exports in `__all__` (core types, flash API, phase-stability API, models, parameters, exceptions, units, validation helpers). (source: src/chemthermo/__init__.py)
-- Phase stability: `stability_tp`, `StabilityResult`, `StabilitySettings`, `StabilityTrial` (ADR-0005). `stability_tp` reports `status` in {"stable","unstable","inconclusive"}; "stable" means "no negative tangent-plane distance was found from the deterministic trial set", not a global proof. (source: src/chemthermo/stability/, .agents/brain/adr/0005-stability-tp-public-api.md)
+- Phase stability: `stability_tp`, `StabilityResult`, `StabilitySettings`, `StabilityTrial` (ADR-0005, ADR-0007). `stability_tp` reports `status` in {"stable","unstable","inconclusive"}; "stable" means "no negative tangent-plane distance was found from the deterministic trial set", not a global proof. (source: src/chemthermo/stability/, .agents/brain/adr/0005-stability-tp-public-api.md)
+- `stability_tp(mixture, *, temperature_K, pressure_Pa, eos=None, activity_model=None, settings=None)` (ADR-0007). **Exactly one** of `eos` / `activity_model` is required; passing both raises `ModelError` because combined gamma-phi stability (activity liquid vs EOS vapor) is out of scope. With `activity_model` the test is liquid-liquid: `ln gamma_i` replaces `ln phi_i`, trials are pure-component-dominant only (no Wilson estimates), and `feed_branch` / `phase_branch` are `None`. `pressure_Pa` stays required and validated but is inert for an activity model (`diagnostics["pressure_dependent"]`, `diagnostics["model_family"]`). `StabilityTrial` gained `ssi_iterations`, `second_order_iterations`, `converged_stage`; `StabilitySettings` gained `second_order`, `ssi_iterations`, `second_order_max_iter`, `second_order_max_step`. Peng-Robinson results are bit-identical to the pre-slice values. (source: src/chemthermo/stability/, .agents/brain/adr/0007-stability-tangent-plane-evaluator.md)
 - `NRTL.activity_coefficients` implements the standard Renon-Prausnitz
   equation with column sums. Public signature unchanged, but **returned values
   changed** for asymmetric parameters: before the `nrtl-gibbs-duhem-fix` slice
@@ -68,7 +69,7 @@ CLI entry points
 Text-only diagram
 ```
 src/chemthermo/data/components.json -> data loaders -> Component/Composition/Mixture -> models (PR/NRTL) -> flash_tp -> FlashResult
-src/chemthermo/data/components.json -> Component/Composition/Mixture -> models (PR) -> stability_tp (min-Gibbs root + Michelsen TPD) -> StabilityResult
+src/chemthermo/data/components.json -> Component/Composition/Mixture -> models (PR | NRTL) -> stability_tp -> internal _TangentPlaneEvaluator (ln phi on the min-Gibbs root | ln gamma) -> Michelsen TPD (SSI + Newton) -> StabilityResult
 chemthermo CLI -> parser -> Mixture + PengRobinsonEOS -> flash_tp -> text/json output
 
 ```
@@ -77,7 +78,7 @@ Key modules and flow
 - Component databank lives in `src/chemthermo/data/components.json`, loaded via `chemthermo.data` helpers. Optional non-runtime mirror path is `database/components.mirror.json` and is never loaded by runtime code. (source: src/chemthermo/data/__init__.py, src/chemthermo/data/components.json, tools/build_database.py)
 - Core domain objects: `Component`, `Composition`, `Mixture`. (source: src/chemthermo/core/component.py, src/chemthermo/core/composition.py, src/chemthermo/core/mixture.py)
 - Flash solver (`flash_tp`) orchestrates models and returns `FlashResult`. Its single-phase decision is still a Wilson K-bound / Rachford-Rice heuristic, NOT a stability analysis. (source: src/chemthermo/flash/tp.py, src/chemthermo/flash/results.py)
-- Phase stability (`stability_tp`) implements Michelsen's tangent-plane test independently of the flash solver and returns `StabilityResult`. It selects the lowest-Gibbs compressibility root generically by minimizing `sum_i w_i ln phi_i(w)` over the `phase="vapor"`/`phase="liquid"` calls of the existing `EquationOfState` interface. (source: src/chemthermo/stability/tp.py, src/chemthermo/stability/results.py)
+- Phase stability (`stability_tp`) implements Michelsen's tangent-plane test independently of the flash solver and returns `StabilityResult`. For an EOS it selects the lowest-Gibbs compressibility root generically by minimizing `sum_i w_i ln phi_i(w)` over the `phase="vapor"`/`phase="liquid"` calls of the existing `EquationOfState` interface. The two model families are isolated behind the **internal** (not exported) `_TangentPlaneEvaluator` protocol in `src/chemthermo/stability/_evaluator.py` with adapters `_EOSTangentPlane` and `_ActivityTangentPlane`; the solver, trivial detection, summary and result types never branch on the family (ADR-0007). Each trial is successive substitution followed, if needed, by a damped Newton stage on the stationarity condition in `ln W` (required near plait points, dormant for every validated PR state). (source: src/chemthermo/stability/tp.py, src/chemthermo/stability/_evaluator.py, src/chemthermo/stability/results.py)
 - EOS registry provides named EOS factories. (source: src/chemthermo/eos/registry.py)
 - Deeper usage docs: `README.md`, `examples/README.md`. (source: README.md, examples/README.md)
 
@@ -104,9 +105,20 @@ Key entry points (top paths)
   src/chemthermo/models/nrtl.py module docstring)
 - Packaged NRTL pair parameters are synthetic demo placeholders, not fitted or
   published data; published parameter sets live in `tests/fixtures/` with a
-  citation and are never loaded by default. (source:
-  src/chemthermo/parameters/data/activity/nrtl.json,
-  tests/fixtures/nrtl/tessier2000_problem1.json)
+  citation and are never loaded by default. The Tessier (2000) Problem 2 set
+  (`tests/fixtures/nrtl/tessier2000_problem2.json`) is third-party fitted data
+  regressed from the DECHEMA Chemistry Data Series; its redistribution here is
+  limited to that cited test fixture and it must never become packaged runtime
+  data. (source: src/chemthermo/parameters/data/activity/nrtl.json,
+  tests/fixtures/nrtl/tessier2000_problem1.json,
+  tests/fixtures/nrtl/tessier2000_problem2.json)
+- Tangent-plane stability is one criterion for both model families: with an
+  activity model, `ln gamma_i` replaces `ln phi_i` in `tpd` and nothing else
+  changes (the pure-liquid reference cancels between two liquid phases). Any
+  new model family must enter through
+  `chemthermo.stability._evaluator._TangentPlaneEvaluator`, never by branching
+  inside the solver. (source: src/chemthermo/stability/_evaluator.py,
+  .agents/brain/adr/0007-stability-tangent-plane-evaluator.md)
 
 ## 5) Error handling & validation policy
 - Validation helpers raise `InputRangeError` for invalid temperatures/pressures; `CompositionError` for invalid fractions. (source: src/chemthermo/validation.py, src/chemthermo/exceptions.py)
@@ -140,6 +152,7 @@ Cheap checks
   - `.agents/brain/adr/0004-cli-tp-flash-gamma-phi.md` (Adopted 2026-02-12)
   - `.agents/brain/adr/0005-stability-tp-public-api.md` (Adopted 2026-09-13)
   - `.agents/brain/adr/0006-pr-kij-matrix.md` (Adopted 2026-09-13)
+  - `.agents/brain/adr/0007-stability-tangent-plane-evaluator.md` (Adopted 2026-09-13)
 - ADR rules: one decision per ADR; keep under 1 page; include status and supersedes fields.
 
 ## 9) Roadmap: next 3 increments (vertical slices)
@@ -147,15 +160,12 @@ Cheap checks
   - `stability-tpd-pr`: public `stability_tp` (Michelsen tangent-plane stability) with Peng-Robinson, min-Gibbs root selection, deterministic trial set, golden path and thermo cross-check.
   - CLI gamma-phi extension for `chemthermo tp-flash` via `--flash-mode`.
   - `pr-kij-matrix`: fixed the diagonal-kij bug and added per-pair `kij` support (`float` or name-keyed `Mapping`) to `PengRobinsonEOS`; `flash_tp` and `stability_tp` results for nonzero kij are now trustworthy. See ADR-0006 and validation Case K-1.
+  - `stability-tpd-nrtl`: `stability_tp` now accepts `activity_model=` for liquid-liquid tangent-plane stability, behind an internal `_TangentPlaneEvaluator` contract (ADR-0007) that also serves the Peng-Robinson path unchanged; added a damped-Newton second stage (required near plait points), the cited Tessier (2000) Problem 2 fixture, and golden paths `examples/basic/stability_tp_nrtl_lle_demo.py` and `examples/validation/08_stability_nrtl_tessier2000.py`. Reproduces the published tangent-plane global minima of Problems 1 and 2. See validation Cases S-6, S-7, S-8.
   - `nrtl-gibbs-duhem-fix`: corrected the NRTL activity-coefficient equation (column sums, single first-term denominator); added Gibbs-Duhem / binary-reduction / permutation / regression tests, a tight `thermo` cross-check with asymmetric parameters, the cited Tessier (2000) Problem 1 fixture, and the Table 2 reproduction golden path `examples/validation/07_nrtl_tessier_stationary_points.py`. Packaged NRTL pairs are now labelled synthetic. No ADR (public signature unchanged). See validation Cases N-1, N-2, N-3.
-- **Slice 1: `stability-tpd-nrtl`**
-  - Capability: Users can run liquid-liquid tangent-plane stability with an activity model instead of an EOS.
-  - Requirements: activity-model tangent-plane intercepts, a documented LLE-splitting trial set, and a known partially-miscible binary as the golden path. A narrow phase-thermodynamics contract becomes earned here (second model family), not before.
-  - Now unblocked: NRTL is thermodynamically consistent (Case N-1) and the activity-based tangent-plane distance D and its stationary points are already reproduced against a published source in `tests/validation/test_nrtl_tessier2000.py`; those feeds and D values are the natural acceptance set for the solver.
-- **Slice 2: `flash-auto-phase-detection`**
+- **Slice 1: `flash-auto-phase-detection`**
   - Capability: `flash_tp` decides 1-vs-2 phases from `stability_tp` instead of K-bound heuristics, and seeds K-values from the converged stationary point.
   - Requirements: keep the `FlashResult` shape and CLI JSON contract, add diagnostics for the stability verdict, and prove behavior change only where the heuristic was wrong.
-- **Slice 3: (not yet scoped)**
+- **Slice 2: (not yet scoped)**
   - To be defined after `flash-auto-phase-detection` lands.
 
 ## 10) Open questions / risks
