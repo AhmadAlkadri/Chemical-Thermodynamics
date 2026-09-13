@@ -102,6 +102,24 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
     beside it **for contrast only** - two models, two answers, neither line
     evidence about the other. Needs no optional dependency. See validation
     Cases P-3, P-4 and P-5.
+- `examples/basic/pcsaft_association_demo.py`
+  - PC-SAFT **with association** (Gross & Sadowski 2002, ADR-0018). Pure water
+    term by term - hard chain, dispersion and association side by side, with
+    the non-bonded site fraction `X` that the association term is a function of
+    (0.9851 in the saturated vapour, 0.0356 in a compressed liquid) - then
+    water's saturation state at 373.15 K by equal fugacity on the two density
+    roots (100,890.27 Pa, 0.43 % below the 101,325 Pa that *defines* the normal
+    boiling point, printed as a remark about the model and asserted nowhere).
+    Then a water / n-hexane liquid-liquid split from the unchanged `flash_tp`,
+    with both of the slice's honest caveats printed by the script: at 1 atm
+    `stability_tp` correctly says unstable and `flash_tp` **raises**, because
+    the phi-phi split can only pair a vapour-root phase with a liquid-root one;
+    at 1 MPa the vapour root is gone, the same machinery returns the real tie
+    line, and ADR-0017 measures both phases as liquids while the phi-phi
+    naming still calls them `"liquid"` / `"vapor"`. `kij = 0`, which is a poor
+    model for water with a hydrocarbon and is said so on the page. Runs in
+    about 7 s. Needs no optional dependency. See ADR-0018 and validation Cases
+    P-6 and P-7.
 - `examples/validation/00_reference_case.py`
   - Deterministic single-case comparison against `thermo` (optional dependency).
     Unchanged by the tangent-plane phase-detection slice: beta 0.46829044 vs
@@ -225,6 +243,24 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
     rescued states still fail with `second_order=False` and on the legacy
     `wilson-heuristic` path, which is deliberate. Needs no optional
     dependency. Runs in about 100 s. See validation Case F-4.
+- `examples/validation/16_pcsaft_association_vs_feos.py`
+  - PC-SAFT **association** against **FeOs** (feos-org/feos, MIT OR
+    Apache-2.0), with PASS/FAIL per check (ADR-0018, validation Cases P-6 and
+    P-7). FeOs is used rather than teqp because teqp's `PCSAFT` kind has no
+    association term at all; like teqp it gets every derivative by automatic
+    differentiation, so no derivative code is shared. Checks eighteen states
+    term by term (hard chain, dispersion, association, `A^res/RT`, `Z`,
+    `ln phi_i`); settles the `sigma^3`-versus-`d^3` question in the association
+    strength numerically, since the 2002 paper is paywalled and was not read;
+    re-asserts that non-associating n-hexane is bit-identical to Case P-1's
+    pinned values; and runs the equilibrium exam - pure-water saturation
+    against FeOs's own `PhaseEquilibrium.pure`, a water/ethanol VLE flash and a
+    water/n-hexane liquid-liquid split with FeOs's fugacities evaluated at
+    chemthermo's converged phases. Every dispersion-dependent number is
+    reported twice, because FeOs hard-codes the 2001 paper's universal
+    constants to fourteen figures where the paper prints ten. Requires
+    `pip install -e ".[validation]"`; prints a message and exits 0 without
+    `feos`. Runs in about 10 s.
 - `examples/validation/*.py`
   - Optional validation sweeps against `thermo` (requires `pip install -e ".[validation]"`).
   - CSV output is disabled by default; pass `--outdir <dir>` or set `CHEMTHERMO_OUTDIR`.
