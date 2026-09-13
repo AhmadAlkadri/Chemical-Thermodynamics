@@ -657,8 +657,15 @@ def test_invalid_inputs_raise_the_documented_errors() -> None:
         eos.residual_helmholtz(temperature_K=300.0, volume_m3=-1.0, composition=[0.5, 0.5])
     with pytest.raises(ct.InputRangeError):
         eos.compressibility_factor(temperature_K=-1.0, density_mol_m3=100.0, composition=[0.5, 0.5])
-    with pytest.raises(ct.ModelError):
-        PCSAFTEOS(components=())
+    # Since ADR-0015 an empty ``components`` is legal at construction - it means
+    # "take the order from the Mixture" - so the failure moved to the point of
+    # use, where the order is genuinely needed and none is available.
+    with pytest.raises(ct.ModelError, match="at least one component"):
+        PCSAFTEOS().compressibility_factor(
+            temperature_K=300.0, density_mol_m3=100.0, composition=[1.0]
+        )
+    with pytest.raises(ct.ModelError, match="no Mixture was supplied"):
+        PCSAFTEOS().density_roots(temperature_K=300.0, pressure_Pa=1.0e5, composition=[1.0])
 
 
 def test_ln_fugacity_coefficients_refuse_a_non_positive_compressibility() -> None:

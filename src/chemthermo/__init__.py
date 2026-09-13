@@ -6,7 +6,7 @@ from .core.component import Component
 from .core.composition import Composition
 from .core.mixture import Mixture
 from .data import list_component_names
-from .eos import get_eos, list_eos
+from .eos import PCSAFTEOS, get_eos, list_eos
 from .exceptions import (
     CompositionError,
     ConvergenceError,
@@ -45,6 +45,7 @@ __all__ = [
     "ActivityModel",
     "EquationOfState",
     "NRTL",
+    "PCSAFTEOS",
     "PengRobinsonEOS",
     "ActivityParameters",
     "NRTLParameters",
