@@ -116,8 +116,9 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
     (the split could only pair a vapour-root phase with a liquid-root one) and
     is what ADR-0019 fixed; the script says so where the old caveat used to be.
     `kij = 0`, which is a poor model for water with a hydrocarbon and is said
-    so on the page. Runs in about 15 s. Needs no optional dependency. See
-    ADR-0018, ADR-0019 and validation Cases P-6, P-7 and P-8.
+    so on the page. **Default stops before the 1 MPa section** (about 5 s);
+    `--full` runs it. Needs no optional dependency. See ADR-0018, ADR-0019 and
+    validation Cases P-6, P-7 and P-8.
 - `examples/basic/flash_tp_pcsaft_lle_demo.py`
   - **Liquid-liquid equilibrium from an equation of state** (ADR-0019), the
     golden path for that slice. Water / n-hexane at 298.15 K: the stability
@@ -127,8 +128,25 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
     identities do not rest on `phase_identity` alone), the same tie line from
     three feeds with the lever rule, and the 1 MPa tie line that used to be
     mislabelled `"liquid"` / `"vapor"` by the Wilson-ranking fallback. `kij = 0`
-    and the mutual-solubility caveat are printed. Runs in about 25 s. Needs no
+    and the mutual-solubility caveat are printed. **Default is the 1 atm split
+    only** (about 5 s); `--full` adds the three feeds and the 1 MPa tie line,
+    both of which run in `tests/test_flash_eos_lle.py`. Needs no
     optional dependency. See validation Case P-8.
+- `examples/basic/flash_tp_pcsaft_vlle_demo.py`
+  - **Three phases from an equation of state** (ADR-0020), the golden path for
+    that slice. Three sections: three *liquid* phases from **Peng-Robinson**
+    with `kij = 0` (water / ethanol / n-hexane at 280 K, in about a tenth of a
+    second - the pure-cubic three-phase state ADR-0019 recorded as not found);
+    the water / n-hexane window at 1 atm, where a 4-equation Newton written in
+    the script locates the three-phase temperature `T3` and shows that every one
+    of the three coexisting compositions has *both* a vapour and a liquid
+    density root, followed by `flash_tp` on either side of `T3` - two conjugate
+    liquids below it via `V -> LV -> LLV -> LL` (those temperatures used to
+    raise), the ordinary vapour-liquid answer above it; and, behind `--full`, a
+    PC-SAFT vapour-liquid-liquid tie triangle. Prints the search route, the
+    phase amounts and every verification residual. About 8 s by default.
+    `kij = 0` and the model caveat are printed, and nothing is compared against
+    measurement. Needs no optional dependency. See validation Cases P-9, P-10.
 - `examples/validation/00_reference_case.py`
   - Deterministic single-case comparison against `thermo` (optional dependency).
     Unchanged by the tangent-plane phase-detection slice: beta 0.46829044 vs
@@ -282,7 +300,25 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
     FeOs's fourteen-figure universal constants, and prints the one feed
     (`z = 0.2/0.8`) where FeOs's own flash raises rather than hiding it.
     Requires `pip install -e ".[validation]"`; prints a message and exits 0
-    without `feos`. Runs in about 40 s.
+    without `feos`. **Default is the 1 atm state only** (about 12 s); `--full`
+    adds the 1 MPa tie line, the three feeds and the negative control.
+- `examples/validation/18_pcsaft_vlle_water_hexane.py`
+  - The **three-phase neighbourhood of water / n-hexane**, with PASS/FAIL per
+    check (ADR-0020, validation Cases P-9 and P-10). Four independent routes:
+    a 4-equation Newton written in the script locates the three-phase
+    temperature `T3` and the three coexisting compositions from
+    `fugacity_coefficients` alone; two-equation Newtons give the
+    liquid-liquid and vapour-liquid tie lines on either side of `T3` and their
+    reduced Gibbs energies say which pair is the equilibrium; FeOs supplies
+    chemical potentials at chemthermo's converged phases and densities; and
+    FeOs's **own** two-phase flash is run and shown to converge on the
+    *metastable* vapour-liquid pair below `T3` - the pair chemthermo's
+    post-split stability test refuses. Every FeOs-at-chemthermo's-densities
+    number is reported twice, as shipped and with FeOs's fourteen-figure
+    universal constants. Routes 1 and 2 run without `feos`; the script says so
+    and still exits 0. About 15 s by default; `--full` adds the 41-point scan
+    at two feeds and the ternary vapour-liquid-liquid tie triangle (several
+    minutes).
 - `examples/validation/*.py`
   - Optional validation sweeps against `thermo` (requires `pip install -e ".[validation]"`).
   - CSV output is disabled by default; pass `--outdir <dir>` or set `CHEMTHERMO_OUTDIR`.

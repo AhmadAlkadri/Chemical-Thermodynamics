@@ -6,10 +6,20 @@ holds the three pieces that turn that into an answer with more than two phases.
 
 1. Multiphase successive substitution
 -------------------------------------
-A phase set is a list of phase *candidates* (a modified-Raoult activity liquid,
-an ideal vapor, ...) each carrying a composition. Choose the first as the
-reference ``r``. Equal fugacity of component ``i`` between phase ``j`` and the
-reference is
+A phase set is a list of phases, each carrying a composition **and its own
+tangent-plane surface** - the thing that turns a composition into fugacities.
+What that surface is differs by model family and is the whole of
+:class:`_PhaseSetModel` (ADR-0020): a modified-Raoult *phase candidate* (an
+activity liquid, an ideal vapor) whose label is also the phase's identity, or,
+for an equation of state, one pinned density root
+(:class:`chemthermo.flash._split._PhaseRoot`, ADR-0019) whose identity has to
+be *measured*. The second case is why the surface travels with the phase
+rather than being looked up from its label: a vapour and two liquids is a
+phase set in which two phases carry the label ``"liquid"`` and are two
+different phases on two different roots.
+
+Choose the first phase as the reference ``r``. Equal fugacity of component
+``i`` between phase ``j`` and the reference is
 
     ln x_i^j + t_i^j(x^j) = ln x_i^r + t_i^r(x^r)                          (1)
 
@@ -70,7 +80,15 @@ numbers).
 post-split stability test on the failing phase, which is Michelsen's incipient
 phase: setting ``x^new = w`` and computing ``K`` from (2) reproduces his
 ``W``-scaled seed ``K_i = W_i / x_i^r`` exactly, because at a stationary point
-``ln W_i = ln x_i^r + t_i^r - t_i(w)``.
+``ln W_i = ln x_i^r + t_i^r - t_i(w)``. The new phase's surface is pinned to
+the branch that stability test reported for it, which is ADR-0019's rule for
+the two phases of a two-phase split, applied to the third.
+
+A minimizer can also *duplicate* a phase already in the set, and then the
+solve removes it again before it can move. Adding the same one back would
+cycle, so the next stationary point of the same report is tried instead, each
+at most once (ADR-0020 decision 3, and the comment on that branch below for
+the state that forced it).
 
 *Removal* is what the ordinary Rachford-Rice cannot express and the Okuno
 formulation can: the feasible region constrains the phase *compositions*, not

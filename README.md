@@ -518,9 +518,10 @@ print(result.diagnostics["phase_stability_tpd_min_liquid1"])
 
 ### Three phases, and how many there are
 
-`flash_tp(..., flash_mode="modified-raoult")` discovers the number of
-equilibrium phases, up to `FlashSettings.max_phases` (default 3). Nothing is
-told how many phases there are:
+`flash_tp` discovers the number of equilibrium phases, up to
+`FlashSettings.max_phases` (default 3), on the `modified-raoult` path
+(ADR-0011) and - since ADR-0020 - on the **equation-of-state** (phi-phi) path
+as well. Nothing is told how many phases there are:
 
 ```
 stability of the feed  ->  a two-phase split  ->  stability of every phase
@@ -586,10 +587,11 @@ Notes and limits:
 - **`FlashSettings(post_split_stability=False)` skips the search**, returning
   the converged two-phase answer with the failure in `diagnostics`. The flag
   means "do not police the phase set".
-- **Only `modified-raoult` searches.** The phi-phi and `gamma-gamma` paths still
-  stop at two phases whatever `max_phases` says, and raise as before: no state
-  in this repository needs a third phase on either, and an unexercised path is
-  not a shipped capability. See ADR-0011 "What remains".
+- **`gamma-gamma` does not search.** The activity-only path still stops at two
+  phases whatever `max_phases` says, and raises as before: no state in this
+  repository needs a third *liquid* there, and an unexercised path is not a
+  shipped capability (ADR-0011 "What remains", narrowed by ADR-0020 decision 5).
+  The phi-phi path does search; see the next section.
 - **Diagnostics keys appear only on a result that entered the search**
   (`phase_set_history`, `phases_added`, `phases_removed`,
   `delta_g_vs_two_phase_rt`, `rachford_rice_iterations`). Every single- and
@@ -597,9 +599,10 @@ Notes and limits:
   diagnostics included.
 - **Phase names.** `vapor` is the ideal-gas candidate; `liquid`, or
   `liquid1` / `liquid2` / ..., are the liquids, numbered in the order the search
-  created them. The liquid numbers are **roles, not identities** - compare the
-  phase *set*. `vapor_fraction` is the `vapor` phase's fraction when there is
-  one and `None` when there is not.
+  created them. On this path the liquid numbers are **roles, not identities** -
+  compare the phase *set*. (On the phi-phi path below they are ordered by
+  composition instead, and are comparable between feeds.) `vapor_fraction` is
+  the `vapor` phase's fraction when there is one and `None` when there is not.
 - **Each stability trial runs on one fixed phase candidate** (ADR-0012). The
   modified-Raoult tangent plane is the lower envelope of two *different* models
   - an activity-coefficient liquid and an ideal gas - and re-selecting the
@@ -634,6 +637,69 @@ Notes and limits:
   `flash_mode="vlle"` raises `ModelError` with the same pointer. The exported
   names are unchanged and stay importable for one deprecation cycle; nothing
   is removed yet.
+
+### Three phases from an equation of state (ADR-0020)
+
+The same search serves `flash_tp(..., eos=...)`. Each phase is pinned to its
+own density root (ADR-0019), so a vapour and two liquids sit on three
+independent roots, and a phase added by the search is pinned to the branch the
+stability test found *it* on.
+
+```python
+import chemthermo as ct
+from chemthermo.eos import PCSAFTEOS
+
+# water / ethanol / n-hexane, PC-SAFT with 2B water and ethanol, k_ij = 0.
+mixture = ct.Mixture.from_database(
+    ("Water", "Ethanol", "n-Hexane"), (0.4, 0.3, 0.3), normalize=True
+)
+result = ct.flash_tp(
+    mixture, temperature_K=333.0, pressure_Pa=101325.0, eos=PCSAFTEOS()
+)
+
+print(result.phase_names())                      # ['liquid1', 'liquid2', 'vapor']
+print(result.diagnostics["phase_regime"])        # 'VLLE'
+print(result.diagnostics["phase_set_history"])   # 'L -> LL -> LLV'
+print(result.vapor_fraction)                     # 0.0853317...
+print(result.diagnostics["delta_g_vs_two_phase_rt"])  # -2.89e-04  (< 0)
+```
+
+```bash
+python examples/basic/flash_tp_pcsaft_vlle_demo.py
+python examples/validation/18_pcsaft_vlle_water_hexane.py
+```
+
+What is different from the `modified-raoult` path:
+
+- **`liquid1` / `liquid2` / `liquid3` are ordered by the first component's mole
+  fraction**, not by the order the search created them, so the names mean the
+  same thing at every feed inside a tie triangle (the ADR-0019 rule, extended
+  to more than two liquids). `vapor` is whichever phase `phase_identity`
+  measures as one (ADR-0017), and `diagnostics["phase_label_method"]` records
+  that the names were measured rather than conventional.
+- **A phase set with no vapour is `phase_regime = "LLE"` with
+  `vapor_fraction = None`**, however many liquids it has. Peng-Robinson with
+  `k_ij = 0` on the ternary above at 280 K returns three liquids.
+- **Removal is what resolves the interesting binary case.** Water / n-hexane at
+  1 atm just below its three-phase temperature runs
+  `V -> LV -> LLV -> LL`: the deepest tangent-plane minimum from the feed is a
+  vapour, the vapour-liquid pair is unstable towards a second liquid, and the
+  three-phase solve then drives the vapour amount negative. Those temperatures
+  raised `ConvergenceError` before ADR-0020.
+- **A binary at fixed pressure has no three-phase region.** Gibbs' phase rule
+  leaves one degree of freedom, so three phases meet at a single temperature,
+  and the three phase *amounts* are not determined by the mass balance there.
+  `flash_tp` returns the two-phase answer on either side of it, and a
+  three-phase answer needs a ternary.
+- **A three-phase PC-SAFT flash is slow** - about 35 s on the development
+  machine, nearly all of it in density-root solves. Peng-Robinson costs about
+  0.1 s. No performance work has been done (`perf-profile-baseline` is the
+  slice that will do it).
+- **Still capped by the stability test.** At `z_water = 0.7` and above the
+  three-phase temperature, water / n-hexane comes back as two liquids whose
+  Gibbs energy is 2.5e-03 RT *above* the vapour-liquid pair's, because the
+  deterministic trial set misses the vapour stationary point from the
+  hexane-rich liquid. Measured and pinned as validation Case P-9 (iv).
 
 ### Binary interaction parameters (`kij`)
 
@@ -1075,25 +1141,17 @@ from `chemthermo` if you prefer to build the block as an object.
   get water / hydrocarbon mutual solubilities wrong by an order of magnitude.
   The cross-checks below are code checks against another implementation, not
   evidence about the model.
-- **A liquid-liquid EOS split is only reachable where the vapour root is
-  gone.** The phi-phi split pairs one vapour-root phase with one liquid-root
-  phase, so at a pressure where both roots exist it cannot represent two
-  liquids: water / n-hexane at 298.15 K and 1 atm converges on a spurious
-  vapour-liquid pair and `flash_tp` raises `ConvergenceError` (the post-split
-  stability test catches it). Above about 0.6 MPa the vapour root no longer
-  exists, both phases sit on the single liquid root, and the same machinery
-  returns the real tie line. When it does, ADR-0017 measures both phases as
-  liquids but the phi-phi path has no `liquid1` / `liquid2` naming, so it falls
-  back to the Wilson ranking, calls them `"liquid"` / `"vapor"`, and
-  `vapor_fraction` is really the second liquid's fraction. Both are recorded
-  limitations, not bugs; the fix is the `flash-phase-addition-eos` slice.
-- **Two phases at most.** The phi-phi flash decides one phase versus two and
-  stops there, whatever `FlashSettings(max_phases=...)` says (ADR-0009,
-  ADR-0011). Automatic phase *addition* exists only on the `modified-raoult`
-  path. The two phases may be two liquids since ADR-0019, so a liquid-liquid
-  PC-SAFT state is now an answer rather than a refusal; a genuinely
-  **three**-phase state still raises (the post-split stability test proves the
-  two-phase set wrong rather than returning it).
+- ~~**A liquid-liquid EOS split is only reachable where the vapour root is
+  gone**, and when it is reached the pair is mislabelled `"liquid"` /
+  `"vapor"`.~~ **Both resolved by ADR-0019**: each phase sits on the branch the
+  stability test found *it* on, and a pair that both measure as liquids is
+  named `liquid1` / `liquid2` with `vapor_fraction = None`.
+- ~~**Two phases at most.**~~ **Resolved by ADR-0020**: the phi-phi path now
+  runs the ADR-0011 phase addition/removal search, up to
+  `FlashSettings(max_phases=...)`. What remains is the honest cap above it - a
+  phase count is never better than the stability test that produced it - and
+  the cost: a three-phase PC-SAFT flash takes about 35 s. See "Three phases
+  from an equation of state" above and validation Cases P-9 and P-10.
 - **The `(T, rho, x)` methods still choose nothing.** `compressibility_factor`,
   `pressure_Pa` and `ln_fugacity_coefficients` take the density you give them.
   Between the two spinodals `Z` is negative, `pressure_Pa` returns the (real)
