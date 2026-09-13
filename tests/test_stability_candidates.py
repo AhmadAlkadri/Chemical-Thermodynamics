@@ -28,6 +28,7 @@ from chemthermo.stability._evaluator import (
     _ActivityTangentPlane,
     _EOSTangentPlane,
     _ModifiedRaoultTangentPlane,
+    _select_surface,
     modified_raoult_candidates,
 )
 
@@ -415,3 +416,309 @@ def test_the_water_butanol_feed_sees_a_liquid_incipient_phase_from_a_vapor_feed(
     assert result.status == "unstable"
     assert result.feed_branch == "vapor"
     assert result.phase_branch == "liquid"
+
+
+# --------------------------------------------------------------------------
+# Trial candidate surfaces (ADR-0012)
+# --------------------------------------------------------------------------
+
+
+@pytest.fixture(scope="module")
+def near_plait_ternary(
+    tessier2000_payload: dict[str, Any],
+) -> tuple[list[str], ct.NRTL, np.ndarray]:
+    """The 363 K feed of validation Case V-2, and its model.
+
+    `z` is the 0.5 / 0.3 / 0.2 barycentric mix of the tie-triangle vertices of
+    validation Case V-1, pinned here rather than solved (it is solved in
+    `tests/validation/test_vlle_water_propanol_butanol.py`).
+    """
+    names = [str(entry["chemthermo_name"]) for entry in tessier2000_payload["components"]]
+    tau = tessier2000_payload["tau"]
+    alpha = tessier2000_payload["alpha"]
+    model = ct.NRTL(
+        parameters=ct.NRTLParameters.from_pairs(
+            [
+                (
+                    names[i],
+                    names[j],
+                    float(tau[i][j]),
+                    float(tau[j][i]),
+                    float(alpha[i][j]),
+                    float(alpha[j][i]),
+                )
+                for i in range(3)
+                for j in range(i + 1, 3)
+            ]
+        )
+    )
+    vertices = np.column_stack(
+        [
+            np.array([0.10282779, 0.03539032, 0.86178189]),
+            np.array([0.15630287, 0.06422717, 0.77946996]),
+            np.array([0.28312929, 0.06046985, 0.65640086]),
+        ]
+    )
+    z = vertices @ np.array([0.5, 0.3, 0.2])
+    return names, model, z / float(np.sum(z))
+
+
+def test_the_modified_raoult_trial_set_names_one_surface_per_trial(propanol_water) -> None:
+    """One vapor-surface trial, one liquid-surface trial per liquid estimate."""
+    names, model = propanol_water
+    evaluator = _ModifiedRaoultTangentPlane(
+        model, mixture=_mixture(names, (0.5, 0.5)), temperature=361.0, pressure=PRESSURE_PA
+    )
+    z = np.array([0.5, 0.5])
+    estimates = evaluator.initial_estimates(z, z > 0.0)
+    assert [(estimate.label, estimate.surface) for estimate in estimates] == [
+        ("raoult-vapor", "vapor"),
+        ("raoult-liquid", "liquid"),
+        ("pure-1-Propanol", "liquid"),
+        ("pure-Water", "liquid"),
+    ]
+
+
+def test_the_other_two_families_name_no_surface(butanol_water) -> None:
+    """The bit-identity guard at its source: no surface means the old iteration.
+
+    An estimate that carries no surface makes the solver call
+    `ln_fugacity_terms` exactly as it did before ADR-0012, so the equation-of-
+    state and activity-only paths are untouched. The whole-result version of
+    this statement is `tests/test_flash_refactor_bit_identity.py`.
+    """
+    ll_names, ll_model = butanol_water
+    activity = _ActivityTangentPlane(
+        ll_model, mixture=_mixture(ll_names, (0.2, 0.8)), temperature=298.15
+    )
+    z = np.array([0.2, 0.8])
+    assert all(estimate.surface is None for estimate in activity.initial_estimates(z, z > 0.0))
+
+    eos = _EOSTangentPlane(
+        ct.PengRobinsonEOS(),
+        mixture=_mixture(("Methane", "Ethane"), (0.5, 0.5)),
+        temperature=240.0,
+        pressure=3.0e6,
+    )
+    zz = np.array([0.5, 0.5])
+    assert all(estimate.surface is None for estimate in eos.initial_estimates(zz, zz > 0.0))
+
+    result = ct.stability_tp(
+        _mixture(ll_names, (0.2, 0.8)),
+        temperature_K=298.15,
+        pressure_Pa=PRESSURE_PA,
+        activity_model=ll_model,
+    )
+    assert all(trial.surface is None for trial in result.trials)
+    assert all(trial.surface_fallback is False for trial in result.trials)
+    assert "trial_surfaces" not in result.diagnostics
+
+    eos_result = ct.stability_tp(
+        _mixture(("Methane", "Ethane"), (0.5, 0.5)),
+        temperature_K=240.0,
+        pressure_Pa=3.0e6,
+        eos=ct.PengRobinsonEOS(),
+    )
+    assert all(trial.surface is None for trial in eos_result.trials)
+    assert "trial_surfaces" not in eos_result.diagnostics
+
+
+def test_the_vapor_surface_is_reached_in_one_substitution(near_plait_ternary) -> None:
+    """`ln W_i = d_i` on the ideal-gas surface: a constant map, so one step.
+
+    This is why the vapor surface needs exactly one trial and why its starting
+    point does not matter (see `_ModifiedRaoultTangentPlane.initial_estimates`).
+    """
+    names, model, z = near_plait_ternary
+    result = ct.stability_tp(
+        _mixture(names, z),
+        temperature_K=363.0,
+        pressure_Pa=PRESSURE_PA,
+        activity_model=model,
+        vapor="ideal",
+    )
+    vapor_trials = [trial for trial in result.trials if trial.surface == "vapor"]
+    assert len(vapor_trials) == 1
+    trial = vapor_trials[0]
+    assert trial.label == "raoult-vapor"
+    assert trial.converged is True
+    assert trial.ssi_iterations == 2
+    assert trial.second_order_iterations == 0
+    assert trial.residual == 0.0
+
+
+def test_the_near_plait_feed_is_unstable_on_the_vapor_surface(near_plait_ternary) -> None:
+    """Validation Case V-2, repaired: the numbers of the fixed trial."""
+    names, model, z = near_plait_ternary
+    result = ct.stability_tp(
+        _mixture(names, z),
+        temperature_K=363.0,
+        pressure_Pa=PRESSURE_PA,
+        activity_model=model,
+        vapor="ideal",
+    )
+    assert result.status == "unstable"
+    assert result.feed_branch == "liquid"
+    assert result.phase_branch == "vapor"
+    assert result.tpd_min == pytest.approx(-0.011680295426, abs=1e-6)
+    assert result.diagnostics["minimizing_trial"] == "raoult-vapor"
+    assert result.diagnostics["minimizing_trial_surface"] == "vapor"
+    assert result.diagnostics["trial_surfaces"] == "vapor:1,liquid:4"
+    assert result.diagnostics["surface_fallback_trial_count"] == 0
+    assert result.trial_composition is not None
+    assert np.allclose(
+        np.array(result.trial_composition),
+        [0.303242, 0.050098, 0.646659],
+        rtol=0.0,
+        atol=1e-6,
+    )
+
+
+def test_without_a_fixed_surface_the_same_feed_is_reported_stable(
+    near_plait_ternary, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The defect ADR-0012 fixes, reproduced by putting the old rule back.
+
+    Stripping the surface labels from the trial set restores the pre-ADR-0012
+    iteration - the lowest-Gibbs candidate re-selected at every iterate - and
+    nothing else. Every trial then collapses onto the trivial solution and the
+    feed is reported *stable*, although the tangent-plane distance at the
+    equilibrium vapor is -9.92e-03. That is the Case V-2 miss, and it is caused
+    by the candidate switching, not by the initial estimates: the estimates
+    here are exactly the ones the repaired trial set uses.
+    """
+    names, model, z = near_plait_ternary
+    original = _ModifiedRaoultTangentPlane.initial_estimates
+
+    def without_surfaces(self, z_local: np.ndarray, active: np.ndarray):
+        return [estimate._replace(surface=None) for estimate in original(self, z_local, active)]
+
+    monkeypatch.setattr(_ModifiedRaoultTangentPlane, "initial_estimates", without_surfaces)
+    result = ct.stability_tp(
+        _mixture(names, z),
+        temperature_K=363.0,
+        pressure_Pa=PRESSURE_PA,
+        activity_model=model,
+        vapor="ideal",
+    )
+    assert result.status == "stable"
+    assert result.tpd_min == 0.0
+    assert all(trial.trivial for trial in result.trials if trial.converged)
+    assert all(trial.surface is None for trial in result.trials)
+
+
+def test_the_reported_distance_is_the_lowest_gibbs_one_at_the_converged_point(
+    near_plait_ternary,
+) -> None:
+    """`tpd` uses the min-Gibbs candidate; `surface` records what was iterated on.
+
+    The distance to the tangent plane is the distance from the *lower envelope*
+    of the candidates, so it is never taken from the pinned surface alone.
+    """
+    names, model, z = near_plait_ternary
+    mixture = _mixture(names, z)
+    evaluator = _ModifiedRaoultTangentPlane(
+        model, mixture=mixture, temperature=363.0, pressure=PRESSURE_PA
+    )
+    result = ct.stability_tp(
+        mixture,
+        temperature_K=363.0,
+        pressure_Pa=PRESSURE_PA,
+        activity_model=model,
+        vapor="ideal",
+    )
+    feed_terms, _feed_label = evaluator.ln_fugacity_terms(np.asarray(z, dtype=float))
+    d = np.log(np.asarray(z, dtype=float)) + feed_terms
+
+    for trial in result.trials:
+        if not trial.converged or trial.composition is None:
+            continue
+        w = np.array(trial.composition, dtype=float)
+        terms, label = evaluator.ln_fugacity_terms(w)
+        assert trial.phase_branch == label
+        assert trial.tpd == pytest.approx(float(np.sum(w * (np.log(w) + terms - d))), abs=1e-14)
+
+
+def test_an_unknown_surface_is_a_model_error(propanol_water) -> None:
+    names, model = propanol_water
+    evaluator = _ModifiedRaoultTangentPlane(
+        model, mixture=_mixture(names, (0.5, 0.5)), temperature=361.0, pressure=PRESSURE_PA
+    )
+    with pytest.raises(ct.ModelError, match="Unknown phase-candidate surface"):
+        evaluator.ln_terms_on_surface(np.array([0.5, 0.5]), "solid")
+
+
+def test_an_unavailable_optional_surface_falls_back_and_says_so() -> None:
+    """Point 3 of ADR-0012: no surface to walk means the lowest-Gibbs candidate.
+
+    Not reachable through the modified-Raoult pair, whose two candidates are
+    both evaluable everywhere, so it is exercised here on two stub candidates.
+    """
+
+    class _Missing:
+        label = "vapor"
+        optional = True
+
+        def ln_fugacity_terms(self, composition: np.ndarray) -> np.ndarray:
+            raise ct.ModelError("no root here")
+
+    class _Present:
+        label = "liquid"
+        optional = True
+
+        def ln_fugacity_terms(self, composition: np.ndarray) -> np.ndarray:
+            return np.full(composition.shape, -0.25)
+
+    w = np.array([0.4, 0.6])
+    terms, label, fell_back = _select_surface(
+        (_Missing(), _Present()), w, "vapor", failure_message="no candidate"
+    )
+    assert fell_back is True
+    assert label == "liquid"
+    assert np.array_equal(terms, np.full(2, -0.25))
+
+    terms, label, fell_back = _select_surface(
+        (_Missing(), _Present()), w, "liquid", failure_message="no candidate"
+    )
+    assert fell_back is False
+    assert label == "liquid"
+
+
+def test_the_pure_water_trial_stalls_near_the_plait_point(near_plait_ternary) -> None:
+    """A recorded limit, not a numerical failure: a near-singular Jacobian.
+
+    At the 363 K Case V-2 feed the `pure-Water` liquid-surface trial does not
+    converge. It is not an overflow and nothing in the iteration is non-finite:
+    the iterate walks into the near-plait region, where the stationarity
+    Jacobian ``dg/d(ln W)`` has an eigenvalue of about 3.3e-09 (condition number
+    ~8.2e+08 at the stalling point w = (0.13762, 0.04163, 0.82075)), so the
+    Newton step is dominated by the near-null direction and the line search
+    cannot reduce the residual below about 5.4e-04. Successive substitution on
+    the same surface *does* converge, to the trivial solution, but only after
+    ~1.2e+04 iterations - far beyond `StabilitySettings.max_iter = 300`. The
+    `nan` tangent-plane distance is the documented sentinel for a trial that did
+    not converge, not a number that blew up.
+
+    The verdict does not depend on this trial: four others converge, and the
+    instability is found on the vapor surface.
+    """
+    names, model, z = near_plait_ternary
+    result = ct.stability_tp(
+        _mixture(names, z),
+        temperature_K=363.0,
+        pressure_Pa=PRESSURE_PA,
+        activity_model=model,
+        vapor="ideal",
+    )
+    stalled = [trial for trial in result.trials if trial.label == "pure-Water"]
+    assert len(stalled) == 1
+    trial = stalled[0]
+    assert trial.converged is False
+    assert trial.surface == "liquid"
+    assert trial.termination_reason == "second_order_no_progress"
+    assert math.isnan(trial.tpd)
+    assert math.isfinite(trial.residual) and trial.residual < 1e-3
+    assert trial.composition is not None
+    assert all(math.isfinite(value) for value in trial.composition)
+    assert result.status == "unstable"
+    assert int(result.diagnostics["converged_trial_count"]) == 4

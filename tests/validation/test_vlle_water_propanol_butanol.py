@@ -534,20 +534,27 @@ def test_a_superheated_feed_is_a_single_vapor(system) -> None:
     assert ratio < 1.0, ratio
 
 
-def test_a_thin_tie_triangle_can_hide_from_the_deterministic_trial_set(system) -> None:
-    """Recorded limitation, not accommodated: a missed three-phase state.
+def test_the_thin_tie_triangle_at_363_k_is_found(system) -> None:
+    """Case V-2 amended: the 363 K near-plait miss is fixed by ADR-0012.
 
     At 363 K the tie-triangle's two liquid vertices are close together (the
-    system is near its plait point there), and for a feed weighted towards
-    those two vertices every trial of the deterministic stability set collapses
-    onto the trivial solution. `flash_tp` then reports a single liquid, which is
-    wrong for this model.
+    system is near its plait point there). For a feed weighted towards those
+    two vertices, *every* trial of the deterministic stability set used to
+    collapse onto the trivial solution and `flash_tp` returned a single liquid,
+    which is wrong for this model. The failure was in the stability test, not
+    in the phase-addition search: the search was never entered.
 
-    The failure is in the *stability* test, not in the phase-addition search:
-    the search is never entered, because nothing told it to. This is the
-    honesty note of `StabilityResult` made concrete, and it is pinned so that a
-    future improvement to the trial set is noticed rather than silently
-    absorbed.
+    The cause was candidate switching *inside* a trial. From the Raoult-vapor
+    start the liquid candidate has the lower Gibbs energy at the intermediate
+    compositions, so the successive-substitution update used the liquid terms
+    and the iterate was dragged onto the liquid surface and onto the trivial
+    solution - even though the tangent-plane distance at the equilibrium vapor
+    is -9.92e-03. ADR-0012 pins each trial to one candidate surface, and the
+    vapor-surface trial then reaches its stationary point in a single
+    substitution (the ideal-gas term is zero, so ``ln W_i = d_i``).
+
+    The whole verdict map around this feed is validation Case V-5,
+    `tests/validation/test_vlle_verdict_map.py`.
     """
     names, model, ln_gamma, psat = system
     temperature_K = 363.0
@@ -556,13 +563,36 @@ def test_a_thin_tie_triangle_can_hide_from_the_deterministic_trial_set(system) -
     # The two liquid vertices differ by only 0.053 in x_1 at this temperature.
     assert float(np.max(np.abs(x_i - x_ii))) < 0.09
 
-    z = vertices @ np.array([0.5, 0.3, 0.2])
+    weights = np.array([0.5, 0.3, 0.2])
+    z = vertices @ weights
     z = z / float(np.sum(z))
     assert np.all(np.linalg.solve(vertices, z) > 0.0)
 
+    stability = ct.stability_tp(
+        ct.Mixture.from_database(list(names), [float(value) for value in z], normalize=True),
+        temperature_K=temperature_K,
+        pressure_Pa=PRESSURE_PA,
+        activity_model=model,
+        vapor="ideal",
+    )
+    assert stability.status == "unstable"
+    assert stability.feed_branch == "liquid"
+    assert stability.phase_branch == "vapor"
+    assert stability.diagnostics["minimizing_trial"] == "raoult-vapor"
+    assert stability.diagnostics["minimizing_trial_surface"] == "vapor"
+    assert abs(stability.tpd_min - (-0.011680)) < 1e-5, stability.tpd_min
+
     result = _flash(names, model, z, temperature_K)
-    assert result.phase_names() == ["liquid"], "the 363 K near-plait miss is fixed; update Case V-2"
-    assert float(result.diagnostics["tpd_min"]) == 0.0
+    assert sorted(result.phase_names()) == ["liquid1", "liquid2", "vapor"]
+    assert result.diagnostics["phase_regime"] == "VLLE"
+    for name, reference, weight in (
+        ("liquid1", x_i, weights[0]),
+        ("liquid2", x_ii, weights[1]),
+        ("vapor", y, weights[2]),
+    ):
+        composition = np.array(result.phases[name].composition.fractions, dtype=float)
+        assert float(np.max(np.abs(composition - reference))) < 1e-8, name
+        assert abs(result.phase_fractions[name] - float(weight)) < 1e-8, name
 
 
 # --------------------------------------------------------------------------

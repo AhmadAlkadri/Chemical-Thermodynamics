@@ -7,7 +7,10 @@ reaches the paths it was not wired to.
 
 The tie-triangle itself, with its independent Newton solve and its Gibbs
 ordering, is validation Cases V-1 and V-2 in
-`tests/validation/test_vlle_water_propanol_butanol.py`.
+`tests/validation/test_vlle_water_propanol_butanol.py`, and the verdict map over
+a grid of feeds is Case V-5 in `tests/validation/test_vlle_verdict_map.py`. The
+ternary feed that Case V-2 recorded as a *miss* until ADR-0012 is pinned here,
+with the answer it has now.
 
 System for the refusal window
 -----------------------------
@@ -293,6 +296,96 @@ def test_the_window_result_is_deterministic_and_permutation_invariant(butanol_wa
     )
     assert np.allclose(np.array(restored), np.array(reference), rtol=0.0, atol=1e-9)
     assert swapped.diagnostics["phase_set_history"] == base.diagnostics["phase_set_history"]
+
+
+# --------------------------------------------------------------------------
+# Case V-2 amended: the near-plait ternary feed at 363 K (ADR-0012)
+# --------------------------------------------------------------------------
+
+
+def test_the_near_plait_ternary_feed_at_363_k_is_a_three_phase_state(
+    tessier2000_names, tessier2000_model
+) -> None:
+    """The pinned miss of validation Case V-2, now the right answer.
+
+    At 363 K the 1-propanol / n-butanol / water tie-triangle is thin - the two
+    liquid vertices differ by 0.053 in `x_1` - and a feed weighted 0.5 / 0.3 /
+    0.2 towards its vertices used to come back a **single liquid**, because
+    every stability trial collapsed onto the trivial solution. The tangent-plane
+    distance at the equilibrium vapor is -9.92e-03, so the feed was provably
+    unstable and the test simply never reached that stationary point: from the
+    Raoult-vapor start the liquid candidate is the lower-Gibbs one at the
+    intermediate compositions, and re-selecting it at every iteration dragged
+    the iterate onto the liquid surface.
+
+    ADR-0012 pins each modified-Raoult trial to one candidate surface. The
+    vapor-surface trial then converges in a single substitution, because the
+    ideal-gas term is zero and equation (8) reduces to `ln W_i = d_i`.
+
+    The vertices below are the tie-triangle of validation Case V-1, pinned here
+    rather than solved; they are derived independently in
+    `tests/validation/test_vlle_water_propanol_butanol.py` and the verdict map
+    around them is Case V-5 in `tests/validation/test_vlle_verdict_map.py`.
+    """
+    x_i = np.array([0.10282779, 0.03539032, 0.86178189])
+    x_ii = np.array([0.15630287, 0.06422717, 0.77946996])
+    y = np.array([0.28312929, 0.06046985, 0.65640086])
+    weights = np.array([0.5, 0.3, 0.2])
+    vertices = np.column_stack([x_i, x_ii, y])
+    z = vertices @ weights
+    z = z / float(np.sum(z))
+    assert np.allclose(z, [0.15493061, 0.04905728, 0.7960121], rtol=0.0, atol=1e-8)
+
+    mixture = ct.Mixture.from_database(
+        tessier2000_names, [float(value) for value in z], normalize=True
+    )
+    stability = ct.stability_tp(
+        mixture,
+        temperature_K=363.0,
+        pressure_Pa=PRESSURE_PA,
+        activity_model=tessier2000_model,
+        vapor="ideal",
+    )
+    assert stability.status == "unstable"
+    assert stability.feed_branch == "liquid"
+    assert stability.phase_branch == "vapor"
+    assert stability.tpd_min == pytest.approx(-0.011680295426, abs=1e-6)
+    assert stability.diagnostics["minimizing_trial"] == "raoult-vapor"
+    assert stability.diagnostics["minimizing_trial_surface"] == "vapor"
+    # Equation (7) still holds at the stationary point of the pinned surface.
+    assert float(stability.diagnostics["tpd_from_sum_W"]) == pytest.approx(
+        stability.tpd_min, abs=1e-12
+    )
+
+    result = ct.flash_tp(
+        mixture,
+        temperature_K=363.0,
+        pressure_Pa=PRESSURE_PA,
+        activity_model=tessier2000_model,
+        flash_mode="modified-raoult",
+    )
+    assert sorted(result.phase_names()) == ["liquid1", "liquid2", "vapor"]
+    assert result.diagnostics["phase_regime"] == "VLLE"
+    assert result.diagnostics["post_split_stable"] is True
+    balance = np.zeros(3)
+    for name, reference, weight in (
+        ("liquid1", x_i, weights[0]),
+        ("liquid2", x_ii, weights[1]),
+        ("vapor", y, weights[2]),
+    ):
+        composition = np.array(result.phases[name].composition.fractions, dtype=float)
+        assert np.allclose(composition, reference, rtol=0.0, atol=1e-8), name
+        # The vertices pinned above are rounded to eight digits, so `z` sits a
+        # few 1e-9 off the model's exact triangle and the lever rule amplifies
+        # that into the phase fractions: measured 5.7e-08 on liquid1. The
+        # fractions are therefore pinned at 1e-6 here and at 1e-8 in
+        # `tests/validation/test_vlle_water_propanol_butanol.py`, where the
+        # triangle is solved rather than rounded.
+        assert result.phase_fractions[name] == pytest.approx(float(weight), abs=1e-6), name
+        balance = balance + result.phase_fractions[name] * composition
+    # The mass balance is exact whatever the rounding of the reference.
+    assert float(np.max(np.abs(balance - z))) < 1e-12
+    assert float(result.diagnostics["mass_balance_residual"]) < 1e-12
 
 
 # --------------------------------------------------------------------------
