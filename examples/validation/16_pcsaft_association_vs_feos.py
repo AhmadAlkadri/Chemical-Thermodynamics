@@ -34,8 +34,8 @@ What is checked
    pinned in validation Case P-1.
 4. **Equilibrium**: pure-water saturation at 373.15 K against FeOs's own
    ``PhaseEquilibrium.pure``; a water/ethanol vapour-liquid flash at 351 K; and
-   a water/n-hexane liquid-liquid split, with FeOs's fugacities evaluated at
-   chemthermo's phases.
+   a water/n-hexane liquid-liquid split at 1 atm and at 1 MPa, with FeOs's
+   fugacities evaluated at chemthermo's phases.
 5. **A negative control**: perturbing one association parameter by 1 % must
    break the agreement.
 
@@ -542,21 +542,23 @@ def liquid_liquid_split() -> None:
     eos = PCSAFTEOS()
     stability = ct.stability_tp(mixture, temperature_K=temperature, pressure_Pa=101325.0, eos=eos)
     print(f"    at 1 atm: stability_tp -> {stability.status!r}, tpd_min = {stability.tpd_min:.6e}")
-    raised = False
-    try:
-        ct.flash_tp(mixture, temperature_K=temperature, pressure_Pa=101325.0, eos=eos)
-    except ct.ConvergenceError:
-        raised = True
     record("at 1 atm the feed is unstable", stability.status == "unstable")
+    result = ct.flash_tp(mixture, temperature_K=temperature, pressure_Pa=101325.0, eos=eos)
     record(
-        "at 1 atm flash_tp refuses rather than returning a spurious vapour-liquid pair",
-        raised,
+        "at 1 atm flash_tp returns a liquid-liquid pair (ADR-0019)",
+        sorted(result.phases) == ["liquid1", "liquid2"] and result.vapor_fraction is None,
     )
     print(
-        "    That refusal is a known limitation, not a bug in the model: the phi-phi\n"
-        "    split can only pair a vapour-root phase with a liquid-root one, and at\n"
-        "    1 atm the isotherm still has a vapour root. FeOs's own two-phase flash at\n"
-        "    the same state returns two liquids. See ADR-0018."
+        "    at 1 atm: flash_tp -> "
+        f"{sorted(result.phases)}, vapor_fraction = {result.vapor_fraction!r}, "
+        f"regime = {result.diagnostics['phase_regime']!r}"
+    )
+    print(
+        "    Until ADR-0019 this state raised: the split pinned one phase to the liquid\n"
+        "    root and the other to the vapour root, so it could only offer a water-rich\n"
+        "    liquid against a hexane-rich vapour above the feed's Gibbs energy. FeOs's own\n"
+        "    tp_flash always returned two liquids here; now so does chemthermo. See\n"
+        "    examples/validation/17_pcsaft_lle_vs_feos.py for the full comparison."
     )
 
     published_a, published_b = pcsaft_module.A_UNIVERSAL, pcsaft_module.B_UNIVERSAL
@@ -577,7 +579,7 @@ def liquid_liquid_split() -> None:
         phases: list[list[float]] = []
         densities: list[float] = []
         identities: list[str] = []
-        for name in ("liquid", "vapor"):
+        for name in ("liquid1", "liquid2"):
             fractions = list(result.phases[name].composition.fractions)
             density = eos.density_roots(
                 temperature_K=temperature,
@@ -596,12 +598,12 @@ def liquid_liquid_split() -> None:
             densities.append(density)
             identities.append(identity)
             print(
-                f"    labelled {name!r:<8} x = ({fractions[0]:.8f}, {fractions[1]:.8f})  "
+                f"    labelled {name!r:<9} x = ({fractions[0]:.8f}, {fractions[1]:.8f})  "
                 f"rho = {density:>12,.2f}  measured identity {identity!r}"
             )
         print(
             f"    phase_label_method = {result.diagnostics['phase_label_method']!r}, "
-            f"vapor_fraction = {result.vapor_fraction:.6f}"
+            f"vapor_fraction = {result.vapor_fraction!r}"
         )
         residual = equal_fugacity(names, temperature, phases, densities)
         print(f"    FeOs equal-fugacity residual at chemthermo's phases: {residual:.2e}")
@@ -609,10 +611,9 @@ def liquid_liquid_split() -> None:
         record("the split is a Gibbs decrease", result.diagnostics["delta_g_split_rt"] < 0.0)
         record("FeOs agrees the two liquids are in equilibrium to 1e-8", residual < 1e-8)
         print(
-            "    Labels: ADR-0017 measures both phases as liquids, but the phi-phi path\n"
-            "    has no 'liquid1' / 'liquid2' naming, so it falls back to the Wilson\n"
-            "    ranking and 'vapor_fraction' is the hexane-rich LIQUID's fraction.\n"
-            "    Recorded as a limitation; fixing it is the next slice's job."
+            "    Labels: ADR-0017 measures both phases as liquids and ADR-0019 names them\n"
+            "    'liquid1' / 'liquid2' with vapor_fraction = None. Before that slice this\n"
+            "    pair fell through to the Wilson ranking and came back 'liquid' / 'vapor'."
         )
         print(
             "    Mutual solubilities from this model, against the commonly tabulated\n"

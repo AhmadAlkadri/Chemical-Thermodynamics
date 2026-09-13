@@ -110,16 +110,25 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
     water's saturation state at 373.15 K by equal fugacity on the two density
     roots (100,890.27 Pa, 0.43 % below the 101,325 Pa that *defines* the normal
     boiling point, printed as a remark about the model and asserted nowhere).
-    Then a water / n-hexane liquid-liquid split from the unchanged `flash_tp`,
-    with both of the slice's honest caveats printed by the script: at 1 atm
-    `stability_tp` correctly says unstable and `flash_tp` **raises**, because
-    the phi-phi split can only pair a vapour-root phase with a liquid-root one;
-    at 1 MPa the vapour root is gone, the same machinery returns the real tie
-    line, and ADR-0017 measures both phases as liquids while the phi-phi
-    naming still calls them `"liquid"` / `"vapor"`. `kij = 0`, which is a poor
-    model for water with a hydrocarbon and is said so on the page. Runs in
-    about 7 s. Needs no optional dependency. See ADR-0018 and validation Cases
-    P-6 and P-7.
+    Then a water / n-hexane liquid-liquid split from `flash_tp`, at 1 atm and
+    again at 1 MPa - the same tie line, both times named `"liquid1"` /
+    `"liquid2"` with `vapor_fraction = None`. The 1 atm state used to raise
+    (the split could only pair a vapour-root phase with a liquid-root one) and
+    is what ADR-0019 fixed; the script says so where the old caveat used to be.
+    `kij = 0`, which is a poor model for water with a hydrocarbon and is said
+    so on the page. Runs in about 15 s. Needs no optional dependency. See
+    ADR-0018, ADR-0019 and validation Cases P-6, P-7 and P-8.
+- `examples/basic/flash_tp_pcsaft_lle_demo.py`
+  - **Liquid-liquid equilibrium from an equation of state** (ADR-0019), the
+    golden path for that slice. Water / n-hexane at 298.15 K: the stability
+    verdict and the two density roots that made the state hard, the 1 atm split
+    (`liquid1` / `liquid2`, `vapor_fraction = None`, every verification residual
+    and a `kappa` recomputed from the public `pressure_Pa` so the liquid
+    identities do not rest on `phase_identity` alone), the same tie line from
+    three feeds with the lever rule, and the 1 MPa tie line that used to be
+    mislabelled `"liquid"` / `"vapor"` by the Wilson-ranking fallback. `kij = 0`
+    and the mutual-solubility caveat are printed. Runs in about 25 s. Needs no
+    optional dependency. See validation Case P-8.
 - `examples/validation/00_reference_case.py`
   - Deterministic single-case comparison against `thermo` (optional dependency).
     Unchanged by the tangent-plane phase-detection slice: beta 0.46829044 vs
@@ -261,6 +270,19 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
     constants to fourteen figures where the paper prints ten. Requires
     `pip install -e ".[validation]"`; prints a message and exits 0 without
     `feos`. Runs in about 10 s.
+- `examples/validation/17_pcsaft_lle_vs_feos.py`
+  - The **liquid-liquid tie line** against FeOs, with PASS/FAIL per check
+    (ADR-0019, validation Case P-8). Water / n-hexane at 298.15 K, at 1 atm and
+    at 1 MPa: the tie line, the phase densities and the phase amounts against
+    FeOs's **own** `State.tp_flash` (two solvers, not just two models); FeOs's
+    chemical potentials evaluated at chemthermo's phases, which does not depend
+    on FeOs's flash converging; the lever rule across three feeds; and a
+    negative control (1 % on water's `eps^AB` must move the tie line). Reports
+    every FeOs-at-chemthermo's-densities number twice, as shipped and with
+    FeOs's fourteen-figure universal constants, and prints the one feed
+    (`z = 0.2/0.8`) where FeOs's own flash raises rather than hiding it.
+    Requires `pip install -e ".[validation]"`; prints a message and exits 0
+    without `feos`. Runs in about 40 s.
 - `examples/validation/*.py`
   - Optional validation sweeps against `thermo` (requires `pip install -e ".[validation]"`).
   - CSV output is disabled by default; pass `--outdir <dir>` or set `CHEMTHERMO_OUTDIR`.
