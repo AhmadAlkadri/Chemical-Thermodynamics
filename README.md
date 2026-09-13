@@ -141,7 +141,8 @@ python examples/basic/flash_tp_auto_phase_demo.py
 - `"stable"` means no negative tangent-plane distance was found from the
   deterministic trial set, not a global proof (same bound as `stability_tp`).
 - **Liquid-liquid splits have their own mode**, `gamma-gamma`; see
-  "Liquid-liquid flash" below.
+  "Liquid-liquid flash" below. **Low-pressure vapor-liquid equilibrium from an
+  activity model** is `modified-raoult`; see below.
 - **Gamma-phi is still heuristic.** Its diagnostics say
   `phase_detection == "wilson-heuristic"` and its numbers are unchanged. A
   gamma-phi stability test needs a consistent pure-liquid reference fugacity
@@ -224,19 +225,146 @@ Notes and limits:
   `ssi_iterations`, `second_order_iterations` and `converged_stage` in
   `diagnostics` record what happened. Measured over the nine validated feeds of
   Tessier Problems 1 and 2, the final residual is at round-off (worst 1.8e-14).
-- **Not gamma-phi.** Passing both an `eos` and an `activity_model` to
-  `gamma-gamma` is a `ModelError`; combined vapor-liquid equilibrium with an
-  activity liquid is `flash_mode="gamma-phi"`, which is unchanged and still
-  heuristic.
+- **Not vapor-liquid.** Passing both an `eos` and an `activity_model` to
+  `gamma-gamma` is a `ModelError`. For vapor-liquid equilibrium from an activity
+  model use `flash_mode="modified-raoult"` (below); the older
+  `flash_mode="gamma-phi"` is unchanged, still heuristic, and deprecated.
 - The scope is the same as `stability_tp`'s: `"stable"` means no negative
   tangent-plane distance was found from the deterministic trial set, not a
   global proof.
 
+### Low-pressure vapor-liquid and liquid-liquid (`modified-raoult`)
+
+`flash_mode="modified-raoult"` gives an activity-coefficient liquid a vapor to
+be in equilibrium with, at the one place where the pure-liquid reference
+fugacity can be written down honestly: low pressure, where `phi_i^V = 1`,
+`phi_i^sat = 1`, the Poynting factor is 1, and `f_i^0 = Psat_i(T)`. The
+equilibrium condition is modified Raoult's law,
+
+```
+y_i P = x_i gamma_i(x) Psat_i(T)
+```
+
+Both phases are put on **one** Gibbs surface by measuring them against the same
+reference `ln( f_i / (x_i P) )`:
+
+```
+liquid candidate:  ln gamma_i(w) + ln( Psat_i(T) / P )
+vapor candidate:   0
+```
+
+Michelsen's test is then run on whichever candidate has the **lower Gibbs
+energy** at each composition - the same rule that picks the minimum-Gibbs root
+of a cubic EOS. So a single call decides *one phase or two*, and if two,
+*vapor-liquid or liquid-liquid*, and says which (ADR-0010).
+
+```python
+from chemthermo import Mixture, NRTL, NRTLParameters, flash_tp
+
+# 1-propanol / water, NRTL parameters from Tessier, Brennecke & Stadtherr,
+# Chem. Eng. Sci. 55 (2000) 1785, Table 1 (pair 1-3). LLE-fitted and
+# temperature independent: an illustration of the method, not a correlation.
+parameters = NRTLParameters.from_pairs(
+    [("1-Propanol", "Water", -0.07149, 2.7425, 0.3, 0.3)]
+)
+mixture = Mixture.from_database(("1-Propanol", "Water"), (0.50, 0.50))
+
+result = flash_tp(
+    mixture,
+    temperature_K=361.0,
+    pressure_Pa=101325.0,
+    activity_model=NRTL(parameters=parameters),
+    flash_mode="modified-raoult",
+)
+
+print(result.phase_names())                     # ['liquid', 'vapor']
+print(result.diagnostics["phase_regime"])       # 'VLE'
+print(result.diagnostics["incipient_phase"])    # 'vapor'
+print(result.vapor_fraction)                    # 0.0869266874...
+print(result.phases["vapor"].composition.fractions)  # (0.4423209..., 0.5576790...)
+print(result.diagnostics["equilibrium_residual"])    # 1.6e-15
+```
+
+The stability test on its own answers the same question without solving a
+split:
+
+```python
+from chemthermo import stability_tp
+
+result = stability_tp(
+    mixture,
+    temperature_K=380.0,
+    pressure_Pa=101325.0,
+    activity_model=NRTL(parameters=parameters),
+    vapor="ideal",          # add an ideal-gas candidate to the liquid
+)
+print(result.status)        # 'stable'
+print(result.feed_branch)   # 'vapor'  - the feed is a superheated vapor
+```
+
+Runnable demos:
+
+```bash
+python examples/basic/flash_tp_modified_raoult_demo.py
+python examples/validation/10_modified_raoult_water_butanol.py
+```
+
+Notes and limits:
+
+- **The mode is never inferred.** An `activity_model` with no `eos` still means
+  `gamma-gamma`; you must name `flash_mode="modified-raoult"`. Which vapor model
+  applies at a given pressure is your physical judgement, not something the
+  package should guess. Passing an `eos` to this mode is a `ModelError`.
+- **Phase naming comes from the candidates, not from a heuristic.** VLE returns
+  `liquid` / `vapor` with a real `vapor_fraction`; LLE returns
+  `liquid1` / `liquid2` with `vapor_fraction = None` (the same role-not-identity
+  caveat as `gamma-gamma`); a single phase is named by the feed's candidate.
+  There is no volatility-ordering convention here, unlike phi-phi.
+- **Both phases are re-tested against both candidates.** A vapor-liquid answer
+  whose liquid is inside a miscibility gap, or a liquid-liquid answer that
+  should be boiling, raises `ConvergenceError` ("a third phase is required")
+  rather than being returned.
+- **Near a three-phase state it refuses.** For water / 1-butanol at 1 atm and
+  z(butanol) = 0.20 there is a window about **0.135 K wide just below** the
+  three-phase temperature T3 = 366.2138 K where the deepest tangent-plane
+  minimum is the vapor, the converged vapor-liquid pair is not the equilibrium,
+  and `flash_tp` raises. The refusal is correct; the *resolution* below T3 is
+  not a third phase but a different pair of two, which needs phase addition
+  **and removal**. See validation Case R-3.
+- **Honest limits of the model itself:** ideal vapor, so low pressure only; no
+  Poynting correction; no `phi^sat`; and the temperature must lie inside every
+  component's Antoine validity range, which is **enforced** - outside it the
+  call raises `InputRangeError` instead of extrapolating a vapor-pressure fit.
+  `diagnostics["antoine_valid_Tmin_K"]` and `["antoine_valid_Tmax_K"]` report
+  the window. Antoine coefficients come from the packaged databank in the form
+  `ln( P^sat / bar ) = A - B / (T/K + C)` (Koretsky 2012).
+- `"stable"` still means no negative tangent-plane distance was found from the
+  deterministic trial set (two Raoult estimates plus one pure-component estimate
+  per component), not a global proof.
+
+### `gamma-phi` is deprecated
+
+`flash_mode="gamma-phi"` still works and its numbers are unchanged, but it is
+**deprecated in favour of `"modified-raoult"`** and should not be used for new
+work. The reason is physical, not stylistic:
+
+- it sets `K_i = gamma_i phi_i^L / phi_i^V` with `gamma_i` from the activity
+  model *and* `phi_i^L` from the equation of state evaluated on the liquid
+  mixture, so the liquid's nonideality is counted **twice**; and
+- it carries **no pure-liquid reference fugacity at all** - no `Psat_i`, no
+  `phi_i^sat`, no Poynting - so its two phases are not on one Gibbs surface.
+
+That is also why it has no stability test, no automatic phase detection and no
+post-split check (ADR-0007, ADR-0009). Use `"modified-raoult"` at low pressure
+and `"phi-phi"` at high pressure. Removal, if it happens, will get its own ADR;
+nothing about `gamma-phi` or the CLI changed in this release.
+
 ### Post-split stability
 
-Every two-phase result from the tangent-plane phi-phi path and from the
-liquid-liquid path is re-tested: each converged phase is fed back into
-`stability_tp` with the same model.
+Every two-phase result from the tangent-plane phi-phi path, the liquid-liquid
+path and the modified-Raoult path is re-tested: each converged phase is fed back
+into `stability_tp` with the same model (and, for modified Raoult, against
+**both** phase candidates).
 
 ```python
 print(result.diagnostics["post_split_status"])            # 'stable'
@@ -408,6 +536,40 @@ Runnable demo:
 python examples/basic/stability_tp_nrtl_lle_demo.py
 ```
 
+### Adding an ideal-gas candidate (`vapor="ideal"`)
+
+`stability_tp(..., activity_model=..., vapor="ideal")` adds a **second phase
+candidate** - an ideal gas - to the activity-model liquid, using the databank
+Antoine coefficients for the pure-liquid reference fugacity `f_i^0 = Psat_i(T)`
+(ADR-0010). At each trial composition the candidate with the lower Gibbs energy
+is used, so one test covers vapor-liquid *and* liquid-liquid behavior:
+
+```python
+result = stability_tp(
+    Mixture.from_database(("1-Propanol", "Water"), (0.50, 0.50)),
+    temperature_K=361.0,
+    pressure_Pa=101325.0,
+    activity_model=NRTL(parameters=parameters),
+    vapor="ideal",
+)
+print(result.status)         # 'unstable'
+print(result.feed_branch)    # 'liquid'  - what the feed is
+print(result.phase_branch)   # 'vapor'   - what the incipient phase is
+```
+
+- `vapor="none"` (the default) is the liquid-liquid test above, unchanged.
+- `vapor="ideal"` is only valid with `activity_model`; combining it with an
+  `eos` is a `ModelError` (an equation of state supplies its own vapor branch).
+- `feed_branch` / `phase_branch` become `"liquid"` / `"vapor"` instead of
+  compressibility-root labels, and `pressure_Pa` now *does* affect the result.
+- The temperature must lie inside every component's Antoine validity range;
+  outside it the call raises `InputRangeError` rather than extrapolating.
+  `diagnostics["antoine_valid_Tmin_K"]` / `["antoine_valid_Tmax_K"]` report it.
+- Combined gamma-phi stability against an **equation-of-state** vapor is still
+  unsupported: that needs a reference fugacity with `phi^sat` and a Poynting
+  correction, which this package does not carry. ADR-0010 narrows ADR-0007's
+  refusal to the low-pressure case; it does not overturn it.
+
 Reproduce the published tangent-plane global minima of Tessier et al. (2000)
 Problems 1 and 2:
 
@@ -428,18 +590,22 @@ Notes:
 - `tpd_min` is dimensionless (units of RT). At a stationary point it equals
   `-ln(sum_i W_i)`, so `sum(W) > 1` is the instability signal.
 - Exactly one of `eos` and `activity_model` must be given. **The combined
-  gamma-phi case (activity-coefficient liquid tested against an
-  equation-of-state vapor) is not supported** and raises `ModelError`: it needs
-  a consistent pure-liquid reference fugacity that this package does not yet
-  carry, and returning a plausible-looking wrong tangent plane would be worse
-  than refusing. See ADR-0007.
-- `pressure_Pa` is required and validated for both families, but it does not
-  affect an activity-model result; `result.diagnostics["pressure_dependent"]`
-  says which case applies, and `["model_family"]` is `"eos"` or `"activity"`.
-- `feed_branch` and `phase_branch` are the minimum-Gibbs compressibility root
-  labels for an EOS and are `None` for an activity model (single branch).
-  For an EOS, fugacity coefficients for both the feed and every trial are taken
-  from the compressibility root with the lowest Gibbs energy at that state.
+  gamma-phi case with an equation-of-state vapor is still not supported** and
+  raises `ModelError`: it needs a reference fugacity carrying `phi^sat` and a
+  Poynting correction that this package does not have, and returning a
+  plausible-looking wrong tangent plane would be worse than refusing. See
+  ADR-0007. At low pressure use `activity_model=...` with `vapor="ideal"`
+  (below), where the reference is `Psat_i(T)` and is exact for the model.
+- `pressure_Pa` is required and validated for every family, but it does not
+  affect an activity-only result (`vapor="none"`);
+  `result.diagnostics["pressure_dependent"]` says which case applies, and
+  `["model_family"]` is `"eos"`, `"activity"` or `"modified-raoult"`.
+- `feed_branch` and `phase_branch` name the **lowest-Gibbs phase candidate** at
+  the feed and at the minimizing trial: the compressibility root for an EOS,
+  `"liquid"` / `"vapor"` for `vapor="ideal"`, and `None` for an activity model
+  on its own (one candidate, so no selection was made). The selection rule is
+  the same for all three: keep the candidate minimizing `sum_i w_i term_i(w)`,
+  which is the only candidate-dependent part of `G/RT`.
 - Each trial runs successive substitution for `settings.ssi_iterations` (default
   50) and then, if still above `settings.tol`, a damped Newton stage on the
   stationarity condition. Near a plait point successive substitution alone does

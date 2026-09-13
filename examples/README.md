@@ -57,6 +57,18 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
     citation (Tessier, Brennecke & Stadtherr, Chem. Eng. Sci. 55 (2000) 1785,
     Table 1, pair 2-3) and are **not** the packaged synthetic defaults. Needs no
     optional dependency. See validation Cases L-3 and L-4.
+- `examples/basic/flash_tp_modified_raoult_demo.py`
+  - Low-pressure TP flash with `flash_mode="modified-raoult"`: an NRTL liquid
+    with Antoine pure-liquid reference fugacities against an ideal-gas vapor,
+    both handed to one tangent-plane test (ADR-0010). Shows 1-propanol / water
+    as a subcooled liquid, a vapor-liquid split and a superheated vapor from the
+    same call, recomputes `y_i P = x_i gamma_i Psat_i` from the printed numbers,
+    and then shows n-butanol / water returning a *liquid-liquid* tie-line from
+    the identical call. Prints the Antoine validity window, the candidate labels
+    and the post-split block. Parameters are written inline with their citation
+    (Tessier, Brennecke & Stadtherr, Chem. Eng. Sci. 55 (2000) 1785, Table 1,
+    pairs 1-3 and 2-3) and are **not** the packaged synthetic defaults. Needs no
+    optional dependency. See validation Cases R-1 and R-2.
 - `examples/validation/00_reference_case.py`
   - Deterministic single-case comparison against `thermo` (optional dependency).
     Unchanged by the tangent-plane phase-detection slice: beta 0.46829044 vs
@@ -93,6 +105,16 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
     (0.25, 0.25, 0.25, 0.25) must stay one liquid. Needs no optional
     dependency. Parameters come from the cited fixtures. See validation Cases
     L-1 and L-2.
+- `examples/validation/10_modified_raoult_water_butanol.py`
+  - Water / 1-butanol at 1 atm around its three-phase temperature, with PASS/FAIL
+    on every check. Solves the binodal and T3 = 366.2138 K independently inside
+    the script (equal activities; then `sum x gamma Psat = P` on one liquid,
+    *checked* on the other), prints the shared vapor y = (0.234063, 0.765937),
+    and then runs the three negative controls: a stable liquid-liquid split
+    2 K below T3, a fully evaporated feed 2 K above it (verified against the
+    dew-point equation), and the refusal just below T3, where `flash_tp` raises
+    `ConvergenceError` because the converged pair is not a stable phase set.
+    Needs no optional dependency. See validation Case R-3.
 - `examples/validation/*.py`
   - Optional validation sweeps against `thermo` (requires `pip install -e ".[validation]"`).
   - CSV output is disabled by default; pass `--outdir <dir>` or set `CHEMTHERMO_OUTDIR`.
