@@ -603,17 +603,18 @@ def test_water_ethanol_vapor_liquid_flash_matches_feos() -> None:
     assert residual < 1e-8
 
 
-def test_water_hexane_is_unstable_and_the_phi_phi_split_cannot_express_two_liquids() -> None:
-    """Case P-7 (iii), part 1: 298.15 K, 1 atm, z = 0.5 / 0.5.
+def test_water_hexane_at_one_atm_is_two_liquids_and_feos_agrees() -> None:
+    """Case P-7(iii) part 1, **amended by Case P-8**: the limitation is gone.
 
-    The tangent-plane test is right (the feed is unstable) and the phi-phi
-    split then fails, **honestly**: it pairs a vapour-root phase with a
-    liquid-root one, which is the only pairing ``_split`` can express, and the
-    post-split stability test refuses the result. At 298 K and 1 atm the true
-    answer is two liquids - water's and n-hexane's vapour pressures sum to
-    about 23 kPa, far below 1 atm, so there is no vapour phase - and FeOs's own
-    two-phase flash finds exactly that. Recorded as a limitation, not worked
-    around; see ADR-0018 and the ``flash-phase-addition-eos`` slice.
+    ADR-0018 recorded this state as the phi-phi path's documented failure: the
+    tangent-plane test was right (the feed is unstable) and the split then
+    paired a water-rich liquid with a hexane-rich *vapour* at a Gibbs energy
+    above the feed's, which the post-split test refused. Since ADR-0019 each
+    phase sits on the branch the stability test found it on - here both on the
+    liquid root - and ``flash_tp`` returns the liquid-liquid pair FeOs's own
+    ``tp_flash`` returns. The full comparison lives in
+    ``tests/validation/test_pcsaft_lle_vs_feos.py``; what is kept here is the
+    part that belongs to the association slice's own ledger entry.
     """
     names = ("Water", "n-Hexane")
     temperature, pressure = 298.15, 101325.0
@@ -624,23 +625,13 @@ def test_water_hexane_is_unstable_and_the_phi_phi_split_cannot_express_two_liqui
     assert stability.status == "unstable"
     assert stability.tpd_min is not None and stability.tpd_min < -0.5
 
-    with pytest.raises(ct.ConvergenceError, match="third phase"):
-        ct.flash_tp(mixture, temperature_K=temperature, pressure_Pa=pressure, eos=eos)
+    result = ct.flash_tp(mixture, temperature_K=temperature, pressure_Pa=pressure, eos=eos)
+    assert sorted(result.phases) == ["liquid1", "liquid2"]
+    assert result.vapor_fraction is None
+    assert _number(result.diagnostics, "delta_g_split_rt") < 0.0
+    assert result.diagnostics["post_split_stable"] is True
 
-    # What the split actually converges on, with the guard switched off: a
-    # water-rich liquid against a hexane-rich *vapour* whose Gibbs energy is
-    # above the feed's, which is why the guard fires.
-    unguarded = ct.flash_tp(
-        mixture,
-        temperature_K=temperature,
-        pressure_Pa=pressure,
-        eos=eos,
-        settings=ct.FlashSettings(post_split_stability=False),
-    )
-    assert _number(unguarded.diagnostics, "delta_g_split_rt") > 0.0
-    assert unguarded.diagnostics["post_split_stable"] is False
-
-    # FeOs's two-phase flash at the same state returns the liquid-liquid pair.
+    # FeOs's two-phase flash at the same state returns the same pair.
     reference = State(
         _feos_eos(names),
         temperature=temperature * si.KELVIN,
@@ -653,20 +644,23 @@ def test_water_hexane_is_unstable_and_the_phi_phi_split_cannot_express_two_liqui
     assert compositions[0] < 0.02 and compositions[1] > 0.98
     for phase in (reference.liquid, reference.vapor):
         assert float(phase.density / _MOL_PER_M3) > 5000.0  # both are liquids
+    ours = sorted(
+        float(result.phases[name].composition.fractions[0]) for name in ("liquid1", "liquid2")
+    )
+    assert ours == pytest.approx(compositions, abs=1e-8)
 
 
 @pytest.mark.usefixtures("matched_constants")
 def test_water_hexane_liquid_liquid_split_above_the_vapour_root() -> None:
-    """Case P-7 (iii), part 2: the same tie line at 1 MPa, where it is reachable.
+    """Case P-7 (iii), part 2: the same tie line at 1 MPa.
 
     Raising the pressure above the vapour branch's existence limit leaves the
-    isotherm with a single density root at every composition, so ``"vapor"``
-    and ``"liquid"`` name the *same* (liquid) root and the phi-phi machinery
-    expresses a genuine liquid-liquid split. Both converged phases are liquids
-    by the ADR-0017 compressibility criterion; ADR-0017's naming then falls
-    back to the Wilson ranking and calls them ``"liquid"`` / ``"vapor"``, and
-    ``vapor_fraction`` is the hexane-rich *liquid*'s fraction. That mislabel is
-    recorded here, not hidden.
+    isotherm with a single density root at every composition, so the split was
+    already reachable here before ADR-0019. What ADR-0019 changed is the
+    *name*: both converged phases are liquids by the ADR-0017 compressibility
+    criterion, and they are now ``liquid1`` / ``liquid2`` with
+    ``vapor_fraction = None`` instead of ``liquid`` / ``vapor`` with a
+    ``vapor_fraction`` that was really the hexane-rich liquid's fraction.
 
     Run with FeOs's universal constants, as the VLE test above and for the same
     reason. Measured: the tie line is the same to eight decimal places with the
@@ -695,9 +689,11 @@ def test_water_hexane_liquid_liquid_split_above_the_vapour_root() -> None:
     assert _number(result.diagnostics, "delta_g_split_rt") < 0.0
     assert _number(result.diagnostics, "fugacity_residual") < 1e-10
     assert result.diagnostics["post_split_status"] == "stable"
-    # The labels actually produced (ADR-0017 fallback), recorded as fact:
-    assert set(result.phases) == {"liquid", "vapor"}
-    assert result.diagnostics["phase_label_method"] == "wilson-ranking"
+    # The labels actually produced (ADR-0019), recorded as fact:
+    assert set(result.phases) == {"liquid1", "liquid2"}
+    assert result.diagnostics["phase_label_method"] == "compressibility"
+    assert result.diagnostics["phase_regime"] == "LLE"
+    assert result.vapor_fraction is None
 
     phases = {name: list(phase.composition.fractions) for name, phase in result.phases.items()}
     densities = {}
@@ -719,8 +715,8 @@ def test_water_hexane_liquid_liquid_split_above_the_vapour_root() -> None:
             mixture=mixture,
         )[0]
 
-    water_rich = phases["liquid"]
-    hexane_rich = phases["vapor"]
+    water_rich = phases["liquid1"]
+    hexane_rich = phases["liquid2"]
     assert water_rich[0] > 0.99 and hexane_rich[1] > 0.99
 
     residual = _equal_fugacity_residual(
@@ -728,7 +724,7 @@ def test_water_hexane_liquid_liquid_split_above_the_vapour_root() -> None:
         temperature,
         pressure,
         (water_rich, hexane_rich),
-        (densities["liquid"], densities["vapor"]),
+        (densities["liquid1"], densities["liquid2"]),
     )
     assert residual < 1e-8
 
