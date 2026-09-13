@@ -494,7 +494,8 @@ def test_registry_exposes_pcsaft_and_builds_a_working_model() -> None:
 
 
 def test_packaged_parameters_cover_the_eleven_published_compounds() -> None:
-    names = ct.PCSAFTParameters.load().names()
+    """The 2001 non-associating set, none of whose records may associate."""
+    parameters = ct.PCSAFTParameters.load()
     expected = {
         "methane",
         "ethane",
@@ -508,7 +509,8 @@ def test_packaged_parameters_cover_the_eleven_published_compounds() -> None:
         "nitrogen",
         "carbon dioxide",
     }
-    assert set(names) == expected
+    assert expected <= set(parameters.names())
+    assert all(record is None for record in parameters.association_for_components(sorted(expected)))
 
 
 @pytest.mark.parametrize(
@@ -541,7 +543,8 @@ def test_packaged_parameter_names_resolve_in_the_component_databank() -> None:
 
 
 def test_missing_parameters_raise_pcsaft_parameter_error() -> None:
-    eos = PCSAFTEOS(components=("Water",))
+    """Ammonia associates in reality but is not in the packaged 2002 set."""
+    eos = PCSAFTEOS(components=("Ammonia",))
     with pytest.raises(ct.PCSAFTParameterError, match="Missing PC-SAFT parameters"):
         eos.residual_helmholtz(temperature_K=350.0, volume_m3=1.0, composition=[1.0])
 

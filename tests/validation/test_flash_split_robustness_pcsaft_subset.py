@@ -25,6 +25,9 @@ Run the full grid with `pytest -q -m slow`.
 
 from __future__ import annotations
 
+import importlib.util
+from pathlib import Path
+
 import numpy as np
 
 import chemthermo as ct
@@ -60,11 +63,20 @@ SUBSET: tuple[tuple[tuple[str, str], float, float, float], ...] = PREVIOUSLY_FAI
 
 
 def _full_grid_states() -> set[tuple[tuple[str, str], float, float, float]]:
-    from tests.validation.test_flash_split_robustness_pcsaft import GRID
+    # Loaded by path, not as ``tests.validation....``: whether the repository
+    # root is on ``sys.path`` depends on how pytest was invoked
+    # (``python -m pytest`` puts it there, the ``pytest`` console script does
+    # not), and this assertion should not depend on that.
+    module_path = Path(__file__).with_name("test_flash_split_robustness_pcsaft.py")
+    spec = importlib.util.spec_from_file_location("_pcsaft_full_grid", module_path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    grid = module.GRID
 
     return {
         (components, z1, temperature_K, pressure_Pa)
-        for components, feeds, temperatures, pressures in GRID
+        for components, feeds, temperatures, pressures in grid
         for z1 in feeds
         for temperature_K in temperatures
         for pressure_Pa in pressures
