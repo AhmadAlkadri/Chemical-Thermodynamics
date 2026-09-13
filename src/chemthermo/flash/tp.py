@@ -565,7 +565,11 @@ def _flash_tp_liquid_liquid(
         z=z,
         K=k_seed,
         vapor_fraction=beta,
-        max_iter=min(settings.ssi_iterations, settings.max_iter),
+        max_iter=(
+            min(settings.ssi_iterations, settings.max_iter)
+            if settings.second_order
+            else settings.max_iter
+        ),
         allow_unconverged=settings.second_order,
     )
 
