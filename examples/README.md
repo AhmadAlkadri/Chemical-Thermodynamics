@@ -23,12 +23,22 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
   - Existing TP flash demo (Peng-Robinson EOS).
 - `examples/basic/flash_tp_gamma_phi_demo.py`
   - Existing TP flash demo (gamma-phi, NRTL + Peng-Robinson).
+  - Uses the packaged NRTL pairs, which are **synthetic illustrative placeholders**
+    (not fitted to data, not from any publication); see the `provenance` block in
+    `src/chemthermo/parameters/data/activity/nrtl.json`.
 - `examples/basic/stability_tp_peng_robinson_demo.py`
   - Michelsen tangent-plane phase stability at two states (unstable and stable).
 - `examples/validation/00_reference_case.py`
   - Deterministic single-case comparison against `thermo` (optional dependency).
 - `examples/validation/06_stability_vs_thermo.py`
   - Deterministic stability cross-check against `thermo`'s Michelsen test over 7 states.
+- `examples/validation/07_nrtl_tessier_stationary_points.py`
+  - Reproduces the published NRTL tangent-plane stationary points and D values of
+    Tessier, Brennecke & Stadtherr, Chem. Eng. Sci. 55 (2000) 1785, Table 2
+    (n-propanol / n-butanol / water). Needs no optional dependency. Parameters come
+    from the cited fixture `tests/fixtures/nrtl/tessier2000_problem1.json`, not from
+    the packaged defaults. Two printed D values do not reproduce and are reported as
+    `KNOWN-TYPO`; see `.agents/brain/validation-cases.md` Case N-3.
 - `examples/validation/*.py`
   - Optional validation sweeps against `thermo` (requires `pip install -e ".[validation]"`).
   - CSV output is disabled by default; pass `--outdir <dir>` or set `CHEMTHERMO_OUTDIR`.
@@ -41,6 +51,7 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
 - Gamma-phi TP flash (NRTL + Peng-Robinson):
   - `chemthermo tp-flash --components Methane,Ethane --z 0.5,0.5 --temperature-k 240 --pressure-pa 3000000 --flash-mode gamma-phi --format json`
 - Gamma-phi coverage depends on available NRTL pair data; unsupported pairs return a runtime validation/model error.
+- The packaged NRTL pairs are synthetic demo values, not fitted or published parameters. Supply your own via `NRTLParameters.from_pairs(...)` for real work.
 
 ## Expected output format
 
