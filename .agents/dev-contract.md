@@ -19,6 +19,15 @@ Optional external-validation extras:
 .venv/bin/pip install -e ".[validation]"
 ```
 
+That installs `thermo` (Peng-Robinson / NRTL cross-checks), `teqp`
+(non-associating PC-SAFT, NIST) and, since ADR-0018, `feos` (PC-SAFT
+**association**, which teqp's `PCSAFT` kind does not implement). `feos` brings
+its own units package along: the PyPI name is `si-units` and the import name is
+`si_units`, so it is not listed separately in `pyproject.toml`. Every test and
+script that needs one of these skips cleanly when it is absent
+(`pytest.importorskip` in `tests/validation/`, a printed message and exit 0 in
+`examples/validation/`).
+
 ## CI gates
 
 Run the same checks as `.github/workflows/ci.yml`:
@@ -109,3 +118,10 @@ python -m pytest tests/test_validation.py -q
 python -m pytest tests/test_flash_tp.py -q
 python -m pytest tests/test_examples.py -q
 ```
+
+Note that CI invokes the `pytest` **console script**, not `python -m pytest`,
+and the two differ in one way that has bitten a test here before: `python -m
+pytest` puts the working directory on `sys.path` and the console script does
+not. A test that needs to read something out of a sibling test module must
+load it by path (`importlib.util.spec_from_file_location`), not with
+`from tests.validation... import ...`.
