@@ -61,11 +61,12 @@ Stable (public) entry points
   See validation Cases N-1..N-3. (source: src/chemthermo/models/nrtl.py)
 - `PengRobinsonEOS.kij` accepts a scalar (off-diagonal only; diagonal always unaffected) or a `Mapping[tuple[str, str], float]` keyed by normalized component-name pairs, default per-pair value `0.0` (ADR-0006). `flash_tp` and `stability_tp` results for nonzero `kij` are now trustworthy (previously the diagonal was silently corrupted; see ADR-0006). (source: src/chemthermo/models/peng_robinson.py, .agents/brain/adr/0006-pr-kij-matrix.md)
 - EOS registry module (`chemthermo.eos`: `EOSProtocol`, `PCSAFTEOS`, `get_eos`, `list_eos`, `register_eos`). (source: src/chemthermo/eos/__init__.py)
+- `PCSAFTEOS` is a **real** non-associating PC-SAFT model (Gross & Sadowski, IECR 40 (2001) 1244; hard chain + dispersion) as of ADR-0014, not a placeholder. Frozen dataclass `PCSAFTEOS(components, parameters=None, kij=0.0)`; `residual_helmholtz(temperature_K=, volume_m3=, composition=)` keeps its signature and returns `A^res/(R T)` with `volume_m3` the **molar** volume in m^3/mol; new `compressibility_factor`, `pressure_Pa` and `ln_fugacity_coefficients`, all taking `(temperature_K=, density_mol_m3=, composition=)`. `kij` is the ADR-0006 contract verbatim (scalar or name-keyed per-pair mapping; never the diagonal). **No density root solving**: the state is `(T, rho, x)`, `Z` may be negative inside the spinodal, and `ln_fugacity_coefficients` raises `ModelError` there rather than returning `nan`. `PCSAFTEOS` is deliberately **not** an `EquationOfState`, so it cannot yet be passed to `stability_tp`/`flash_tp`. Association and polar terms are out of scope. New public names `PCSAFTParameters`, `PCSAFTRecord`, `get_pcsaft_parameters`; the stub `PCSAFTParameterRegistry` is **removed** (it was never in `chemthermo.__all__` and only ever raised). Validated against teqp (NIST, autodiff) to <= 2.7e-14 in `A^res/RT`, `Z` and `ln phi` over 14 states (Cases P-0, P-1, P-2). (source: src/chemthermo/eos/pcsaft.py, src/chemthermo/parameters/pcsaft.py, .agents/brain/adr/0014-pcsaft-residual-helmholtz.md)
 - VLLE plugin boundary (`chemthermo.vlle`: `get_vlle_engine`, `VLLEEngine`, `VLLEResult`, and related types/errors) is **DEPRECATED** (ADR-0013): three-phase equilibrium is now discovered in-tree by `flash_tp(..., flash_mode="modified-raoult")` with `FlashSettings(max_phases=3)` (ADR-0011). Importing `chemthermo.vlle`, or calling `get_vlle_engine()`, emits `DeprecationWarning`; the exported names and the loader's `VLLEPluginNotInstalledError`/`VLLEPluginError` behavior are otherwise unchanged for one deprecation cycle. `flash_mode="vlle"` still raises `ModelError`, now pointing at `"modified-raoult"` instead of the out-of-tree `chemthermo_vlle` package. Removal is not decided; it needs its own follow-up ADR. (source: src/chemthermo/vlle/__init__.py, src/chemthermo/vlle/loader.py, src/chemthermo/flash/tp.py, README.md, .agents/brain/adr/0013-vlle-plugin-deprecation.md)
 
 Implementation status notes
 - `chemthermo.vlle`: Deprecated public plugin boundary for optional VLLE engines (ADR-0013); see the bullet above.
-- `chemthermo.eos.pcsaft`: Public EOS registry entry and interface with implementation details evolving over time.
+- `chemthermo.eos.pcsaft`: Implemented and validated (ADR-0014). Remaining gaps are stated, not hidden: no association/polar terms, no density solver, no temperature derivative, not wired into the flash/stability solvers.
 
 CLI entry points
 - `chemthermo = "chemthermo.cli:main"` in `[project.scripts]` and module execution via `python -m chemthermo`. (source: pyproject.toml, src/chemthermo/__main__.py, src/chemthermo/cli.py)
@@ -77,6 +78,7 @@ src/chemthermo/data/components.json -> data loaders -> Component/Composition/Mix
   (i.e. flash_tp -> stability_tp(feed) -> seeded Rachford-Rice/SSI split (+ second-order stage for LLE and modified-Raoult) -> post-split stability of each phase -> multiphase Rachford-Rice with phase addition/removal, up to FlashSettings.max_phases -> FlashResult)
 src/chemthermo/data/components.json -> Component/Composition/Mixture -> models (PR | NRTL | NRTL+Antoine+ideal gas) -> stability_tp -> internal _TangentPlaneEvaluator (a set of _PhaseCandidates; the min-Gibbs one wins) -> Michelsen TPD (SSI + Newton) -> StabilityResult
 chemthermo CLI -> parser -> Mixture + PengRobinsonEOS -> flash_tp -> text/json output
+src/chemthermo/parameters/data/eos/pcsaft.json -> PCSAFTParameters -> PCSAFTEOS(T, molar density, x) -> A^res/RT, Z, P, ln phi   (standalone; no density root solver and no flash/stability wiring yet, ADR-0014)
 
 ```
 
@@ -171,6 +173,27 @@ Key entry points (top paths)
   (PC-SAFT density roots, a Gibbs-energy phase model). (source:
   src/chemthermo/stability/_evaluator.py `_select_min_gibbs`, validation
   Case R-2)
+- **A Helmholtz-explicit model's state is `(T, rho, x)`, and choosing a
+  density root is a separate decision from evaluating the model.** PC-SAFT's
+  `A^res/RT`, `Z`, `P` and `ln phi_i` are single-valued functions of
+  `(T, rho, x)`; a `(T, P)` state is several of them. `chemthermo.eos.PCSAFTEOS`
+  therefore takes the density and never guesses the root, and inside the
+  spinodal (`Z <= 0`) it raises rather than returning a `nan` fugacity
+  coefficient. Any future density solver must keep that separation: the root
+  *selection* rule belongs with the phase-candidate machinery (ADR-0010's
+  `_select_min_gibbs`), not inside the equation of state. (source:
+  src/chemthermo/eos/pcsaft.py, .agents/brain/adr/0014-pcsaft-residual-helmholtz.md)
+- **An analytic derivative of a published model is a transcription risk, and
+  is tested as one.** Every PC-SAFT derivative is checked three ways: against
+  central finite differences of the quantity it differentiates, against the
+  Euler identity `sum_i x_i ln phi_i = A^res/RT + Z - 1 - ln Z`, and against
+  teqp's automatic differentiation of the same model. The middle check is the
+  cheap one and the last is the sharp one: a missing `I2` factor in
+  `partial a_disp / partial m2e2s3` found during this slice was invisible in
+  `A^res` and `Z` and in every pure-component number, and showed up only in
+  mixture `ln phi`. Any new hand-written derivative must carry the same three.
+  (source: tests/test_pcsaft.py, tests/validation/test_pcsaft_vs_teqp.py,
+  validation Cases P-0 and P-1)
 - **A vapor-pressure correlation is never extrapolated silently.** Antoine
   evaluation outside a component's stated `[Tmin_K, Tmax_K]` raises
   `InputRangeError`; the mixture's validity window is reported in diagnostics.
@@ -187,6 +210,7 @@ Key entry points (top paths)
 - Composition sum tolerance: `COMPOSITION_SUM_TOL = 1e-8`. (source: src/chemthermo/validation.py)
 - Unit constants: `R_J_PER_MOL_K`, `STANDARD_T_K`, `STANDARD_P_PA`, pressure conversions. (source: src/chemthermo/units.py)
 - NRTL parameters load from packaged JSON (`src/chemthermo/parameters/data/activity/nrtl.json`). (source: src/chemthermo/parameters/nrtl.py, src/chemthermo/parameters/data/activity/nrtl.json)
+- PC-SAFT pure-component parameters load from packaged JSON (`src/chemthermo/parameters/data/eos/pcsaft.json`, schema_version 1, 11 non-associating compounds of Gross & Sadowski 2001 Table 1 with a `provenance` block). No `kij` dataset is packaged; `kij` defaults to `0.0` per instance. (source: src/chemthermo/parameters/pcsaft.py)
 
 - No environment-variable configuration is documented in README or `pyproject.toml`. (source: README.md, pyproject.toml)
 
@@ -196,7 +220,7 @@ Cheap checks
 
 ## 7) Testing & CI contract
 - CI runs: ruff format check, ruff lint, pyright, pytest on Python 3.11. (source: .github/workflows/ci.yml)
-- Optional validation tests compare against the `thermo` library and are skipped if not installed. (source: tests/validation/test_flash_vs_thermo.py, tests/validation/test_stability_vs_thermo.py, pyproject.toml)
+- Optional validation tests compare against the `thermo` library (cubic EOS, activity models) and against `teqp` (PC-SAFT, NIST), and are skipped if the dependency is not installed. Both live in the `validation` extra. (source: tests/validation/test_flash_vs_thermo.py, tests/validation/test_stability_vs_thermo.py, tests/validation/test_pcsaft_vs_teqp.py, pyproject.toml)
 - Validation case ledger ("thermodynamics exam"): `.agents/brain/validation-cases.md`. One entry per case with source, location, assumptions, parameters and provenance, expected outcome, tolerance achieved, independent route, and test path. Never record an expected value that was not read from a source or produced by an independent route.
 
 ## 8) Decisions log (index)
@@ -215,10 +239,12 @@ Cheap checks
   - `.agents/brain/adr/0011-flash-phase-addition-removal.md` (Adopted 2026-09-13)
   - `.agents/brain/adr/0012-stability-trial-candidate-surfaces.md` (Adopted 2026-09-13)
   - `.agents/brain/adr/0013-vlle-plugin-deprecation.md` (Adopted 2026-09-13; amends ADR-0001)
+  - `.agents/brain/adr/0014-pcsaft-residual-helmholtz.md` (Adopted 2026-09-13)
 - ADR rules: one decision per ADR; keep under 1 page; include status and supersedes fields.
 
 ## 9) Roadmap: next 3 increments (vertical slices)
 - **Recently completed**
+  - `pcsaft-residual-helmholtz`: `chemthermo.eos.PCSAFTEOS` stopped being a placeholder that raised `NotImplementedError` and became the real non-associating PC-SAFT model of Gross & Sadowski (2001) - hard chain plus dispersion - behind the unchanged `EOSProtocol.residual_helmholtz` signature, plus three density-based methods (`compressibility_factor`, `pressure_Pa`, `ln_fugacity_coefficients`) and eleven cited pure-component parameter sets packaged with a provenance block (ADR-0014). All derivatives are **analytic**, assembled by one chain rule over the `zeta` moments / `mbar` / `m2es3` / `m2e2s3` rather than transcribed equation by equation from the appendix; `C1` uses the typo-corrected reciprocal form of Eq. (A.11) (the erratum NIST TRC states). Validated against teqp 0.23.2 (NIST, MIT, automatic differentiation - no shared derivative code) at 14 states to **4.4e-15 in `A^res/RT`, 2.6e-14 in `Z` and 2.7e-14 in `max |d ln phi|`** against an asserted 1e-10, plus finite differences, the Euler identity `sum_i x_i ln phi_i = A^res/RT + Z - 1 - ln Z` (worst 8.9e-16), the fixed-`(T, rho)` Gibbs-Duhem form derived in the test, and teqp's `pure_VLE_T` saturation for n-hexane at 300/400 K (to 3e-12 relative). The Peng-Robinson `kij` helpers moved to the internal `chemthermo/models/_kij.py` unchanged so both models share one contract (PR stays bit-identical). What it deliberately does **not** do: association/polar terms, density root solving, temperature derivatives, or any `flash_tp`/`stability_tp` integration. See validation Cases P-0, P-1, P-2. Golden paths `examples/basic/pcsaft_properties_demo.py` and `examples/validation/13_pcsaft_vs_teqp.py`.
   - `vlle-plugin-deprecation`: `chemthermo.vlle` (`get_vlle_engine`, `VLLEEngine`, `VLLEResult`, related types/errors) is now **DEPRECATED** rather than the way to reach VLLE support (ADR-0013, discharging ADR-0011 "What remains" / the promised `vlle-plugin-boundary-disposition` follow-up). Importing `chemthermo.vlle`, or calling `get_vlle_engine()`, emits `warnings.warn(..., DeprecationWarning, stacklevel=2)` naming the in-tree replacement; nothing about its exported names or its `VLLEPluginNotInstalledError`/`VLLEPluginError` behavior changed, so it stays importable for one deprecation cycle. `flash_tp(..., flash_mode="vlle")` still raises `ModelError`, now pointing at `flash_mode="modified-raoult"` with `FlashSettings(max_phases=3)` (ADR-0011) instead of the out-of-tree `chemthermo_vlle` package. ADR-0013 also records, as a recommendation and not an action taken here, that the private sibling `chemthermo_vlle` (a 164-line scaffold pinned to a January 2026 chemthermo commit, predating every stability/flash ADR from 0005 onward, whose `solve_vlle()` unconditionally returns `status="not_implemented"`) should be archived rather than developed, and what a future private engine could still legitimately differentiate on (optimized kernels, initialization/continuation strategies, batch/grid infrastructure, proprietary parameter packs) while consuming the public `EquationOfState`/stability/flash contracts instead of a second solve-everything protocol. ADR-0001 amended accordingly.
   - `stability-candidate-surfaces`: a tangent-plane trial now runs on **one fixed phase-candidate surface** instead of re-selecting the lowest-Gibbs candidate at every iterate (ADR-0012). Only the heterogeneous modified-Raoult pair names a surface; cubic roots and the single activity liquid name none and iterate exactly as before, so phi-phi / gamma-gamma / gamma-phi are bit-identical. The trial set is unchanged in size - the ideal-gas term is zero, so the vapor surface is a constant map reaching its unique stationary point in one substitution from any start, and one vapor trial is provably enough. The 363 K feed pinned as a miss in Case V-2 is now found unstable (`tpd_min = -1.1680295426e-02`, minimizing trial `raoult-vapor` on the vapor surface) and `flash_tp` returns the verified three-phase answer. New validation Case V-5 maps the verdict over 75-76 feeds per temperature at 363/364/365 K against an independent lowest-Gibbs classifier (tie-triangle, VL, LL and single-phase states each solved here by their own Newton): **zero disagreements**, three-phase compositions to |dx| <= 9.5e-12 and fractions to 1.6e-11. Golden path `examples/validation/12_vlle_verdict_map.py`.
   - `flash-vlle-phase-addition`: `flash_tp(..., flash_mode="modified-raoult")` now **discovers** the number of equilibrium phases up to `FlashSettings.max_phases` (new, default 3), by adding the incipient phase a failed post-split stability test found and removing a phase whose fraction converges to zero or below. The inner solve is the multiphase Rachford-Rice written as the constrained convex minimization of `F(beta) = -sum_i z_i ln t_i` (Okuno et al. 2010), whose feasible region contains no pole and does not constrain the sign of `beta` - which is what makes the "negative flash" the removal signal. A second-order stage minimizes the total Gibbs energy in the non-reference phases' mole numbers (the ADR-0009 stage generalized). Verified three-phase results for the 1-propanol / n-butanol / water tie-triangle at 363/364/365 K against an independent Newton solve (|dx| <= 2.2e-14, |dbeta| <= 1.6e-13) with G3 < G2 < G1, and the ~0.135 K refusal window of Case R-3 resolved to the two-liquid pair via `"V -> LV -> LLV -> LL"`. phi-phi and gamma-gamma still stop at two phases. See ADR-0011 and validation Cases V-1..V-4. Golden paths `examples/basic/flash_tp_vlle_demo.py` and `examples/validation/11_vlle_water_propanol_butanol.py`.
@@ -230,8 +256,8 @@ Cheap checks
   - `pr-kij-matrix`: fixed the diagonal-kij bug and added per-pair `kij` support (`float` or name-keyed `Mapping`) to `PengRobinsonEOS`; `flash_tp` and `stability_tp` results for nonzero kij are now trustworthy. See ADR-0006 and validation Case K-1.
   - `stability-tpd-nrtl`: `stability_tp` now accepts `activity_model=` for liquid-liquid tangent-plane stability, behind an internal `_TangentPlaneEvaluator` contract (ADR-0007) that also serves the Peng-Robinson path unchanged; added a damped-Newton second stage (required near plait points), the cited Tessier (2000) Problem 2 fixture, and golden paths `examples/basic/stability_tp_nrtl_lle_demo.py` and `examples/validation/08_stability_nrtl_tessier2000.py`. Reproduces the published tangent-plane global minima of Problems 1 and 2. See validation Cases S-6, S-7, S-8.
   - `nrtl-gibbs-duhem-fix`: corrected the NRTL activity-coefficient equation (column sums, single first-term denominator); added Gibbs-Duhem / binary-reduction / permutation / regression tests, a tight `thermo` cross-check with asymmetric parameters, the cited Tessier (2000) Problem 1 fixture, and the Table 2 reproduction golden path `examples/validation/07_nrtl_tessier_stationary_points.py`. Packaged NRTL pairs are now labelled synthetic. No ADR (public signature unchanged). See validation Cases N-1, N-2, N-3.
-- **Slice 1: `pcsaft-residual-helmholtz` (Stage F)**
-  - `chemthermo.eos.pcsaft` is a registry entry whose implementation has never been validated against a published source. Bring it up to the standard the rest of the package now holds: cited parameters, an independent route, a validation-case ledger entry, and the same `stability_tp` / `flash_tp` integration the cubic has (it enters as further `_PhaseCandidate`s - several density roots - with no solver change, which is the case ADR-0010 designed the candidate abstraction for).
+- **Slice 1: `pcsaft-density-roots-flash` (Stage F2)**
+  - PC-SAFT now computes `A^res/RT`, `Z`, `P` and `ln phi_i` at a state given as `(T, molar density, x)` (ADR-0014), but nothing solves for a density at a given `(T, P)`. That solver is the missing piece between the equation of state and the equilibrium machinery: it turns one `(T, P)` into the vapour-like and liquid-like candidate roots, which is exactly the shape `stability_tp` already consumes as further `_PhaseCandidate`s (the case ADR-0010 designed the candidate abstraction for, and what ADR-0013 decision 3 says a future private engine should build on). The slice ends with a flash cross-check against teqp VLE; the methane / n-hexane 300 K isotherm has already been traced as a reference. Deciding how `PCSAFTEOS` presents itself to the pressure-based `EquationOfState` interface is part of it.
 - **Also open**
   - Wiring the phase addition/removal search to the **phi-phi** and **gamma-gamma** paths. The machinery is generic and it is a few lines each, but no state in this repository exercises a third phase on either (Case L-4), so shipping it would be a scaffolded feature. A PR three-phase case in the databank, or a ternary with three liquid phases, is the trigger. See ADR-0011 "What remains".
   - Performance of the multiphase path: unmeasured and unoptimized (ADR-0011).

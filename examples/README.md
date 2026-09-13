@@ -80,6 +80,18 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
     inline with their citation (Tessier, Brennecke & Stadtherr, Chem. Eng. Sci.
     55 (2000) 1785, Table 1) and are **not** the packaged synthetic defaults.
     Needs no optional dependency. See validation Cases V-1 and V-2.
+- `examples/basic/pcsaft_properties_demo.py`
+  - PC-SAFT (Gross & Sadowski 2001, **non-associating**) residual properties of
+    a methane / n-hexane mixture at two densities: `A^res/(R T)`, `Z`, `P` and
+    `ln phi_i`, plus the identity `sum_i x_i ln phi_i = A^res/RT + Z - 1 - ln Z`
+    recomputed from the printed numbers. Also shows a state *inside* the
+    spinodal, where `Z < 0` and the model refuses to produce fugacity
+    coefficients rather than returning a `nan`, and the effect of a nonzero
+    per-pair `kij`. Parameters come from the packaged
+    `src/chemthermo/parameters/data/eos/pcsaft.json` (Gross & Sadowski 2001,
+    Table 1; see its `provenance` block). **No density root solving happens
+    anywhere**: the state is given as `(T, molar density, x)`. Needs no optional
+    dependency. See ADR-0014 and validation Case P-0.
 - `examples/validation/00_reference_case.py`
   - Deterministic single-case comparison against `thermo` (optional dependency).
     Unchanged by the tangent-plane phase-detection slice: beta 0.46829044 vs
@@ -158,6 +170,18 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
     feed that validation Case V-2 recorded as a miss, showing the stability
     trials and the surface each ran on. Needs no optional dependency. Runs in
     about 16 s. See validation Case V-5 and ADR-0012.
+- `examples/validation/13_pcsaft_vs_teqp.py`
+  - PC-SAFT against **teqp** (NIST, MIT), with PASS/FAIL per state. teqp
+    implements the same published model but takes every derivative by automatic
+    differentiation, where chemthermo writes them analytically - so agreement on
+    `Z` and `ln phi` tests the hand-written derivatives, not just the model.
+    Compares `A^res/RT`, `Z`, `P` and `ln phi_i` at 14 states (pure, binary,
+    ternary, gas-like and liquid-like densities, a nonzero `k_ij`, and one state
+    inside the spinodal), runs a negative control (a 1 % change in `sigma` must
+    break the agreement), and reproduces teqp's `pure_VLE_T` saturation for
+    n-hexane at 300 K and 400 K with a bisection density root finder written
+    inside the script. Requires `pip install -e ".[validation]"`; prints a
+    message and exits 0 without teqp. See validation Cases P-1 and P-2.
 - `examples/validation/*.py`
   - Optional validation sweeps against `thermo` (requires `pip install -e ".[validation]"`).
   - CSV output is disabled by default; pass `--outdir <dir>` or set `CHEMTHERMO_OUTDIR`.
