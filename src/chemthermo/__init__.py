@@ -19,7 +19,13 @@ from .exceptions import (
 )
 from .flash import FlashResult, FlashSettings, PhaseResult, flash_tp
 from .models import NRTL, ActivityModel, EquationOfState, PengRobinsonEOS
-from .parameters import ActivityParameters, NRTLParameters, PCSAFTParameterError
+from .parameters import (
+    ActivityParameters,
+    NRTLParameters,
+    PCSAFTParameterError,
+    PCSAFTParameters,
+    PCSAFTRecord,
+)
 from .phase_boundary import bubble_pressure, bubble_temperature, dew_pressure, dew_temperature
 from .stability import StabilityResult, StabilitySettings, StabilityTrial, stability_tp
 from .units import PA_PER_BAR, STANDARD_P_PA
@@ -48,6 +54,8 @@ __all__ = [
     "validate_fractions",
     "Composition",
     "PCSAFTParameterError",
+    "PCSAFTParameters",
+    "PCSAFTRecord",
     "ConvergenceError",
     "ModelError",
     "FlashResult",

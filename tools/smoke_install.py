@@ -47,7 +47,8 @@ def main() -> int:
         smoke_code = textwrap.dedent(
             """
             from chemthermo.data import get_component_record
-            from chemthermo.parameters import NRTLParameters
+            from chemthermo.eos import PCSAFTEOS
+            from chemthermo.parameters import NRTLParameters, PCSAFTParameters
 
             record = get_component_record("Methane")
             if record.get("name") != "Methane":
@@ -56,6 +57,18 @@ def main() -> int:
             tau, alpha = NRTLParameters.load().for_components(["Methane", "Ethane"])
             if tau.shape != (2, 2) or alpha.shape != (2, 2):
                 raise SystemExit("Unexpected NRTL matrix shape in smoke check.")
+
+            m, sigma, eps = PCSAFTParameters.load().for_components(["Methane", "n-Hexane"])
+            if m.shape != (2,) or sigma.shape != (2,) or eps.shape != (2,):
+                raise SystemExit("Unexpected PC-SAFT parameter shape in smoke check.")
+            if abs(float(m[1]) - 3.0576) > 1e-12:
+                raise SystemExit("Unexpected packaged PC-SAFT parameter value.")
+
+            z_factor = PCSAFTEOS(components=("Methane", "n-Hexane")).compressibility_factor(
+                temperature_K=300.0, density_mol_m3=200.0, composition=[0.5, 0.5]
+            )
+            if abs(z_factor - 0.9102033818931962) > 1e-10:
+                raise SystemExit("Unexpected PC-SAFT compressibility factor in smoke check.")
 
             print("chemthermo install smoke passed")
             """

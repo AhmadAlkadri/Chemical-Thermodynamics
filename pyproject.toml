@@ -28,6 +28,7 @@ dev = [
 ]
 validation = [
   "thermo>=0.6.0",
+  "teqp>=0.23",
 ]
 
 [tool.setuptools]
@@ -38,7 +39,7 @@ where = ["src"]
 
 [tool.setuptools.package-data]
 "chemthermo.data" = ["components.json", "references.bib"]
-"chemthermo.parameters" = ["data/activity/nrtl.json"]
+"chemthermo.parameters" = ["data/activity/nrtl.json", "data/eos/pcsaft.json"]
 
 [tool.ruff]
 target-version = "py311"
