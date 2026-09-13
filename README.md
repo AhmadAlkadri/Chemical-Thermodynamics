@@ -74,6 +74,85 @@ print(result.phases["vapor"].composition.fractions)
 See `examples/basic/flash_tp_peng_robinson_demo.py` for a runnable script that prints a
 table-style summary.
 
+### Automatic phase detection
+
+In phi-phi mode `flash_tp` decides one phase versus two with Michelsen's
+tangent-plane stability test, not with Wilson K-value heuristics (ADR-0008):
+
+```
+flash_tp -> stability_tp(feed) -> single phase | split seeded from the minimizer
+```
+
+- The feed is tested first. A **single-phase** result means the feed was *found
+  stable*; `termination_reason` is `"feed_stable_tangent_plane"` and
+  `diagnostics["tpd_min"]` records the smallest tangent-plane distance found.
+- An **unstable** feed seeds the K-values from the converged stationary point
+  (`diagnostics["k_seed"] == "stability"`; the Wilson estimate stays as a
+  fallback and is reported as `"wilson"` when it is used), and the existing
+  Rachford-Rice / successive-substitution split runs unchanged.
+- An **inconclusive** stability analysis raises `ConvergenceError` rather than
+  quietly returning one phase.
+- Every converged two-phase result reports its own verification residuals:
+  `mass_balance_residual`, `fugacity_residual`
+  (`max_i |ln(x_i phi_i^L) - ln(y_i phi_i^V)|`) and `delta_g_split_rt`, which
+  must be negative for the split to be an improvement on the feed.
+
+```python
+from chemthermo import Mixture, PengRobinsonEOS, flash_tp
+
+mixture = Mixture.from_database(("Methane", "n-Pentane"), (0.60, 0.40))
+result = flash_tp(mixture, temperature_K=175.0, pressure_Pa=1.778e6, eos=PengRobinsonEOS())
+
+print(result.phase_names())                        # ['liquid', 'vapor']
+print(result.vapor_fraction)                       # 0.0792360...
+print(result.diagnostics["stability_status"])      # 'unstable'
+print(result.diagnostics["tpd_min"])               # -0.04265697...
+print(result.diagnostics["delta_g_split_rt"])      # -0.00176661...
+```
+
+The legacy behavior stays reachable:
+
+```python
+from chemthermo import FlashSettings
+
+legacy = FlashSettings(phase_detection="wilson-heuristic")
+```
+
+Runnable demo:
+
+```bash
+python examples/basic/flash_tp_auto_phase_demo.py
+```
+
+**What this does and does not give you.**
+
+- Converged two-phase results are unchanged: the two paths reach the same
+  equilibrium from different seeds and agree to 8.6e-7 relative in vapor
+  fraction over the validated grid. Verdicts change only where the heuristic was
+  wrong. Over a 175-state Peng-Robinson grid, verdict agreement with `thermo`'s
+  `FlashVL` (same `Tc`/`Pc`/`omega`, `kij = 0`) rises from 166/175 to 175/175;
+  see validation Cases F-1 and F-2.
+- **Two phases at most.** This release returns `liquid` and/or `vapor` only.
+- **The converged phases are not re-tested for stability.** A three-phase state
+  will still come back as two phases. Phase addition/removal and LLE are the
+  next slice.
+- `"stable"` means no negative tangent-plane distance was found from the
+  deterministic trial set, not a global proof (same bound as `stability_tp`).
+- **Gamma-phi is still heuristic.** Its diagnostics say
+  `phase_detection == "wilson-heuristic"` and its numbers are unchanged. A
+  gamma-phi stability test needs a consistent pure-liquid reference fugacity
+  that this package does not yet carry; see ADR-0007 for why building one on the
+  current gamma-phi flash would produce a silently wrong tangent plane.
+- **Vapor/liquid naming is a convention in two places.** For a single-phase
+  result the name is the minimum-Gibbs compressibility root branch; when the
+  cubic has a single real root (dense or supercritical fluids) both branches
+  coincide and the name is a tie-break, not a phase identification. For a
+  two-phase result the phase named `vapor` is the one enriched, relative to the
+  feed, in the component with the largest Wilson K over the one with the
+  smallest. `EquationOfState` exposes no molar volume, so no density-based
+  identification is available; this decides the *name* only, never the verdict
+  or the compositions.
+
 ### Binary interaction parameters (`kij`)
 
 `PengRobinsonEOS.kij` accepts either a scalar (applied to every `i != j` pair,
@@ -251,8 +330,9 @@ Notes:
   stationarity condition. Near a plait point successive substitution alone does
   not converge at all; `trial.ssi_iterations`, `trial.second_order_iterations`
   and `trial.converged_stage` record what actually happened.
-- `flash_tp` does **not** consume this yet; its single-phase decision is still a
-  K-bound heuristic.
+- `flash_tp` **does** consume this now: in phi-phi mode its single-phase
+  decision is this test (see "Automatic phase detection" above, and ADR-0008).
+  Gamma-phi still uses the K-bound heuristic.
 
 ## CLI usage
 

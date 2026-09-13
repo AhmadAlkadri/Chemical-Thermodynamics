@@ -593,3 +593,173 @@ Rules:
   solve sharing no code with `chemthermo.stability`.
 - **Test path:** `tests/test_stability_activity.py`.
 - **Script:** `examples/basic/stability_tp_nrtl_lle_demo.py`.
+
+---
+
+## Case F-1: `flash_tp` phase verdicts against `thermo` 0.6.0 `FlashVL`
+
+- **Source:** `thermo` 0.6.0 (`FlashVL` with `PRMIX`), used as an independent
+  implementation of the same Peng-Robinson model. Not a literature case: it is a
+  cross-implementation check, and it is recorded as such.
+- **Location:** `tests/validation/test_flash_phase_detection_vs_thermo.py::test_phase_verdicts_over_a_grid_match_thermo_more_often_than_the_heuristic`.
+- **Assumptions:** Both sides use **the same** `Tc`, `Pc` and `omega`, read from
+  the chemthermo databank and handed to `thermo`'s `ChemicalConstantsPackage`,
+  and `kij = 0` everywhere. `thermo`'s ideal-gas heat capacities come from its
+  own databank and do not enter an isothermal-isobaric VLE verdict. A verdict
+  difference is therefore a *solver* difference.
+- **Components / units:** 5 systems - Methane/Ethane (0.5, 0.5),
+  Methane/n-Pentane (0.6, 0.4), Ethane/n-Heptane (0.7, 0.3),
+  Methane/Ethane/Propane (0.5, 0.3, 0.2), Propane/n-Butane/n-Pentane
+  (0.4, 0.3, 0.3). T in {170, 175, 200, 240, 280, 320, 360} K, P in
+  {2e5, 1e6, 1.778e6, 3e6, 8e6} Pa. 175 states. SI units; `tpd` dimensionless.
+- **Parameters and provenance:** packaged chemthermo databank
+  (`src/chemthermo/data/components.json`, Koretsky 2012); `kij = 0`.
+- **Expected outcome:** the tangent-plane path's 1-vs-2 phase verdict should
+  match `FlashVL` at least as often as the legacy Wilson heuristic does.
+- **Results:**
+
+  | path | verdicts matching `thermo` | misses |
+  | --- | --- | --- |
+  | `phase_detection="tangent-plane"` (default) | **175 / 175** | 0 |
+  | `phase_detection="wilson-heuristic"` (legacy) | 166 / 175 | 8 `ConvergenceError` + 1 wrong single-phase |
+
+  All 8 legacy non-convergences are states where `thermo` says single phase and
+  the tangent-plane path now returns a single phase. The 1 wrong single-phase is
+  Case F-2 below. Over the 56 states that are two-phase on both sides, the worst
+  `|beta - beta_thermo|` is **1.601e-04**.
+- **Wider scan (recorded, not asserted):** the same comparison over 1144 states
+  (8 databank mixtures, T 150-450 K in 11 steps, P 1e5-3.2e7 Pa in 13 geometric
+  steps) gives: tangent-plane 1138/1144 verdicts matching `thermo`, legacy
+  1061/1144. 75 states move from `ConvergenceError` to a single-phase answer
+  (`thermo` agrees single-phase on 75/75); 2 move from single-phase to
+  two-phase; **0** move from two-phase to single-phase. Of the 6 remaining
+  tangent-plane disagreements, 5 are Methane/Propane/n-Decane (0.7, 0.2, 0.1) at
+  1.98e7-1.22e7 Pa where chemthermo splits (`tpd_min` from -5.2e-2 to -4.0e-3,
+  `delta_g_split_rt < 0`) and `thermo` returns `VF = 0`; those 5 disagree with
+  `thermo` **before and after** this slice, so they are not caused by it and are
+  left open. The 6th is the near-critical Methane/n-Pentane state below.
+- **Regression:** over the 47 states of the in-repo grid
+  (`tests/test_flash_phase_detection.py`) where both paths find two phases, the
+  worst relative vapor-fraction difference is **8.60e-07** (asserted < 1e-6).
+  The legacy path reproduces the pre-slice values bit-identically
+  (`0.6745181801306899` binary, `0.46829043780053325` ternary).
+- **Known failure kept honest:** Methane/n-Pentane (0.6, 0.4) at 390 K,
+  1.2236e7 Pa is weakly unstable (`tpd_min = -1.17e-3`, near-critical) and the
+  successive-substitution split hits the iteration limit in both paths. This
+  slice adds no acceleration to the *flash*, so it still raises
+  `ConvergenceError`.
+- **Tolerance:** asserted 175/175 verdict match, `tangent >= legacy`, and
+  `|beta - beta_thermo| < 1e-3`. Achieved 1.601e-04.
+- **Independent route:** `thermo` 0.6.0 `FlashVL`, a separate implementation of
+  the same EOS with its own stability test and phase-split solver.
+- **Test path:** `tests/validation/test_flash_phase_detection_vs_thermo.py`,
+  `tests/test_flash_phase_detection.py::test_both_paths_agree_on_every_state_where_both_find_two_phases`,
+  `tests/test_flash_phase_detection.py::test_legacy_path_reproduces_the_pre_slice_numbers_exactly`.
+- **Script:** `examples/basic/flash_tp_auto_phase_demo.py`,
+  `examples/validation/00_reference_case.py`.
+
+---
+
+## Case F-2: a state where the Wilson heuristic and the tangent plane disagree
+
+- **Source:** found by scanning the databank's Peng-Robinson states (see Case
+  F-1); adjudicated by `thermo` 0.6.0 `FlashVL` and by the Gibbs-energy
+  criterion. Not a literature case.
+- **Location:** `tests/validation/test_flash_phase_detection_vs_thermo.py::test_the_disagreement_state_is_two_phase_in_thermo_and_lowers_the_gibbs_energy`
+  and `tests/test_flash_phase_detection.py::test_heuristic_calls_a_two_phase_feed_single_phase_and_tangent_plane_does_not`.
+- **Assumptions:** Peng-Robinson, `kij = 0`, chemthermo databank constants on
+  both sides. n-Pentane's normal melting point is ~143 K, so 175 K is a
+  physically liquid-pentane state; Peng-Robinson has no solid phase, so the
+  question under test is the fluid-phase answer.
+- **Components / units:** Methane(0.6) / n-Pentane(0.4), T = 175.0 K,
+  P = 1.778e6 Pa. Mole fractions; `tpd` and `delta_g/RT` dimensionless.
+- **Parameters and provenance:** packaged chemthermo databank. Methane
+  Tc = 190.6 K, Pc = 4.600e6 Pa, omega = 0.008; n-Pentane Tc = 469.6 K,
+  Pc = 3.374e6 Pa, omega = 0.251.
+- **Expected outcome:** two phases.
+- **Results:**
+  - **Legacy heuristic:** single `liquid`, `termination_reason = "rr_no_root"`.
+    The Wilson K-values straddle 1 (`k_min = 2.3121e-05`, `k_max = 1.5964`), so
+    the K-bound test does not fire, but Rachford-Rice cannot bracket a root for
+    them: `f(0) = -4.213e-02` and `f(1) = -1.730e+04` have the same sign.
+  - **Tangent-plane path:** `stability_status = "unstable"`,
+    `tpd_min = -4.265697e-02`, incipient phase vapor-like
+    (`w = (0.99998, 1.824e-05)`), converged split
+    `beta = 0.0792360`, `x = (0.565580, 0.434420)`,
+    `y = (0.9999798, 2.0201e-05)`, `mass_balance_residual = 7.2e-15`,
+    `fugacity_residual = 6.2e-09`, `delta_g_split_rt = -1.76661e-03`.
+  - **`thermo` `FlashVL` (same constants, kij = 0):** `VF = 0.07912756`,
+    `x = (0.5656310, 0.4343690)`, `y = (0.9999798, 2.0188e-05)`.
+    `|d beta| = 1.08e-04`, `max |dx| = 6.8e-05`, `max |dy| = 1.9e-07`.
+  - **Gibbs-energy criterion, evaluated at `thermo`'s split with chemthermo's
+    own fugacity coefficients on the minimum-Gibbs root:**
+    `G_feed/RT = -5.0263909`, `G_split/RT = -5.0281575`, so
+    `dG/RT = -1.7666e-03 < 0`. The split is the lower-Gibbs state, independently
+    of which solver produced it.
+- **Two further states of the same kind** (same system, recorded not asserted):
+  150 K / 6.8399e5 Pa (`tpd_min = -4.5567e-02`, chemthermo `beta = 0.080184`,
+  `thermo` 0.080020, `dG/RT = -1.9074e-03`) and 210 K / 4.6784e6 Pa
+  (`tpd_min = -2.2673e-02`, chemthermo `beta = 0.049352`, `thermo` 0.049299,
+  `dG/RT = -5.7644e-04`).
+- **Tolerance:** asserted `beta` to abs 5e-4 against `thermo`, compositions to
+  abs 1e-3, `dG/RT` to rel 1e-3 against -1.7666e-03, and `dG/RT < 0`.
+- **Independent route:** two, and they agree - `thermo` 0.6.0 `FlashVL`, and a
+  Gibbs-energy comparison computed from the definition (not from the flash
+  solver) at `thermo`'s compositions.
+- **Test path:** the two tests named above.
+- **Script:** `examples/basic/flash_tp_auto_phase_demo.py` (case 3).
+
+---
+
+## Case F-3: verification invariants of every converged two-phase flash
+
+- **Source:** internal invariants (material balance, equal fugacities, the
+  Gibbs-energy criterion for a phase split, Michelsen's instability proof).
+  This entry's "independent route" is an internal invariant, stated as required
+  by the ledger rules.
+- **Location:** `tests/test_flash_phase_detection.py::test_grid_invariants`.
+- **Assumptions:** A converged isothermal-isobaric two-phase solution must
+  satisfy `z = beta y + (1 - beta) x`, `x_i phi_i^L = y_i phi_i^V` for every
+  component present in both phases, `0 < beta < 1`, and must have a lower molar
+  Gibbs energy than the single-phase feed. A feed that splits must have been
+  found unstable (`tpd_min < 0`), and a feed reported as one phase must have
+  been found stable.
+- **Components / units:** 6 binary and ternary hydrocarbon systems
+  (Methane/Ethane, Methane/Propane, Ethane/n-Heptane, Methane/n-Pentane,
+  Methane/Ethane/Propane, Propane/n-Butane/n-Pentane) over T in
+  {170, 200, 240, 280, 320, 360} K and P in {2e5, 1e6, 3e6, 8e6} Pa - 144
+  states, of which 47 are two-phase and 97 single-phase (0 refused). Mole
+  fractions; residuals dimensionless.
+- **Parameters and provenance:** packaged chemthermo databank; `kij = 0`.
+- **Expected outcome and results (worst values over the 47 two-phase states):**
+
+  | invariant | required | achieved (worst) |
+  | --- | --- | --- |
+  | `max_i |z_i - (beta y_i + (1-beta) x_i)|` | < 1e-10 | **2.014e-13** |
+  | `max_i |ln(x_i phi_i^L) - ln(y_i phi_i^V)|` | < 1e-6 | **8.246e-09** |
+  | `delta_g_split_rt` | < 0 | **-1.4575e-04** (least negative) |
+  | `beta` | in (0, 1) | all |
+  | feed `tpd_min` | < 0 | all |
+  | single-phase `stability_status` | `"stable"` | all 97 |
+
+  The material balance is re-checked in the test from the returned phase
+  compositions, not from the residual the solver wrote into diagnostics.
+- **Permutation invariance and determinism:** over 4 states (two-phase and
+  single-phase, binary and ternary) and every component permutation, the phase
+  names are identical, `|d beta| = 0.0` and the worst composition difference
+  after undoing the permutation is **2.22e-16**. Repeated calls are
+  bit-identical including the full diagnostics mapping.
+- **Failure semantics:** `StabilitySettings(max_iter=1, second_order=False)`
+  makes the stability analysis `"inconclusive"`; `flash_tp` then raises
+  `ConvergenceError` in tangent-plane mode and still returns
+  `0.46829043780053325` through `phase_detection="wilson-heuristic"`.
+  `FlashSettings(max_iter=1, tol=1e-12)` still raises `ConvergenceError` for
+  the split, as before this slice.
+- **Tolerance:** as tabulated above; also asserted `>= 30` two-phase states so
+  the sweep cannot silently shrink.
+- **Independent route:** internal invariant (the test recomputes the material
+  balance from the returned compositions; the fugacity and Gibbs residuals come
+  from the definitions in `chemthermo.flash.tp._verify_split`, which the solver
+  does not use to iterate).
+- **Test path:** `tests/test_flash_phase_detection.py`.
+- **Script:** `examples/basic/flash_tp_auto_phase_demo.py`.
