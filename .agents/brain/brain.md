@@ -45,6 +45,14 @@ Definition of public API follows ADR-0001 (source of truth rules in `.agents/bra
 Stable (public) entry points
 - `chemthermo` top-level exports in `__all__` (core types, flash API, phase-stability API, models, parameters, exceptions, units, validation helpers). (source: src/chemthermo/__init__.py)
 - Phase stability: `stability_tp`, `StabilityResult`, `StabilitySettings`, `StabilityTrial` (ADR-0005). `stability_tp` reports `status` in {"stable","unstable","inconclusive"}; "stable" means "no negative tangent-plane distance was found from the deterministic trial set", not a global proof. (source: src/chemthermo/stability/, .agents/brain/adr/0005-stability-tp-public-api.md)
+- `NRTL.activity_coefficients` implements the standard Renon-Prausnitz
+  equation with column sums. Public signature unchanged, but **returned values
+  changed** for asymmetric parameters: before the `nrtl-gibbs-duhem-fix` slice
+  the implementation used row sums and per-term denominators and violated
+  Gibbs-Duhem (residuals ~1e-1, up to 0.89 off in `ln gamma` versus
+  `thermo.NRTL`). Gamma-phi flash results with the packaged synthetic pairs
+  shifted slightly (CLI Methane/Ethane vapor fraction 0.767092 -> 0.764835).
+  See validation Cases N-1..N-3. (source: src/chemthermo/models/nrtl.py)
 - `PengRobinsonEOS.kij` accepts a scalar (off-diagonal only; diagonal always unaffected) or a `Mapping[tuple[str, str], float]` keyed by normalized component-name pairs, default per-pair value `0.0` (ADR-0006). `flash_tp` and `stability_tp` results for nonzero `kij` are now trustworthy (previously the diagonal was silently corrupted; see ADR-0006). (source: src/chemthermo/models/peng_robinson.py, .agents/brain/adr/0006-pr-kij-matrix.md)
 - EOS registry module (`chemthermo.eos`: `EOSProtocol`, `PCSAFTEOS`, `get_eos`, `list_eos`, `register_eos`). (source: src/chemthermo/eos/__init__.py)
 - VLLE plugin boundary (`chemthermo.vlle`: `get_vlle_engine`, `VLLEEngine`, `VLLEResult`, and related types/errors). (source: src/chemthermo/vlle/__init__.py, README.md)
@@ -83,6 +91,22 @@ Key entry points (top paths)
 - `flash_tp` requires mole-fraction compositions and an EOS; gamma-phi requires an activity model. Enforced by runtime checks. (source: src/chemthermo/flash/tp.py)
 - Flash solver determinism for fixed inputs/settings. Stated in docs. (source: src/chemthermo/flash/tp.py, src/chemthermo/flash/settings.py)
 - `FlashResult` phases non-empty; phase fractions in [0,1] sum to 1 within tolerance. Enforced in `FlashResult.__post_init__`. (source: src/chemthermo/flash/results.py)
+- **Activity models must be thermodynamically consistent**: `ln gamma` must be
+  the composition derivative of a single reduced excess Gibbs energy, so
+  `sum_i x_i d ln gamma_i = 0` at fixed T, P (Gibbs-Duhem). For NRTL this is
+  enforced by test, not by construction; any future activity model must carry
+  the same check. Consistency must be tested with **asymmetric** parameters:
+  symmetric binaries are blind to row/column mix-ups. (source:
+  src/chemthermo/models/nrtl.py, tests/test_activity_nrtl.py, validation Case N-1)
+- NRTL index convention: `tau[i, j] = tau_ij`, `alpha[i, j] = alpha_ij`,
+  `G_ij = exp(-alpha_ij tau_ij)`, and every internal sum `S_j = sum_k G_kj x_k`,
+  `C_j = sum_k tau_kj G_kj x_k` runs down a **column**. (source:
+  src/chemthermo/models/nrtl.py module docstring)
+- Packaged NRTL pair parameters are synthetic demo placeholders, not fitted or
+  published data; published parameter sets live in `tests/fixtures/` with a
+  citation and are never loaded by default. (source:
+  src/chemthermo/parameters/data/activity/nrtl.json,
+  tests/fixtures/nrtl/tessier2000_problem1.json)
 
 ## 5) Error handling & validation policy
 - Validation helpers raise `InputRangeError` for invalid temperatures/pressures; `CompositionError` for invalid fractions. (source: src/chemthermo/validation.py, src/chemthermo/exceptions.py)
@@ -123,9 +147,11 @@ Cheap checks
   - `stability-tpd-pr`: public `stability_tp` (Michelsen tangent-plane stability) with Peng-Robinson, min-Gibbs root selection, deterministic trial set, golden path and thermo cross-check.
   - CLI gamma-phi extension for `chemthermo tp-flash` via `--flash-mode`.
   - `pr-kij-matrix`: fixed the diagonal-kij bug and added per-pair `kij` support (`float` or name-keyed `Mapping`) to `PengRobinsonEOS`; `flash_tp` and `stability_tp` results for nonzero kij are now trustworthy. See ADR-0006 and validation Case K-1.
+  - `nrtl-gibbs-duhem-fix`: corrected the NRTL activity-coefficient equation (column sums, single first-term denominator); added Gibbs-Duhem / binary-reduction / permutation / regression tests, a tight `thermo` cross-check with asymmetric parameters, the cited Tessier (2000) Problem 1 fixture, and the Table 2 reproduction golden path `examples/validation/07_nrtl_tessier_stationary_points.py`. Packaged NRTL pairs are now labelled synthetic. No ADR (public signature unchanged). See validation Cases N-1, N-2, N-3.
 - **Slice 1: `stability-tpd-nrtl`**
   - Capability: Users can run liquid-liquid tangent-plane stability with an activity model instead of an EOS.
   - Requirements: activity-model tangent-plane intercepts, a documented LLE-splitting trial set, and a known partially-miscible binary as the golden path. A narrow phase-thermodynamics contract becomes earned here (second model family), not before.
+  - Now unblocked: NRTL is thermodynamically consistent (Case N-1) and the activity-based tangent-plane distance D and its stationary points are already reproduced against a published source in `tests/validation/test_nrtl_tessier2000.py`; those feeds and D values are the natural acceptance set for the solver.
 - **Slice 2: `flash-auto-phase-detection`**
   - Capability: `flash_tp` decides 1-vs-2 phases from `stability_tp` instead of K-bound heuristics, and seeds K-values from the converged stationary point.
   - Requirements: keep the `FlashResult` shape and CLI JSON contract, add diagnostics for the stability verdict, and prove behavior change only where the heuristic was wrong.

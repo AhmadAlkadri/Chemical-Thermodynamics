@@ -1,6 +1,20 @@
 # Steering Brief
 
 ## What changed since last brief (files + bullets)
+- `src/chemthermo/models/nrtl.py`
+  - Corrected the NRTL activity-coefficient equation. The previous code computed `S = G @ x` (row sums) and divided the first term term-by-term; the standard Renon-Prausnitz form needs the column sums `S_j = sum_k G_kj x_k`, `C_j = sum_k tau_kj G_kj x_k` and a single denominator `S_i` in the first term. The implementation is now vectorized (`G.T @ x`, `(tau * G).T @ x`) and the module docstring derives the equation and states the index convention (`tau[i, j] = tau_ij`, `G_ij = exp(-alpha_ij tau_ij)`). Public signature and the single-component `[1.0]` shortcut unchanged; returned values change for asymmetric parameters (pre-fix: Gibbs-Duhem residuals ~1e-1, up to 0.89 off in `ln gamma` versus `thermo.NRTL`).
+- `src/chemthermo/parameters/data/activity/nrtl.json`, `src/chemthermo/parameters/nrtl.py`
+  - Labelled the two packaged pairs (Methane/Ethane, Benzene/Water) honestly: new top-level `provenance` block and per-pair `"source": "synthetic-demo"`. They are illustrative placeholders added ad hoc in commits e5ccd8f/ecd476e, not fitted or published data. The loader already ignored unknown keys, so no `schema_version` change; that tolerance is now documented in the `NRTLParameters` docstring together with the index convention.
+- `tests/fixtures/nrtl/tessier2000_problem1.json`, `tests/conftest.py`
+  - Cited published parameter set (Tessier, Brennecke & Stadtherr, Chem. Eng. Sci. 55 (2000) 1785, Table 1; parameters originally McDonald & Floudas, AIChE J. 41 (1995) 1798) plus Table 2 stationary points, deliberately kept out of the packaged defaults and loaded via `NRTLParameters.from_pairs`. New `tests/conftest.py` exposes it as session fixtures.
+- `tests/test_activity_nrtl.py`, `tests/validation/test_nrtl_tessier2000.py`
+  - Gibbs-Duhem (4 compositions x 4 simplex directions, worst residual 2.07e-10), binary reduction against independently written two-component formulas (1.1e-16), permutation invariance, symmetric-ternary and zero-tau limits, a hard-coded regression guard against the row-sum bug, a `thermo` 0.6.0 cross-check with the asymmetric Tessier parameters (max |d ln gamma| 8.88e-16), and the Table 2 reproduction with a from-scratch tangent-plane distance and damped-Newton stationary-point solve.
+- `examples/validation/07_nrtl_tessier_stationary_points.py`, `examples/README.md`, `README.md`
+  - Golden path reproducing Table 2 (no optional dependency), plus a README "NRTL activity coefficients" section carrying the equation, the correctness note and the synthetic-parameter disclosure.
+- `tests/fixtures/cli/tp_flash_gamma_phi_v1.json`
+  - Regenerated: the corrected gammas move the CLI gamma-phi Methane/Ethane result (vapor fraction 0.7670920475829917 -> 0.7648352545438684). Schema, phase names, iteration count and termination reason unchanged.
+- `.agents/brain/validation-cases.md`, `.agents/brain/brain.md`
+  - Added validation Cases N-1 (Gibbs-Duhem + binary reduction), N-2 (`thermo` cross-check) and N-3 (Tessier Table 2, including two printed D values documented as typographical errors rather than accommodated), and a new brain invariant that activity models must satisfy Gibbs-Duhem and must be tested with asymmetric parameters.
 - `src/chemthermo/models/peng_robinson.py`
   - Fixed the diagonal-kij bug: `aij`'s diagonal is now always unaffected by `kij` (pure-component `a_ii` never corrupted). Added per-pair `kij` support (`float` or `Mapping[tuple[str, str], float]` keyed by normalized component names, canonicalized to a sorted tuple in `__post_init__`), plus two private helpers (`_kij_matrix`, `_mixture_parameters`) so `fugacity_coefficients`/`compressibility_factor` no longer duplicate the mixing-rule code. Public method signatures unchanged; `kij=0.0` (default) is bit-identical to before.
 - `tests/test_pr_eos.py`, `tests/validation/test_pr_kij_vs_thermo.py`
@@ -37,6 +51,7 @@
   - Recorded CLI API decision and updated architecture/public API status.
 
 ## Current architecture (8-12 lines)
+- `NRTL` implements the standard Renon-Prausnitz equation (column sums); it satisfies Gibbs-Duhem to ~2e-10 and matches `thermo` to ~9e-16 with asymmetric parameters. Packaged pair parameters are synthetic placeholders; published sets live in `tests/fixtures/`.
 - `PengRobinsonEOS.kij` is a scalar (off-diagonal only) or a name-keyed per-pair `Mapping`; `flash_tp` and `stability_tp` results for nonzero kij are now trustworthy (ADR-0006).
 - Phase stability (`chemthermo.stability`) is a solver-independent sibling of `chemthermo.flash`; `flash_tp` does NOT consume it yet.
 - Canonical runtime DB path is `src/chemthermo/data/components.json`.

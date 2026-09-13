@@ -101,6 +101,55 @@ versions -- see ADR-0006). Runnable demo:
 python examples/basic/tp_flash_pr_kij_demo.py
 ```
 
+### NRTL activity coefficients
+
+`NRTL` implements the standard Renon-Prausnitz equation (AIChE J. 14 (1968)
+135) with the index convention `tau[i, j] = tau_ij`, `alpha[i, j] = alpha_ij`
+and `G_ij = exp(-alpha_ij tau_ij)`:
+
+```text
+S_j = sum_k G_kj x_k                      (column sums)
+C_j = sum_k tau_kj G_kj x_k
+ln gamma_i = C_i / S_i + sum_j x_j G_ij / S_j * (tau_ij - C_j / S_j)
+```
+
+**Correctness note.** Versions before the `nrtl-gibbs-duhem-fix` slice summed
+`G` along rows instead of columns and divided the first term term-by-term. The
+result was not the composition derivative of any excess Gibbs energy: with
+asymmetric parameters it violated the Gibbs-Duhem relation
+`sum_i x_i d ln gamma_i = 0` (residuals of order 1e-1) and differed from
+`thermo.NRTL` by up to 0.89 in `ln gamma`. The current implementation agrees
+with `thermo` to ~9e-16 and satisfies Gibbs-Duhem to ~2e-10 (central
+differences, step 1e-6). Symmetric binaries were unaffected, so gamma-phi flash
+results with the packaged pairs shifted only slightly (vapor fraction
+0.767092 -> 0.764835 for the Methane/Ethane CLI example).
+
+**Packaged parameters are synthetic.** The pairs shipped in
+`src/chemthermo/parameters/data/activity/nrtl.json` (Methane/Ethane and
+Benzene/Water) are illustrative placeholders so that the gamma-phi path,
+`--flash-mode gamma-phi` and the examples run out of the box. They are **not
+fitted to data and not taken from any publication**; do not use them for
+engineering work. Supply your own:
+
+```python
+from chemthermo import NRTL, NRTLParameters
+
+parameters = NRTLParameters.from_pairs(
+    [("1-Propanol", "Water", -0.07149, 2.7425, 0.3, 0.3)]
+)
+model = NRTL(parameters=parameters)
+```
+
+A citation-backed published parameter set (Tessier, Brennecke & Stadtherr,
+Chem. Eng. Sci. 55 (2000) 1785, Table 1) lives in
+`tests/fixtures/nrtl/tessier2000_problem1.json`, deliberately outside the
+packaged defaults. Reproduce the paper's Table 2 tangent-plane stationary
+points with:
+
+```bash
+python examples/validation/07_nrtl_tessier_stationary_points.py
+```
+
 ## Phase stability (tangent-plane analysis)
 
 `stability_tp` answers "is this feed one phase or more?" at fixed T, P and z
@@ -168,7 +217,8 @@ python -m chemthermo tp-flash --components Methane,Ethane --z 0.5,0.5 --temperat
 
 Notes:
 - `--flash-mode` defaults to `phi-phi`; valid choices are `phi-phi` and `gamma-phi`.
-- Gamma-phi mode currently uses `NRTL()` for the liquid activity model.
+- Gamma-phi mode currently uses `NRTL()` for the liquid activity model with the
+  packaged **synthetic** pair parameters (see "NRTL activity coefficients").
 - NRTL pair coverage is data-dependent; missing pair data returns a runtime validation/model error.
 
 ## EOS extension points
