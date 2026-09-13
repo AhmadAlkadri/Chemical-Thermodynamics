@@ -140,9 +140,24 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
     `G(3 phases) < G(2-phase candidate) < G(feed)` computed in the script; four
     feeds outside it (vapor-liquid region, liquid-liquid region, water-rich
     corner, superheated) are each verified by their own route; and the binary
-    refusal window of Case R-3 is shown resolved. Records the one feed the
-    stability test misses at 363 K. Needs no optional dependency. See validation
-    Cases V-1, V-2 and V-3.
+    refusal window of Case R-3 is shown resolved. Needs no optional dependency.
+    See validation Cases V-1, V-2 and V-3. The 363 K feed this script used to
+    record as a stability miss is fixed by ADR-0012; it is now the closing
+    section of `12_vlle_verdict_map.py`.
+- `examples/validation/12_vlle_verdict_map.py`
+  - The **verdict map** of the same ternary: how many phases the model has at
+    each of 75-76 feeds per temperature, at 363, 364 and 365 K, with PASS/FAIL
+    and a printed confusion matrix per temperature. Every feed is classified
+    independently inside the script by building *every* state the model admits
+    - the tie-triangle, a four-equation vapor-liquid Newton, a seven-equation
+    liquid-liquid Newton, and the single phase - and taking the one of lowest
+    Gibbs energy, so "inside the tie-triangle means three phases" is checked
+    rather than assumed. Zero disagreements at all three temperatures; every
+    three-phase answer is the same triangle to |dx| <= 9.5e-12 with phase
+    fractions equal to the feed's barycentric weights to 1.6e-11. Ends with the
+    feed that validation Case V-2 recorded as a miss, showing the stability
+    trials and the surface each ran on. Needs no optional dependency. Runs in
+    about 16 s. See validation Case V-5 and ADR-0012.
 - `examples/validation/*.py`
   - Optional validation sweeps against `thermo` (requires `pip install -e ".[validation]"`).
   - CSV output is disabled by default; pass `--outdir <dir>` or set `CHEMTHERMO_OUTDIR`.

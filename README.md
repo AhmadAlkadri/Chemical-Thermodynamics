@@ -477,11 +477,30 @@ Notes and limits:
   created them. The liquid numbers are **roles, not identities** - compare the
   phase *set*. `vapor_fraction` is the `vapor` phase's fraction when there is
   one and `None` when there is not.
+- **Each stability trial runs on one fixed phase candidate** (ADR-0012). The
+  modified-Raoult tangent plane is the lower envelope of two *different* models
+  - an activity-coefficient liquid and an ideal gas - and re-selecting the
+  lower one at every iterate makes the successive-substitution map
+  discontinuous where the two surfaces cross. A vapor-like trial could then be
+  dragged onto the liquid surface and collapse onto the feed, hiding a real
+  instability: that is what made one feed inside the 363 K tie-triangle come
+  back a single liquid (the pinned miss of validation Case V-2, now fixed). A
+  trial is therefore pinned to one candidate, reports the stationarity residual
+  on that surface, and still reports its tangent-plane distance with the
+  lowest-Gibbs candidate at the converged composition - the distance is to the
+  envelope, not to one sheet. `StabilityTrial.surface` says what a trial
+  iterated on, `StabilityTrial.phase_branch` where it stopped. Cubic
+  compressibility roots are deliberately *not* pinned: a missing root is the
+  same model failing to exist at that composition, so minimum-Gibbs root
+  selection at every iterate stays the rule there. Over a grid of 75-76 feeds
+  per temperature at 363 / 364 / 365 K, the phase-count verdict now agrees with
+  an independent lowest-Gibbs classifier at **every** feed (validation Case
+  V-5, `python examples/validation/12_vlle_verdict_map.py`).
 - **The phase count is never better than the stability test that produced it.**
   `"stable"` means no negative tangent-plane distance was found from the
-  deterministic trial set. A thin three-phase region can hide from it: measured
-  at 363 K for this ternary, one feed inside the tie-triangle comes back a
-  single liquid (validation Case V-2).
+  deterministic trial set. Pinning the surfaces enlarges the set of stationary
+  points a trial can reach; it does not turn a local search into a global
+  proof.
 - **No performance work was done.** A three-phase solve costs a two-phase solve
   plus several stability tests plus roughly 50 successive substitutions, a
   handful of Newton steps and ~100-150 Rachford-Rice Newton iterations.

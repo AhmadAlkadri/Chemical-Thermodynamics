@@ -113,8 +113,11 @@ Up to ``FlashSettings.max_phases`` phases are returned on the
 and raise when a third is needed. A negative ``tpd_min`` proves a feed is not
 one phase; ``"stable"`` only means no negative tangent-plane distance was found
 from the deterministic trial set - so a phase count is never more reliable than
-the stability test that produced it, and near a plait point the deterministic
-trial set can miss a thin three-phase region (validation Case V-2).
+the stability test that produced it. Each trial of that set runs on one fixed
+phase candidate (ADR-0012), which is what lets a thin three-phase region be
+found near a plait point; over the ternary grid of validation Case V-5 the
+verdict agrees with an independent lowest-Gibbs classifier at every feed. That
+is evidence, not a global proof.
 
 Module layout
 -------------
