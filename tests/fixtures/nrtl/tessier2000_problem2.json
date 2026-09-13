@@ -1,0 +1,191 @@
+{
+  "fixture_version": 1,
+  "model": "NRTL",
+  "name": "Tessier, Brennecke and Stadtherr (2000), Problem 2",
+  "citation": {
+    "reference": "S. R. Tessier, J. F. Brennecke and M. A. Stadtherr, 'Reliable phase stability analysis for excess Gibbs energy models', Chemical Engineering Science 55 (2000) 1785-1796.",
+    "location": "Section 4.2 (Problem 2), Table 4 (NRTL parameters) and Table 5 (stationary points of the tangent-plane distance D).",
+    "parameter_origin": "Table 4 attributes the NRTL parameters to J. Gmehling et al., 'Vapor-Liquid Equilibrium Data Collection', DECHEMA Chemistry Data Series, 1977-1990.",
+    "copy_used": "Author copy of the accepted manuscript, https://academicweb.nd.edu/~markst/srt2000.pdf",
+    "model_form": "Section 2.2: g^E = sum_k x_k (sum_i tau_ik G_ik x_i) / (sum_i G_ik x_i) with G_ik = exp(-alpha_ik tau_ik); this is the standard Renon-Prausnitz NRTL equation.",
+    "redistribution_note": "These are fitted binary parameters regressed from the DECHEMA Chemistry Data Series and reproduced here solely as a citation-backed validation anchor for the cited paper's Table 5. They are NOT packaged runtime data and must never be loaded as defaults or presented as chemthermo's own parameter set."
+  },
+  "components": [
+    {
+      "index": 1,
+      "paper_name": "n-propanol",
+      "chemthermo_name": "1-Propanol"
+    },
+    {
+      "index": 2,
+      "paper_name": "n-butanol",
+      "chemthermo_name": "n-Butanol"
+    },
+    {
+      "index": 3,
+      "paper_name": "benzene",
+      "chemthermo_name": "Benzene"
+    },
+    {
+      "index": 4,
+      "paper_name": "water",
+      "chemthermo_name": "Water"
+    }
+  ],
+  "notes": [
+    "tau[i][j] is tau_ij with the row index i first, exactly as printed in Table 4.",
+    "Table 4 prints G_ij and tau_ij but not alpha_ij. The alpha values below are implied by alpha_ij = -ln(G_ij)/tau_ij applied to the printed table; the two directions of each pair agree to max |alpha_ij - alpha_ji| = 2.597e-05 (see alpha_recovered_from_published_G), i.e. alpha is symmetric to the precision the printed G matrix supports. The symmetric average rounded to three decimals is used.",
+    "Re-exponentiating the rounded alpha reproduces the printed G to max |dG| = 4.41e-06 (see G_published). That is a hundred times looser than the Problem 1 fixture (3.99e-08) because the printed G values carry only five decimals here while the tau values are large; it shifts the recomputed D values by at most 9.0e-05 relative (measured, worst case the +0.03079 point of feed 2), which is below the five printed digits of Table 5.",
+    "The temperature is not needed: Table 4 gives dimensionless tau directly, and the NRTL equation at fixed tau is temperature independent. The paper does not state a temperature for Problem 2.",
+    "printed_D_disputed marks a printed D that this fixture's own stationarity solve does not reproduce; see dispute_note."
+  ],
+  "tau": [
+    [0.0, 2.16486, 0.23689, 0.1306],
+    [-1.2007, 0.0, -0.0973, 0.19154],
+    [2.01911, 1.73912, 0.0, 4.01932],
+    [2.31985, 4.31706, 4.09334, 0.0]
+  ],
+  "alpha": [
+    [0.0, 0.494, 0.286, 0.282],
+    [0.494, 0.0, 0.297, 0.344],
+    [0.286, 0.297, 0.0, 0.281],
+    [0.282, 0.344, 0.281, 0.0]
+  ],
+  "G_published": [
+    [1.0, 0.3432, 0.93449, 0.96384],
+    [1.80967, 1.0, 1.02932, 0.93623],
+    [0.56132, 0.59659, 1.0, 0.32322],
+    [0.51986, 0.22649, 0.31656, 1.0]
+  ],
+  "alpha_recovered_from_published_G": [
+    [0.0, 0.49400049, 0.2860161, 0.28200592],
+    [0.49399892, 0.0, 0.29700298, 0.34402269],
+    [0.28599934, 0.29700375, 0.0, 0.2809983],
+    [0.28199915, 0.34399672, 0.28100341, 0.0]
+  ],
+  "alpha_symmetry_max_abs_error": 2.596961215856064e-05,
+  "G_reconstruction_max_abs_error": 4.413480202747344e-06,
+  "stationary_points": [
+    {
+      "feed": [0.148, 0.052, 0.6, 0.2],
+      "printed_composition": [0.0461, 0.0189, 0.916, 0.0187],
+      "printed_D": -0.03365,
+      "trivial": false,
+      "global_minimum": false,
+      "printed_D_disputed": false
+    },
+    {
+      "feed": [0.148, 0.052, 0.6, 0.2],
+      "printed_composition": [0.148, 0.052, 0.6, 0.2],
+      "printed_D": 0.0,
+      "trivial": true,
+      "global_minimum": false,
+      "printed_D_disputed": false
+    },
+    {
+      "feed": [0.148, 0.052, 0.6, 0.2],
+      "printed_composition": [0.0181, 0.00062, 0.00448, 0.977],
+      "printed_D": -0.33982,
+      "trivial": false,
+      "global_minimum": true,
+      "printed_D_disputed": false
+    },
+    {
+      "feed": [0.25, 0.25, 0.25, 0.25],
+      "printed_composition": [0.0353, 0.00573, 0.00675, 0.952],
+      "printed_D": 0.03079,
+      "trivial": false,
+      "global_minimum": true,
+      "printed_D_disputed": false
+    },
+    {
+      "feed": [0.25, 0.25, 0.25, 0.25],
+      "printed_composition": [0.133, 0.0802, 0.052, 0.735],
+      "printed_D": 0.06532,
+      "trivial": false,
+      "global_minimum": false,
+      "printed_D_disputed": false
+    },
+    {
+      "feed": [0.25, 0.25, 0.25, 0.25],
+      "printed_composition": [0.25, 0.25, 0.25, 0.25],
+      "printed_D": 0.0,
+      "trivial": true,
+      "global_minimum": false,
+      "printed_D_disputed": false
+    },
+    {
+      "feed": [0.148, 0.052, 0.7, 0.1],
+      "printed_composition": [0.082, 0.0307, 0.854, 0.0329],
+      "printed_D": -0.0031279,
+      "trivial": false,
+      "global_minimum": false,
+      "printed_D_disputed": false
+    },
+    {
+      "feed": [0.148, 0.052, 0.7, 0.1],
+      "printed_composition": [0.148, 0.052, 0.7, 0.1],
+      "printed_D": 0.0,
+      "trivial": true,
+      "global_minimum": false,
+      "printed_D_disputed": false
+    },
+    {
+      "feed": [0.148, 0.052, 0.7, 0.1],
+      "printed_composition": [0.0241, 0.000786, 0.00474, 0.97],
+      "printed_D": -0.31097,
+      "trivial": false,
+      "global_minimum": true,
+      "printed_D_disputed": false
+    },
+    {
+      "feed": [0.25, 0.15, 0.4, 0.2],
+      "printed_composition": [0.0367, 0.00298, 0.00737, 0.953],
+      "printed_D": -0.03867,
+      "trivial": false,
+      "global_minimum": true,
+      "printed_D_disputed": false
+    },
+    {
+      "feed": [0.25, 0.15, 0.4, 0.2],
+      "printed_composition": [0.195, 0.0786, 0.114, 0.613],
+      "printed_D": 0.02268,
+      "trivial": false,
+      "global_minimum": false,
+      "printed_D_disputed": true,
+      "dispute_note": "Refining the printed composition to a stationarity residual of 1e-15 gives w = (0.194545, 0.078562, 0.113961, 0.612933), which matches the printed composition to 3.4e-04 (the paper prints three digits), but D = +2.66799e-02 rather than the printed +2.26800e-02, a 17.6% mismatch. The recomputed value is +2.667985e-02 with the rounded alpha and +2.667994e-02 with the printed G matrix used verbatim, so it is not a parameter-rounding artefact, and every other Table 5 point reproduces to 2.5e-04 relative or better. The printed digit string is therefore treated as a typographical error (2.6680 printed as 2.2680), not a model disagreement. This point is a positive-D stationary point and does not change the paper's or this package's verdict for the feed."
+    },
+    {
+      "feed": [0.25, 0.15, 0.4, 0.2],
+      "printed_composition": [0.25, 0.15, 0.4, 0.2],
+      "printed_D": 0.0,
+      "trivial": true,
+      "global_minimum": false,
+      "printed_D_disputed": false
+    },
+    {
+      "feed": [0.25, 0.15, 0.35, 0.25],
+      "printed_composition": [0.0332, 0.00269, 0.00671, 0.957],
+      "printed_D": -0.07363,
+      "trivial": false,
+      "global_minimum": true,
+      "printed_D_disputed": false
+    },
+    {
+      "feed": [0.25, 0.15, 0.35, 0.25],
+      "printed_composition": [0.206, 0.0947, 0.14, 0.56],
+      "printed_D": 0.01066,
+      "trivial": false,
+      "global_minimum": false,
+      "printed_D_disputed": false
+    },
+    {
+      "feed": [0.25, 0.15, 0.35, 0.25],
+      "printed_composition": [0.25, 0.15, 0.35, 0.25],
+      "printed_D": 0.0,
+      "trivial": true,
+      "global_minimum": false,
+      "printed_D_disputed": false
+    }
+  ]
+}
