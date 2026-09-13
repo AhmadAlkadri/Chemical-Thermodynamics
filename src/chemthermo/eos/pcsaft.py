@@ -124,12 +124,34 @@ The residual chemical potential then follows from the definition
 
     ln phi_i = mu_i^res / kT - ln Z                              (Eq. A.32)
 
-Scope of this slice
--------------------
-No density root solving happens here: every property method takes the density
-(or molar volume) as an input. Finding the vapour/liquid density roots at a
-given ``(T, P)``, and wiring PC-SAFT into ``stability_tp`` / ``flash_tp``, is
-the next slice (``pcsaft-density-roots-flash``). See ADR-0014.
+Two state specifications, one model (ADR-0015)
+----------------------------------------------
+The methods above take the state as ``(T, rho, x)`` or ``(T, v, x)``: that is
+the natural specification for a residual-Helmholtz model and it is what
+``EOSProtocol`` asks for. The flash and the stability test speak the other
+one - ``(T, P, x)`` plus a *phase label* - through
+``chemthermo.models.EquationOfState``. Since the ``pcsaft-density-roots-flash``
+slice this class implements **both**:
+
+    fugacity_coefficients(mixture=, temperature_K=, pressure_Pa=,
+                          composition=, phase=)
+
+solves ``P_model(T, rho, x) = P`` for its mechanically stable roots
+(:mod:`chemthermo.eos._pcsaft_density`), takes the lowest-density root for
+``phase="vapor"`` and the highest for ``phase="liquid"``, and returns
+``exp(ln phi)`` there. Those are the Peng-Robinson label semantics verbatim
+(largest ``Z`` is the vapour), including the single-root case where both
+labels name the same state. :meth:`density_roots` exposes the root set itself.
+
+That is the whole wiring: ``stability_tp`` and ``flash_tp`` are untouched by
+this slice. The tangent-plane evaluator already holds the two compressibility
+branches as competing phase candidates and keeps the lowest-Gibbs one
+(ADR-0005, ADR-0012), which is exactly the right rule for PC-SAFT's roots too.
+See ADR-0015 for why the fugacity interface, and not a new density-root
+candidate type, is the seam this slice uses.
+
+Still out of scope: association and polar terms, and any temperature
+derivative (so no caloric properties).
 """
 
 from __future__ import annotations
@@ -140,16 +162,31 @@ from typing import NamedTuple, Sequence
 
 import numpy as np
 
+from ..core import Mixture
+from ..data import normalize_name
 from ..exceptions import CompositionError, InputRangeError, ModelError
 from ..models._kij import KijInput, KijPairs, canonicalize_kij, kij_matrix
+from ..models.base import EquationOfState
 from ..parameters.pcsaft import (
     PCSAFTParameterError,
     PCSAFTParameters,
     get_pcsaft_parameters,
 )
-from ..validation import COMPOSITION_SUM_TOL, validate_fractions, validate_temperature
+from ..validation import (
+    COMPOSITION_SUM_TOL,
+    validate_fractions,
+    validate_pressure,
+    validate_temperature,
+)
+from ._pcsaft_density import DensityRoots, PCSAFTIsotherm, build_isotherm, solve_density_roots
 from .api import EOSProtocol
 from .registry import register_eos
+
+#: Phase labels accepted by :meth:`PCSAFTEOS.fugacity_coefficients`, with the
+#: Peng-Robinson semantics: "vapor" is the largest ``Z`` (lowest density) root,
+#: "liquid" the smallest ``Z`` (highest density) one.
+_VAPOR = "vapor"
+_LIQUID = "liquid"
 
 #: Exact SI definitions (2019 redefinition).
 BOLTZMANN_J_PER_K = 1.380649e-23
@@ -421,13 +458,20 @@ def _evaluate(
 
 
 @dataclass(frozen=True)
-class PCSAFTEOS(EOSProtocol):
-    """PC-SAFT equation of state for non-associating fluids (ADR-0014).
+class PCSAFTEOS(EquationOfState, EOSProtocol):
+    """PC-SAFT equation of state for non-associating fluids (ADR-0014, ADR-0015).
 
     Args:
         components: Component names, in the order every composition argument
             uses. Names are matched against the parameter set (and therefore
             the packaged databank) via ``chemthermo.data.normalize_name``.
+            **Optional since ADR-0015**: leave it empty (``PCSAFTEOS()``) and
+            the ``(T, P, x)`` methods take the order from the ``Mixture`` they
+            are handed, which is what lets an instance be passed straight to
+            ``stability_tp`` / ``flash_tp``. Give it, and a ``Mixture`` whose
+            names differ is rejected rather than silently reordered. The
+            ``(T, rho, x)`` methods always need it, since no ``Mixture``
+            reaches them.
         parameters: Pure-component parameters. ``None`` (the default) uses the
             packaged Gross & Sadowski (2001) Table 1 set; supply a
             :class:`~chemthermo.parameters.PCSAFTParameters` built with
@@ -439,27 +483,37 @@ class PCSAFTEOS(EOSProtocol):
             ``{("Methane", "n-Decane"): 0.03}``. Missing pairs default to
             ``0.0``. It enters through ``eps_ij = sqrt(eps_i eps_j)(1 - k_ij)``.
 
-    Every property method takes the state as ``(T, molar density)`` or
-    ``(T, molar volume)``: **this slice does no density root solving**, so the
-    caller chooses which root they are on. A state inside the mechanically
-    unstable region can have ``Z <= 0``, for which fugacity coefficients do not
-    exist; :meth:`ln_fugacity_coefficients` raises ``ModelError`` there rather
-    than returning a ``nan``.
+    There are two families of methods and they differ in how the state is
+    specified, not in the model:
+
+    - :meth:`residual_helmholtz`, :meth:`compressibility_factor`,
+      :meth:`pressure_Pa` and :meth:`ln_fugacity_coefficients` take
+      ``(T, molar density, x)`` (or molar volume). The caller chooses which
+      root they are on. A state inside the mechanically unstable region can
+      have ``Z <= 0``, for which fugacity coefficients do not exist;
+      :meth:`ln_fugacity_coefficients` raises ``ModelError`` there rather than
+      returning a ``nan``.
+    - :meth:`fugacity_coefficients`, :meth:`density_roots` and
+      :meth:`molar_volume` take ``(T, P, x)`` and solve for the density
+      themselves. This is the ``chemthermo.models.EquationOfState`` interface
+      the flash and the stability test use.
     """
 
-    components: tuple[str, ...]
+    components: tuple[str, ...] = ()
     parameters: PCSAFTParameters | None = None
     kij: KijInput | KijPairs = 0.0
     name: str = "PC-SAFT"
 
     def __post_init__(self) -> None:
-        if not self.components:
-            raise ModelError("PC-SAFT requires at least one component.")
         object.__setattr__(self, "components", tuple(self.components))
         object.__setattr__(self, "kij", canonicalize_kij(self.kij, model="PCSAFTEOS"))
 
     def num_components(self) -> int:
-        """Return the number of components the EOS instance was configured for."""
+        """Return the number of components the EOS instance was configured for.
+
+        Zero for an instance built without ``components``, which takes its
+        component order from the ``Mixture`` it is handed instead.
+        """
         return len(self.components)
 
     def residual_helmholtz(
@@ -528,7 +582,22 @@ class PCSAFTEOS(EOSProtocol):
         :meth:`pressure_Pa`. Raises ``ModelError`` when ``Z <= 0``, where
         ``ln phi`` does not exist.
         """
-        state = self._state(temperature_K, density_mol_m3, composition)
+        return self._ln_fugacity_coefficients(
+            names=self.components,
+            temperature_K=temperature_K,
+            density_mol_m3=density_mol_m3,
+            composition=composition,
+        )
+
+    def _ln_fugacity_coefficients(
+        self,
+        *,
+        names: tuple[str, ...],
+        temperature_K: float,
+        density_mol_m3: float,
+        composition: Sequence[float],
+    ) -> list[float]:
+        state = self._state(temperature_K, density_mol_m3, composition, names)
         z_factor = 1.0 + state.z_minus_one
         if z_factor <= 0.0:
             raise ModelError(
@@ -536,24 +605,255 @@ class PCSAFTEOS(EOSProtocol):
                 f"T = {temperature_K!r} K, rho = {density_mol_m3!r} mol/m^3; fugacity "
                 "coefficients do not exist inside the mechanically unstable region."
             )
-        x = self._composition(composition)
+        x = self._composition(composition, names)
         mu_res = state.a_res + state.z_minus_one + state.da_dx - float(x @ state.da_dx)
         return (mu_res - math.log(z_factor)).tolist()
 
-    def component_parameters(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Return ``(m, sigma_A, epsilon_k_K)`` for this instance's components."""
+    # -- the (T, P, x) interface: EquationOfState (ADR-0015) ----------------
+
+    def fugacity_coefficients(
+        self,
+        *,
+        mixture: Mixture,
+        temperature_K: float,
+        pressure_Pa: float,
+        composition: Sequence[float],
+        phase: str,
+    ) -> list[float]:
+        """Return fugacity coefficients on the named density root.
+
+        This is the ``chemthermo.models.EquationOfState`` interface, with the
+        Peng-Robinson label semantics: ``"vapor"`` selects the largest ``Z``
+        (lowest density) admissible root and ``"liquid"`` the smallest ``Z``
+        (highest density) one. When the solver finds only one root the two
+        labels return the same values, exactly as a cubic does outside its
+        three-root region - the tangent-plane evaluator's minimum-Gibbs
+        selection then has nothing to choose between and keeps the first
+        candidate (ADR-0005).
+
+        Args:
+            mixture: Mixture providing the component names (and, for the
+                stability test's Wilson estimates, their critical properties).
+            temperature_K: Temperature in K.
+            pressure_Pa: Pressure in Pa.
+            composition: Mole fractions, summing to 1 within
+                ``COMPOSITION_SUM_TOL``.
+            phase: ``"vapor"`` or ``"liquid"``.
+
+        Returns:
+            Fugacity coefficients (dimensionless), one per component.
+
+        Raises:
+            CompositionError: If the composition length does not match.
+            ModelError: If the instance's components disagree with the
+                mixture's, if no admissible density root exists at this state,
+                or if ``ln phi`` does not exist on the selected root.
+            ValueError: If ``phase`` is neither ``"vapor"`` nor ``"liquid"``.
+        """
+        if phase not in (_VAPOR, _LIQUID):
+            raise ValueError("phase must be 'vapor' or 'liquid'.")
+
+        names = self._resolve_components(mixture)
+        density = self._root_for_phase(
+            names=names,
+            temperature_K=temperature_K,
+            pressure_Pa=pressure_Pa,
+            composition=composition,
+            phase=phase,
+        )
+        ln_phi = self._ln_fugacity_coefficients(
+            names=names,
+            temperature_K=temperature_K,
+            density_mol_m3=density,
+            composition=composition,
+        )
+        return np.exp(np.asarray(ln_phi, dtype=float)).tolist()
+
+    def density_roots(
+        self,
+        *,
+        temperature_K: float,
+        pressure_Pa: float,
+        composition: Sequence[float],
+        mixture: Mixture | None = None,
+    ) -> tuple[float, ...]:
+        """Return the mechanically stable molar densities at ``(T, P, x)``.
+
+        The roots of ``P_model(T, rho, x) = P`` that satisfy
+        ``(dP/drho)_{T,x} > 0``, in mol/m^3, sorted ascending: the first entry
+        is the vapour-like root and the last the liquid-like one. A
+        single-element result means the fluid has one phase-like state at this
+        ``(T, P, x)`` - a dense liquid, a dilute gas or a supercritical fluid -
+        and is not an error. The mechanically unstable (spinodal-branch) root
+        is never returned.
+
+        Args:
+            temperature_K: Temperature in K.
+            pressure_Pa: Pressure in Pa.
+            composition: Mole fractions, summing to 1 within
+                ``COMPOSITION_SUM_TOL``.
+            mixture: Supplies the component names when the instance was built
+                without ``components``; otherwise optional, and checked
+                against them.
+
+        Returns:
+            Admissible molar densities in mol/m^3, ascending.
+
+        Raises:
+            ModelError: If the scan finds no admissible root at this state.
+                The message names the state and the scan grid.
+        """
+        names = self._resolve_components(mixture)
+        return self._density_roots(
+            names=names,
+            temperature_K=temperature_K,
+            pressure_Pa=pressure_Pa,
+            composition=composition,
+        ).densities
+
+    def molar_volume(
+        self,
+        *,
+        temperature_K: float,
+        pressure_Pa: float,
+        composition: Sequence[float],
+        phase: str,
+        mixture: Mixture | None = None,
+    ) -> float:
+        """Return the molar volume in m^3/mol on the named density root.
+
+        The reciprocal of the root :meth:`fugacity_coefficients` would use for
+        the same ``phase``; see :meth:`density_roots` for the root semantics.
+        """
+        if phase not in (_VAPOR, _LIQUID):
+            raise ValueError("phase must be 'vapor' or 'liquid'.")
+        names = self._resolve_components(mixture)
+        density = self._root_for_phase(
+            names=names,
+            temperature_K=temperature_K,
+            pressure_Pa=pressure_Pa,
+            composition=composition,
+            phase=phase,
+        )
+        return 1.0 / density
+
+    # -- parameter and component plumbing -----------------------------------
+
+    def component_parameters(
+        self, components: Sequence[str] | None = None
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        """Return ``(m, sigma_A, epsilon_k_K)`` for this instance's components.
+
+        Args:
+            components: Optional explicit name order; defaults to the
+                instance's own ``components``.
+        """
+        names = self.components if components is None else tuple(components)
+        if not names:
+            raise ModelError(
+                "PC-SAFT requires at least one component: this instance was built without "
+                "'components', so the component order has to come from a Mixture."
+            )
         source = self.parameters if self.parameters is not None else get_pcsaft_parameters()
-        return source.for_components(self.components)
+        return source.for_components(names)
 
-    def kij_matrix(self) -> np.ndarray:
-        """Return the dense ``n x n`` kij matrix in this instance's order."""
-        return kij_matrix(self.kij, self.components)
+    def kij_matrix(self, components: Sequence[str] | None = None) -> np.ndarray:
+        """Return the dense ``n x n`` kij matrix in the given (or instance) order."""
+        names = self.components if components is None else tuple(components)
+        if not names:
+            raise ModelError(
+                "PC-SAFT requires at least one component: this instance was built without "
+                "'components', so the component order has to come from a Mixture."
+            )
+        return kij_matrix(self.kij, names)
 
-    def _composition(self, composition: Sequence[float]) -> np.ndarray:
-        if len(composition) != len(self.components):
+    def _resolve_components(self, mixture: Mixture | None) -> tuple[str, ...]:
+        """Return the component-name order to use for a ``(T, P, x)`` request.
+
+        An instance built without ``components`` takes the mixture's order.
+        An instance built *with* them must agree with the mixture, compared
+        after ``normalize_name``: reordering the caller's composition silently
+        would be a wrong answer rather than a convenience.
+        """
+        if not self.components:
+            if mixture is None:
+                raise ModelError(
+                    "PCSAFTEOS was built without 'components' and no Mixture was supplied, "
+                    "so the component order is unknown."
+                )
+            return tuple(mixture.component_names)
+
+        if mixture is not None:
+            expected = [normalize_name(name) for name in self.components]
+            actual = [normalize_name(name) for name in mixture.component_names]
+            if expected != actual:
+                raise ModelError(
+                    "PCSAFTEOS components do not match the mixture: the model was built for "
+                    f"{tuple(self.components)!r} but the mixture is {tuple(mixture.component_names)!r}. "
+                    "Build PCSAFTEOS() without 'components' to take the mixture's order."
+                )
+        return self.components
+
+    def _isotherm(
+        self,
+        *,
+        names: tuple[str, ...],
+        temperature_K: float,
+        composition: Sequence[float],
+    ) -> PCSAFTIsotherm:
+        temperature = validate_temperature(temperature_K)
+        x = self._composition(composition, names)
+        m, sigma_A, epsilon_k_K = self.component_parameters(names)
+        return build_isotherm(
+            temperature_K=temperature,
+            composition=x,
+            m=m,
+            sigma_A=sigma_A,
+            epsilon_k_K=epsilon_k_K,
+            kij=self.kij_matrix(names),
+        )
+
+    def _density_roots(
+        self,
+        *,
+        names: tuple[str, ...],
+        temperature_K: float,
+        pressure_Pa: float,
+        composition: Sequence[float],
+    ) -> DensityRoots:
+        pressure = validate_pressure(pressure_Pa)
+        isotherm = self._isotherm(names=names, temperature_K=temperature_K, composition=composition)
+        description = (
+            f" at T = {float(temperature_K)!r} K, x = {list(map(float, composition))!r} "
+            f"for {names!r}"
+        )
+        return solve_density_roots(isotherm, pressure, state_description=description)
+
+    def _root_for_phase(
+        self,
+        *,
+        names: tuple[str, ...],
+        temperature_K: float,
+        pressure_Pa: float,
+        composition: Sequence[float],
+        phase: str,
+    ) -> float:
+        roots = self._density_roots(
+            names=names,
+            temperature_K=temperature_K,
+            pressure_Pa=pressure_Pa,
+            composition=composition,
+        ).densities
+        return roots[0] if phase == _VAPOR else roots[-1]
+
+    def _composition(
+        self, composition: Sequence[float], names: Sequence[str] | None = None
+    ) -> np.ndarray:
+        expected = len(self.components) if names is None else len(names)
+        if len(composition) != expected:
             raise CompositionError(
                 "Composition length must match number of PC-SAFT components "
-                f"({len(composition)} != {len(self.components)})."
+                f"({len(composition)} != {expected})."
             )
         fractions = validate_fractions(composition, normalize=False, tol=COMPOSITION_SUM_TOL)
         return np.array(fractions, dtype=float)
@@ -563,11 +863,15 @@ class PCSAFTEOS(EOSProtocol):
         temperature_K: float,
         density_mol_m3: float,
         composition: Sequence[float],
+        names: Sequence[str] | None = None,
     ) -> _PCSAFTState:
         temperature = validate_temperature(temperature_K)
         density = _validated_density(density_mol_m3)
-        x = self._composition(composition)
-        m, sigma_A, epsilon_k_K = self.component_parameters()
+        # Resolved first: an instance built without ``components`` has no
+        # component order at all, and "length 1 != 0" would be a poor way to
+        # say so.
+        m, sigma_A, epsilon_k_K = self.component_parameters(names)
+        x = self._composition(composition, names)
         return _evaluate(
             temperature_K=temperature,
             density_mol_m3=density,
@@ -575,7 +879,7 @@ class PCSAFTEOS(EOSProtocol):
             m=m,
             sigma_A=sigma_A,
             epsilon_k_K=epsilon_k_K,
-            kij=self.kij_matrix(),
+            kij=self.kij_matrix(names),
         )
 
 
