@@ -24,6 +24,17 @@ def _run_cli(*args: str) -> subprocess.CompletedProcess[str]:
 
 
 def test_cli_tp_flash_json_output_matches_fixture_contract() -> None:
+    """Phi-phi CLI contract against the pre-`flash-auto-phase-detection` fixture.
+
+    The fixture's `result` block is deliberately still the pre-slice one. Its
+    numbers were produced by the Wilson-seeded iteration; the tangent-plane
+    path reaches the *same* equilibrium from a different starting K, so the two
+    differ only by the width of the K-update tolerance (`tol = 1e-8`). Achieved
+    agreement at this state: 1.11e-9 relative on the vapor fraction and 1.8e-9
+    relative on the compositions, hence `rel=1e-7` here instead of the previous
+    `rel=1e-9`. The `diagnostics` block and `solver.algorithm` were regenerated
+    (iteration path and new keys); see ADR-0008 and validation Case F-1.
+    """
     proc = _run_cli(
         "tp-flash",
         "--components",
@@ -53,19 +64,19 @@ def test_cli_tp_flash_json_output_matches_fixture_contract() -> None:
     assert payload["result"]["phase_names"] == fixture["result"]["phase_names"]
 
     assert payload["result"]["vapor_fraction"] == pytest.approx(
-        fixture["result"]["vapor_fraction"], rel=1e-9, abs=1e-12
+        fixture["result"]["vapor_fraction"], rel=1e-7, abs=1e-12
     )
 
     assert np.allclose(
         payload["result"]["phases"]["liquid"]["fractions"],
         fixture["result"]["phases"]["liquid"]["fractions"],
-        rtol=1e-9,
+        rtol=1e-7,
         atol=1e-12,
     )
     assert np.allclose(
         payload["result"]["phases"]["vapor"]["fractions"],
         fixture["result"]["phases"]["vapor"]["fractions"],
-        rtol=1e-9,
+        rtol=1e-7,
         atol=1e-12,
     )
 
@@ -75,6 +86,52 @@ def test_cli_tp_flash_json_output_matches_fixture_contract() -> None:
             assert actual == pytest.approx(expected, rel=1e-9, abs=1e-12)
         else:
             assert actual == expected
+
+
+def test_cli_tp_flash_json_diagnostics_carry_the_phase_detection_keys() -> None:
+    """New diagnostics keys serialize through the CLI without a schema bump.
+
+    ADR-0003/ADR-0004 require `cli_schema_version` to be bumped for a
+    *structural* break. `diagnostics` is a free-form mapping whose keys are
+    documented as implementation details, so adding keys inside it removes
+    nothing and changes no type: the version stays 1 (ADR-0008).
+    """
+    proc = _run_cli(
+        "tp-flash",
+        "--components",
+        "Methane,Ethane,Propane",
+        "--z",
+        "0.5,0.3,0.2",
+        "--temperature-k",
+        "240",
+        "--pressure-pa",
+        "3000000",
+        "--format",
+        "json",
+    )
+    assert proc.returncode == 0, proc.stderr
+    payload = json.loads(proc.stdout)
+
+    assert payload["cli_schema_version"] == 1
+    diagnostics = payload["diagnostics"]
+    for key in (
+        "phase_detection",
+        "stability_status",
+        "tpd_min",
+        "feed_branch",
+        "k_seed",
+        "mass_balance_residual",
+        "fugacity_residual",
+        "delta_g_split_rt",
+        "stability_trials",
+    ):
+        assert key in diagnostics, key
+    assert diagnostics["phase_detection"] == "tangent-plane"
+    assert diagnostics["stability_status"] == "unstable"
+    assert diagnostics["k_seed"] == "stability"
+    # Round-trips through json.dumps already (the CLI printed it), so every
+    # value is a JSON scalar.
+    assert json.loads(json.dumps(diagnostics)) == diagnostics
 
 
 def test_cli_tp_flash_gamma_phi_json_output_matches_fixture_contract() -> None:

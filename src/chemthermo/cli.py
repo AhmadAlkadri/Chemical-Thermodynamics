@@ -35,6 +35,19 @@ def _parse_csv_floats(raw: str, *, label: str) -> list[float]:
     return values
 
 
+def _algorithm_label(*, flash_mode: str, settings: FlashSettings) -> str:
+    """Name the path the solver actually took.
+
+    The phase split is unchanged (Rachford-Rice plus fixed-point K updates);
+    only the initialization and the one-versus-two-phase decision differ, so the
+    first token names the phase-detection mode. Gamma-phi always uses the
+    Wilson heuristic (ADR-0008).
+    """
+    if flash_mode == "phi-phi" and settings.phase_detection == "tangent-plane":
+        return "tangent-plane+rachford-rice+fixed-point"
+    return "wilson+rachford-rice+fixed-point"
+
+
 def _tp_flash_payload(
     *,
     component_names: list[str],
@@ -68,7 +81,7 @@ def _tp_flash_payload(
         "solver": {
             "eos": "peng_robinson",
             "method": flash_mode,
-            "algorithm": "wilson+rachford-rice+fixed-point",
+            "algorithm": _algorithm_label(flash_mode=flash_mode, settings=settings),
             "settings": {
                 "max_iter": settings.max_iter,
                 "tol": settings.tol,

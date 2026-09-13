@@ -7,8 +7,10 @@
     "iterations": 12,
     "k_max": 3.433875573623854,
     "k_min": 0.4846789528468791,
+    "k_seed": "wilson",
     "max_delta_k": 2.557426270755059e-09,
     "phase_count": 2,
+    "phase_detection": "wilson-heuristic",
     "phase_regime": "VLE",
     "phase_state": "two_phase",
     "termination_reason": "tolerance_met"
