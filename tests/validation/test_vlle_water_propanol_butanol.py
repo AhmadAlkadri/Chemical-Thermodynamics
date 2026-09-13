@@ -563,3 +563,145 @@ def test_a_thin_tie_triangle_can_hide_from_the_deterministic_trial_set(system) -
     result = _flash(names, model, z, temperature_K)
     assert result.phase_names() == ["liquid"], "the 363 K near-plait miss is fixed; update Case V-2"
     assert float(result.diagnostics["tpd_min"]) == 0.0
+
+
+# --------------------------------------------------------------------------
+# The external cross-check that is not available, checked rather than assumed
+# --------------------------------------------------------------------------
+
+
+def test_thermo_cannot_hold_two_distinct_excess_gibbs_liquids(system) -> None:
+    """`thermo` 0.6.0 gives no three-phase reference here, and this records why.
+
+    Validation Case L-2 found that `thermo`'s `FlashVLN` collapses two
+    `GibbsExcessLiquid` phases built on one excess-Gibbs model into one
+    (`unique_liquid_count == 1`). That was measured for a *binary* liquid-liquid
+    split; before claiming "no external reference exists" for a three-phase
+    state it is checked again here, directly, with two distinct
+    `GibbsExcessLiquid` objects.
+
+    Measured with `thermo` 0.6.0, identical NRTL parameters and chemthermo's own
+    Antoine records pushed into `thermo` (so `Psat` is shared):
+
+    - `liquids=[liquid]`: `unique_liquid_count == 1`, and the flash returns a
+      **two-phase** vapor-liquid answer at a feed that is inside the
+      tie-triangle - vapor (0.21027032, 0.09978016, 0.68994952), liquid
+      (0.09928882, 0.07716435, 0.82354683), betas (0.31446, 0.68554). That
+      liquid is neither conjugate liquid; it is the single-liquid answer.
+    - `liquids=[liquid, liquid]`: still `unique_liquid_count == 1`, and the
+      flash raises `TypeError: 'NoneType' object is not subscriptable`.
+
+    So there is no external three-phase reference for this system, and none is
+    claimed anywhere in this module. The test also *adjudicates*: chemthermo's
+    three-phase answer has the lower Gibbs energy of the two, computed here from
+    this module's own equations.
+
+    The assertions are deliberately loose - they pin the *failure*, so that a
+    future `thermo` which fixes it is noticed rather than silently ignored.
+    """
+    pytest.importorskip("thermo")
+    from thermo import NRTL as ThermoNRTL  # noqa: PLC0415
+    from thermo import (  # noqa: PLC0415 - optional dependency
+        ChemicalConstantsPackage,
+        FlashVLN,
+        GibbsExcessLiquid,
+        IdealGas,
+    )
+
+    names, model, ln_gamma, psat = system
+    temperature_K = 364.0
+    x_i, x_ii, y, _ = _tie_triangle(temperature_K, TRIANGLE_SEEDS[temperature_K], ln_gamma, psat)
+    z = np.column_stack([x_i, x_ii, y]) @ np.array([1 / 3, 1 / 3, 1 / 3])
+    z = z / float(np.sum(z))
+
+    constants, correlations = ChemicalConstantsPackage.from_IDs(["1-propanol", "butanol", "water"])
+    # Share Psat: chemthermo stores ln(P/bar), thermo's Antoine is in Pa.
+    for index, name in enumerate(names):
+        record = ct.Component.from_database(name).antoine
+        assert record is not None
+        correlations.VaporPressures[index].add_correlation(
+            name="chemthermo",
+            model="Antoine",
+            Tmin=record.Tmin_K,
+            Tmax=record.Tmax_K,
+            A=record.A + float(np.log(1e5)),
+            B=record.B,
+            C=record.C,
+            base=float(np.e),
+        )
+
+    tau = [[0.0, -0.61259, -0.07149], [0.7164, 0.0, 0.90047], [2.7425, 3.51307, 0.0]]
+    alpha = [[0.0, 0.3, 0.3], [0.3, 0.0, 0.48], [0.3, 0.48, 0.0]]
+    excess = ThermoNRTL(T=temperature_K, xs=[1 / 3] * 3, tau_as=tau, alpha_cs=alpha)
+
+    def liquid() -> object:
+        return GibbsExcessLiquid(
+            VaporPressures=correlations.VaporPressures,
+            GibbsExcessModel=excess,
+            equilibrium_basis=None,
+            eos_pure_instances=None,
+            use_Poynting=False,
+            use_phis_sat=False,
+            HeatCapacityGases=correlations.HeatCapacityGases,
+            T=temperature_K,
+            P=PRESSURE_PA,
+            zs=[1 / 3] * 3,
+        )
+
+    gas = IdealGas(
+        HeatCapacityGases=correlations.HeatCapacityGases,
+        T=temperature_K,
+        P=PRESSURE_PA,
+        zs=[1 / 3] * 3,
+    )
+
+    single = FlashVLN(constants, correlations, liquids=[liquid()], gas=gas)
+    assert single.unique_liquid_count == 1
+    external = single.flash(T=temperature_K, P=PRESSURE_PA, zs=[float(v) for v in z])
+    assert external.phase_count == 2, (
+        "thermo now returns more than two phases here; Case V-1's 'no external "
+        "reference' note needs revisiting"
+    )
+
+    doubled = FlashVLN(constants, correlations, liquids=[liquid(), liquid()], gas=gas)
+    assert doubled.unique_liquid_count == 1
+    with pytest.raises((TypeError, ValueError, AttributeError)):
+        doubled.flash(T=temperature_K, P=PRESSURE_PA, zs=[float(v) for v in z])
+
+    # Adjudication: chemthermo's three-phase answer is the lower-Gibbs one.
+    ours = _flash(names, model, z, temperature_K)
+    assert len(ours.phase_names()) == 3
+
+    def energy_of(betas, compositions, vapors) -> float:
+        return float(
+            sum(
+                float(beta)
+                * _reduced_g(np.array(composition), is_vapor, temperature_K, ln_gamma, psat)
+                for beta, composition, is_vapor in zip(betas, compositions, vapors)
+            )
+        )
+
+    theirs_g = energy_of(
+        external.betas,
+        [phase.zs for phase in external.phases],
+        [phase.__class__.__name__ == "IdealGas" for phase in external.phases],
+    )
+    ours_g = energy_of(
+        [ours.phase_fractions[name] for name in ours.phase_names()],
+        [ours.phases[name].composition.fractions for name in ours.phase_names()],
+        [name == "vapor" for name in ours.phase_names()],
+    )
+    # Achieved with thermo 0.6.0: ours -0.693912758, theirs -0.693543321.
+    assert ours_g < theirs_g, (ours_g, theirs_g)
+
+    # And the intermediate *is* externally confirmed: thermo's two-phase answer
+    # has the same Gibbs energy as the two-phase candidate chemthermo converged
+    # before adding the third phase, to 2.4e-09. So the disagreement is about
+    # the phase count, not about the two-phase thermodynamics.
+    two = _flash(names, model, z, temperature_K, ct.FlashSettings(post_split_stability=False))
+    ours_two_g = energy_of(
+        [two.phase_fractions[name] for name in two.phase_names()],
+        [two.phases[name].composition.fractions for name in two.phase_names()],
+        [name == "vapor" for name in two.phase_names()],
+    )
+    assert ours_two_g == pytest.approx(theirs_g, abs=1e-7)
