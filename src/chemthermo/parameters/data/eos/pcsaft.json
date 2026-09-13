@@ -1,0 +1,100 @@
+{
+  "schema_version": 1,
+  "model": "PC-SAFT",
+  "provenance": {
+    "status": "published",
+    "primary_source": "J. Gross and G. Sadowski, \"Perturbed-Chain SAFT: An Equation of State Based on a Perturbation Theory for Chain Molecules\", Ind. Eng. Chem. Res. 40 (2001) 1244-1260, Table 1 (pure-component parameters of non-associating compounds). DOI 10.1021/ie0003887.",
+    "primary_source_read": false,
+    "primary_source_note": "The paper itself is behind the ACS paywall and could not be opened from the environment that produced this file (pubs.acs.org returned HTTP 403). The eleven records below were therefore transcribed from two independent secondary sources that both cite Table 1 of the same paper, and they agree digit for digit; the citation above remains the primary one.",
+    "secondary_sources": [
+      "FeOs (feos-org/feos, MIT/Apache-2.0), parameters/pcsaft/gross2001.json - one record per compound with m, sigma, epsilon_k.",
+      "Clapeyron.jl (ClapeyronThermo/Clapeyron.jl, MIT), database/SAFT/PCSAFT/PCSAFT_like.csv - rows whose 'source' column is the DOI 10.1021/ie0003887.",
+      "teqp (usnistgov/teqp, MIT), include/teqp/models/pcsaft.hpp - its built-in PCSAFTLibrary hard-codes Methane, Ethane and Propane with the BibTeXKey 'Gross-IECR-2001' and confirms those three independently."
+    ],
+    "units": "m is dimensionless (segments per chain); sigma_A is the segment diameter in Angstrom; epsilon_k_K is the segment dispersion energy divided by the Boltzmann constant, in K.",
+    "scope": "Non-associating compounds only. This slice implements the hard-chain and dispersion terms of the 2001 paper; association (Gross & Sadowski, Ind. Eng. Chem. Res. 41 (2002) 5510) and the polar terms are not implemented, so associating compounds are deliberately absent from this file rather than present and silently mis-modelled.",
+    "molar_mass": "No MW is stored here on purpose: the packaged component databank (src/chemthermo/data/components.json) is the single source of truth for molar mass, and PC-SAFT does not use it. PCSAFTParameters.from_records() accepts an optional MW_g_mol for user-supplied records.",
+    "names": "Component names match the packaged databank after chemthermo.data.normalize_name, so PCSAFTEOS(components=[...]) accepts the same spellings the rest of the package does.",
+    "kij": "No binary interaction parameters are packaged. k_ij defaults to 0 and is supplied per call as PCSAFTEOS(kij=...), either as a scalar or as a name-keyed per-pair mapping (ADR-0006).",
+    "note": "Keys outside 'schema_version', 'model' and 'components' (and extra keys inside a component entry) are documentation only; the loader ignores them, so recording provenance does not require a schema bump."
+  },
+  "components": [
+    {
+      "name": "Methane",
+      "m": 1.0,
+      "sigma_A": 3.7039,
+      "epsilon_k_K": 150.03,
+      "source": "Gross & Sadowski 2001, Table 1"
+    },
+    {
+      "name": "Ethane",
+      "m": 1.6069,
+      "sigma_A": 3.5206,
+      "epsilon_k_K": 191.42,
+      "source": "Gross & Sadowski 2001, Table 1"
+    },
+    {
+      "name": "Propane",
+      "m": 2.002,
+      "sigma_A": 3.6184,
+      "epsilon_k_K": 208.11,
+      "source": "Gross & Sadowski 2001, Table 1"
+    },
+    {
+      "name": "n-Butane",
+      "m": 2.3316,
+      "sigma_A": 3.7086,
+      "epsilon_k_K": 222.88,
+      "source": "Gross & Sadowski 2001, Table 1"
+    },
+    {
+      "name": "n-Pentane",
+      "m": 2.6896,
+      "sigma_A": 3.7729,
+      "epsilon_k_K": 231.2,
+      "source": "Gross & Sadowski 2001, Table 1"
+    },
+    {
+      "name": "n-Hexane",
+      "m": 3.0576,
+      "sigma_A": 3.7983,
+      "epsilon_k_K": 236.77,
+      "source": "Gross & Sadowski 2001, Table 1"
+    },
+    {
+      "name": "n-Heptane",
+      "m": 3.4831,
+      "sigma_A": 3.8049,
+      "epsilon_k_K": 238.4,
+      "source": "Gross & Sadowski 2001, Table 1"
+    },
+    {
+      "name": "n-Octane",
+      "m": 3.8176,
+      "sigma_A": 3.8373,
+      "epsilon_k_K": 242.78,
+      "source": "Gross & Sadowski 2001, Table 1"
+    },
+    {
+      "name": "n-Decane",
+      "m": 4.6627,
+      "sigma_A": 3.8384,
+      "epsilon_k_K": 243.87,
+      "source": "Gross & Sadowski 2001, Table 1"
+    },
+    {
+      "name": "Nitrogen",
+      "m": 1.2053,
+      "sigma_A": 3.313,
+      "epsilon_k_K": 90.96,
+      "source": "Gross & Sadowski 2001, Table 1"
+    },
+    {
+      "name": "Carbon dioxide",
+      "m": 2.0729,
+      "sigma_A": 2.7852,
+      "epsilon_k_K": 169.21,
+      "source": "Gross & Sadowski 2001, Table 1"
+    }
+  ]
+}

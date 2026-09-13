@@ -2,12 +2,18 @@
 
 from .activity import ActivityParameters
 from .nrtl import NRTLParameters
-from .pcsaft import PCSAFTParameterError, PCSAFTParameterRegistry, get_pcsaft_parameters
+from .pcsaft import (
+    PCSAFTParameterError,
+    PCSAFTParameters,
+    PCSAFTRecord,
+    get_pcsaft_parameters,
+)
 
 __all__ = [
     "ActivityParameters",
     "NRTLParameters",
     "PCSAFTParameterError",
-    "PCSAFTParameterRegistry",
+    "PCSAFTParameters",
+    "PCSAFTRecord",
     "get_pcsaft_parameters",
 ]
