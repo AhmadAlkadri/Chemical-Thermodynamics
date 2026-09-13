@@ -27,27 +27,25 @@ The script prints four things:
    the experimental value at that temperature is 101.325 kPa by the definition
    of the normal boiling point. That line is a **remark about the model**, not
    a claim about this code.
-4. **A water / n-hexane liquid-liquid split** at 298.15 K and 1 MPa, from the
-   unchanged ``flash_tp``. Two honest caveats come with it, printed by the
-   script:
+4. **A water / n-hexane liquid-liquid split** at 298.15 K, at 1 atm and again
+   at 1 MPa, from ``flash_tp``. One honest caveat comes with it, printed by
+   the script: ``k_ij = 0``, and PC-SAFT with no binary interaction parameter
+   is known to be poor for water / hydrocarbon mutual solubilities, so the
+   numbers are a demonstration that the machinery works, not a prediction
+   anyone should use.
 
-   * ``k_ij = 0``. PC-SAFT with no binary interaction parameter is known to be
-     poor for water / hydrocarbon mutual solubilities, so the numbers below
-     are a demonstration that the machinery works, not a prediction anyone
-     should use.
-   * The pressure is 1 MPa, not 1 atm, and that is not cosmetic. At 1 atm the
-     isotherm still has a vapour density root, and the ``phi-phi`` split can
-     only pair a vapour-root phase with a liquid-root one - so it converges on
-     a spurious vapour-liquid pair, the post-split stability test catches it,
-     and ``flash_tp`` raises. The script shows that too. Above about 0.6 MPa
-     the vapour root is gone, both phases sit on the single (liquid) root, and
-     the same machinery produces the real liquid-liquid tie line.
+   The two pressures are both shown because 1 atm is the state that used to
+   fail. At 1 atm the isotherm still has a vapour density root, and until
+   ADR-0019 the phi-phi split pinned one phase to the liquid root and the
+   other to the vapour root, so it could only offer a spurious vapour-liquid
+   pair; the post-split stability test caught it and ``flash_tp`` raised.
+   Above about 0.6 MPa the vapour root is gone and the same tie line was
+   already reachable. Both now come back as the same pair of liquids.
 
 Labels: both converged phases are liquids by the ADR-0017 compressibility
-criterion, but the phi-phi path has no ``liquid1`` / ``liquid2`` naming, so it
-falls back to the Wilson ranking and calls them ``"liquid"`` and ``"vapor"``.
-``vapor_fraction`` is then the hexane-rich *liquid*'s fraction. The script
-prints the labels it actually got; fixing them is the next slice's job.
+criterion, so they are named ``"liquid1"`` and ``"liquid2"`` (ADR-0019) and
+``vapor_fraction`` is ``None`` - there is no vapour to report a fraction for.
+``examples/basic/flash_tp_pcsaft_lle_demo.py`` is the dedicated demo.
 
 Validated against FeOs in ``examples/validation/16_pcsaft_association_vs_feos.py``
 (validation Cases P-6 and P-7).
@@ -153,24 +151,72 @@ def _water_saturation() -> None:
 def _atmospheric_attempt() -> None:
     mixture = ct.Mixture.from_database(WATER_HEXANE, FEED)
     eos = PCSAFTEOS()
-    print("\n3) Water / n-hexane at 298.15 K and 1 atm: the feed is unstable ...")
+    print("\n3) Water / n-hexane at 298.15 K and 1 atm: two liquids, not a vapour pair")
     stability = ct.stability_tp(
         mixture, temperature_K=LL_TEMPERATURE_K, pressure_Pa=ATMOSPHERIC_PA, eos=eos
     )
     print(f"   stability_tp -> {stability.status!r}, tpd_min = {stability.tpd_min:.6e}")
-    try:
-        ct.flash_tp(mixture, temperature_K=LL_TEMPERATURE_K, pressure_Pa=ATMOSPHERIC_PA, eos=eos)
-    except ct.ConvergenceError as error:
-        first_sentence = str(error).split(". ")[0]
-        print(f"   ... and flash_tp refuses rather than returning it:\n     {first_sentence}.")
-    else:  # pragma: no cover - would mean the limitation below was fixed
-        print("   ... and flash_tp returned a result (the documented limitation is gone).")
-    print(
-        "   Why: at 1 atm the isotherm still has a vapour density root, and the phi-phi\n"
-        "   split pairs one vapour-root phase with one liquid-root phase - it has no way\n"
-        "   to put both phases on the liquid root. The post-split stability test catches\n"
-        "   the spurious pair. See ADR-0018; the fix is the flash-phase-addition-eos slice."
+    roots = eos.density_roots(
+        temperature_K=LL_TEMPERATURE_K,
+        pressure_Pa=ATMOSPHERIC_PA,
+        composition=FEED,
+        mixture=mixture,
     )
+    print(
+        f"   the isotherm still has {len(roots)} density roots at the feed "
+        f"({roots[0]:,.2f} and {roots[-1]:,.2f} mol/m^3),"
+    )
+    result = ct.flash_tp(
+        mixture, temperature_K=LL_TEMPERATURE_K, pressure_Pa=ATMOSPHERIC_PA, eos=eos
+    )
+    _print_phases(result, mixture, eos, ATMOSPHERIC_PA)
+    print(
+        f"   phase_regime = {result.diagnostics['phase_regime']!r}, "
+        f"vapor_fraction = {result.vapor_fraction!r}, "
+        f"phase_label_method = {result.diagnostics['phase_label_method']!r}"
+    )
+    print(
+        f"   dG/RT of the split = {result.diagnostics['delta_g_split_rt']:.6e}; fugacity "
+        f"residual {result.diagnostics['fugacity_residual']:.2e};\n"
+        f"   post-split stability {result.diagnostics['post_split_status']!r}."
+    )
+    print(
+        "   Until ADR-0019 this state raised: the split pinned one phase to the liquid\n"
+        "   root and the other to the vapour root, so it could only offer a water-rich\n"
+        "   liquid against a hexane-rich *vapour* whose Gibbs energy was above the feed's,\n"
+        "   and the post-split test refused it. Each phase now sits on the root the\n"
+        "   stability test found it on. See examples/basic/flash_tp_pcsaft_lle_demo.py."
+    )
+
+
+def _print_phases(
+    result: ct.FlashResult, mixture: ct.Mixture, eos: PCSAFTEOS, pressure_Pa: float
+) -> None:
+    """Print every phase with its measured identity and its density."""
+    for name, phase in result.phases.items():
+        fractions = list(phase.composition.fractions)
+        identity = eos.phase_identity(
+            mixture=mixture,
+            temperature_K=LL_TEMPERATURE_K,
+            pressure_Pa=pressure_Pa,
+            composition=fractions,
+            phase="liquid",
+        )
+        density = eos.density_roots(
+            temperature_K=LL_TEMPERATURE_K,
+            pressure_Pa=pressure_Pa,
+            composition=fractions,
+            mixture=mixture,
+        )[-1]
+        amounts = ", ".join(
+            f"{component} {value:.8f}"
+            for component, value in zip(mixture.component_names, fractions)
+        )
+        print(
+            f"   phase named {name!r:>9}: {amounts}\n"
+            f"     measured identity = {identity!r}, rho = {density:,.2f} mol/m^3, "
+            f"fraction = {result.phase_fractions[name]:.6f}"
+        )
 
 
 def _liquid_liquid_split() -> None:
@@ -187,32 +233,10 @@ def _liquid_liquid_split() -> None:
     result = ct.flash_tp(
         mixture, temperature_K=LL_TEMPERATURE_K, pressure_Pa=LL_PRESSURE_PA, eos=eos
     )
-    for name, phase in result.phases.items():
-        fractions = list(phase.composition.fractions)
-        identity = eos.phase_identity(
-            mixture=mixture,
-            temperature_K=LL_TEMPERATURE_K,
-            pressure_Pa=LL_PRESSURE_PA,
-            composition=fractions,
-            phase="liquid",
-        )
-        density = eos.density_roots(
-            temperature_K=LL_TEMPERATURE_K,
-            pressure_Pa=LL_PRESSURE_PA,
-            composition=fractions,
-            mixture=mixture,
-        )[0]
-        amounts = ", ".join(
-            f"{component} {value:.8f}"
-            for component, value in zip(mixture.component_names, fractions)
-        )
-        print(
-            f"   phase named {name!r:>9}: {amounts}\n"
-            f"     measured identity = {identity!r}, rho = {density:,.2f} mol/m^3"
-        )
+    _print_phases(result, mixture, eos, LL_PRESSURE_PA)
     print(
         f"   phase_label_method = {result.diagnostics['phase_label_method']!r}, "
-        f"vapor_fraction = {result.vapor_fraction:.6f}"
+        f"vapor_fraction = {result.vapor_fraction!r}"
     )
     print(
         f"   dG/RT of the split = {result.diagnostics['delta_g_split_rt']:.6e} (negative, so it\n"
@@ -221,9 +245,10 @@ def _liquid_liquid_split() -> None:
         f"   post-split stability {result.diagnostics['post_split_status']!r}."
     )
     print(
-        "   Labels: both phases measure as liquids, but the phi-phi path cannot name them\n"
-        "   'liquid1' / 'liquid2', so ADR-0017 falls back to the Wilson ranking and\n"
-        "   'vapor_fraction' is really the hexane-rich liquid's fraction. Recorded, not hidden."
+        "   A liquid tie line barely moves between 1 atm and 1 MPa, and this one does not:\n"
+        "   compare the compositions in section 3. Before ADR-0019 this pair came back\n"
+        "   named 'liquid' / 'vapor' by the Wilson-ranking fallback, with a vapor_fraction\n"
+        "   that was really the hexane-rich liquid's fraction."
     )
     print(
         "   k_ij = 0 here. PC-SAFT without a fitted binary parameter is known to be poor\n"
