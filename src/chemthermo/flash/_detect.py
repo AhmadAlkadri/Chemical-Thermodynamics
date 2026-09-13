@@ -32,7 +32,7 @@ from ._multiphase import _flash_tp_phase_addition, _phase_set_label
 from ._second_order import _second_order_split
 from ._split import (
     _ln_gamma_function,
-    _ln_phi_function,
+    _PhaseRoot,
     _rachford_rice,
     _solve_k_loop,
     _SplitSolution,
@@ -63,13 +63,15 @@ _LIQUID = "liquid"
 _VAPOR = "vapor"
 _MODIFIED_RAOULT = "modified-raoult"
 
-#: ``diagnostics["phase_label_method"]`` values (ADR-0017): the phase name(s)
-#: came from ``EquationOfState.phase_identity`` ("compressibility"), or from
-#: the pre-ADR-0017 convention because the model does not implement it, or
-#: because the two phases of a split were on the same side of the threshold
-#: ("wilson-ranking" - the historical name, kept because that is what decided
-#: the orientation the label defaults to; see :func:`_orient_two_phase_labels`
-#: and :func:`_phase_label_method`).
+#: ``diagnostics["phase_label_method"]`` values (ADR-0017, ADR-0019): the phase
+#: name(s) came from ``EquationOfState.phase_identity`` ("compressibility"), or
+#: from the pre-ADR-0017 convention because the model does not implement it, or
+#: because the two phases of a split both measured "vapor" ("wilson-ranking" -
+#: the historical name, kept because that is what decided the orientation the
+#: label defaults to; see :func:`_name_two_phase_result` and
+#: :func:`_phase_label_method`). Two phases that both measure "liquid" are no
+#: longer a fallback case since ADR-0019: they are named ``liquid1`` /
+#: ``liquid2`` and the method stays "compressibility".
 _LABEL_COMPRESSIBILITY = "compressibility"
 _LABEL_WILSON_RANKING = "wilson-ranking"
 _LABEL_TIE_BREAK = "tie-break"
@@ -107,7 +109,87 @@ def _phase_label_method(
     return _LABEL_COMPRESSIBILITY if identity in (_LIQUID, _VAPOR) else _LABEL_TIE_BREAK
 
 
-def _orient_two_phase_labels(
+class _TwoPhaseNaming:
+    """What the two converged phi-phi phases are called, and why.
+
+    Attributes:
+        names: Pairs positionally with ``(x, y)``: ``names[0]`` is ``x``'s.
+        vapor_fraction: The value reported as ``FlashResult.vapor_fraction`` -
+            ``beta``, ``1 - beta``, or None when the phase set holds no vapour.
+        regime: ``diagnostics["phase_regime"]``.
+        method: ``diagnostics["phase_label_method"]``.
+        identities: The measured identity of each phase's converged root.
+    """
+
+    __slots__ = ("identities", "method", "names", "regime", "vapor_fraction")
+
+    def __init__(
+        self,
+        *,
+        names: tuple[str, str],
+        vapor_fraction: float | None,
+        regime: str,
+        method: str,
+        identities: tuple[str, str],
+    ) -> None:
+        self.names = names
+        self.vapor_fraction = vapor_fraction
+        self.regime = regime
+        self.method = method
+        #: What each phase's converged root *is*, measured by ADR-0017 on that
+        #: root, falling back to the candidate label the selector used when the
+        #: model cannot measure one. Reported as ``phase_i_branch`` /
+        #: ``phase_ii_branch``.
+        self.identities = identities
+
+
+def _phase_identity_on(
+    eos: EquationOfState,
+    mixture: Mixture,
+    temperature: float,
+    pressure: float,
+    composition: np.ndarray,
+    branch: str,
+) -> str | None:
+    """``eos.phase_identity`` on ``branch``, or None when it cannot be measured."""
+    try:
+        return eos.phase_identity(
+            mixture=mixture,
+            temperature_K=temperature,
+            pressure_Pa=pressure,
+            composition=composition.tolist(),
+            phase=branch,
+        )
+    except ModelError:
+        return None
+
+
+def _liquid_order(x: np.ndarray, y: np.ndarray) -> tuple[str, str]:
+    """Name two liquid phases ``liquid1`` / ``liquid2`` deterministically.
+
+    ADR-0019 decision 3. Unlike the gamma-gamma path - whose ``liquid1`` /
+    ``liquid2`` are *roles assigned by the seed* and may swap between two feeds
+    on the same tie line - the phi-phi pair is ordered by composition:
+    ``liquid1`` is the phase with the **larger mole fraction of the first
+    component**, ties broken by the second component and so on, and finally by
+    position. Two feeds on one tie line therefore come back with the same
+    labels on the same phases, which is what makes a lever-rule check
+    meaningful. The order is relative to the mixture's component order, so
+    permuting the components permutes which phase is ``liquid1``; the phase
+    *set* is unchanged.
+
+    Returns:
+        ``(name_of_x, name_of_y)``.
+    """
+    for value_x, value_y in zip(x.tolist(), y.tolist()):
+        if value_x > value_y:
+            return (_LIQUID_I, _LIQUID_II)
+        if value_y > value_x:
+            return (_LIQUID_II, _LIQUID_I)
+    return (_LIQUID_I, _LIQUID_II)
+
+
+def _name_two_phase_result(
     eos: EquationOfState,
     mixture: Mixture,
     temperature: float,
@@ -115,61 +197,120 @@ def _orient_two_phase_labels(
     x: np.ndarray,
     y: np.ndarray,
     beta: float,
-) -> tuple[tuple[str, str], float, str]:
-    """Decide which converged phase is "liquid" and which is "vapor" (ADR-0017).
+    branches: tuple[str, str],
+) -> _TwoPhaseNaming:
+    """Name the two converged phi-phi phases (ADR-0017, extended by ADR-0019).
 
-    ``x`` is always the composition the split evaluated on the model's
-    "liquid" compressibility/density branch and ``y`` always the "vapor" one
-    (:func:`chemthermo.flash._split._ln_phi_function`), regardless of which
-    orientation seeded the iteration - so this never touches ``x``, ``y`` or
-    ``beta`` themselves, only which name and which ``vapor_fraction`` value
-    (``beta`` or ``1 - beta``) go with each.
+    Each phase is asked for its own compressibility identity **on the root it
+    actually converged on** (``branches``, from
+    :class:`chemthermo.flash._split._PhaseRoot`) - which since ADR-0019 need
+    not be ``("liquid", "vapor")``. This never touches ``x``, ``y`` or ``beta``
+    themselves, only which name and which ``vapor_fraction`` value goes with
+    each:
 
-    Each phase is asked for its own compressibility identity on the root it
-    was actually evaluated on. When the two disagree (one liquid-like, one
-    vapor-like) that identity wins and may *swap* the historical assignment.
-    When they agree (both liquid-like or both vapor-like - a near-critical or
-    otherwise ambiguous split) or the model does not implement
-    ``phase_identity``, the historical orientation is kept - ``x`` = "liquid",
-    ``y`` = "vapor", the Wilson-ranking-seeded assignment ADR-0008 decision 3
-    already produced.
+    ==========================  =====================================  ========
+    measured identities         names (positional with ``(x, y)``)     regime
+    ==========================  =====================================  ========
+    one liquid, one vapour      ``"liquid"`` / ``"vapor"``, the         VLE
+                                vapour-identified phase carrying
+                                ``vapor_fraction``
+    both liquid                 ``"liquid1"`` / ``"liquid2"``           LLE
+                                (:func:`_liquid_order`),
+                                ``vapor_fraction = None``
+    both vapour, or either      ``"liquid"`` / ``"vapor"`` in the       VLE
+    identity unavailable        historical ``(x, y)`` orientation
+    ==========================  =====================================  ========
 
-    Returns:
-        ``(names, vapor_fraction, phase_label_method)`` where ``names`` pairs
-        with ``(x, y)`` positionally, i.e. ``names[0]`` is ``x``'s name and
-        ``names[1]`` is ``y``'s.
+    The last row is the documented last-resort fallback: a model that does not
+    implement ``phase_identity``, or a near-critical split whose phases both
+    measure ``"vapor"``. It keeps ADR-0008 decision 3's Wilson-ranking
+    orientation and records ``phase_label_method = "wilson-ranking"``. Ranking
+    two same-side phases by the *magnitude* of ``kappa`` would need the number
+    itself, which ``EquationOfState`` does not expose (only the verdict); that
+    is deliberately left to a later slice rather than guessed at here.
     """
-    try:
-        identity_x = eos.phase_identity(
-            mixture=mixture,
-            temperature_K=temperature,
-            pressure_Pa=pressure,
-            composition=x.tolist(),
-            phase=_LIQUID,
-        )
-    except ModelError:
-        identity_x = None
-    try:
-        identity_y = eos.phase_identity(
-            mixture=mixture,
-            temperature_K=temperature,
-            pressure_Pa=pressure,
-            composition=y.tolist(),
-            phase=_VAPOR,
-        )
-    except ModelError:
-        identity_y = None
+    identity_x = _phase_identity_on(eos, mixture, temperature, pressure, x, branches[0])
+    identity_y = _phase_identity_on(eos, mixture, temperature, pressure, y, branches[1])
+    identities = (identity_x or branches[0], identity_y or branches[1])
 
-    if (
-        identity_x in (_LIQUID, _VAPOR)
-        and identity_y in (_LIQUID, _VAPOR)
-        and identity_x != identity_y
-    ):
-        if identity_x == _VAPOR:
-            return (_VAPOR, _LIQUID), 1.0 - beta, _LABEL_COMPRESSIBILITY
-        return (_LIQUID, _VAPOR), beta, _LABEL_COMPRESSIBILITY
+    if identity_x in (_LIQUID, _VAPOR) and identity_y in (_LIQUID, _VAPOR):
+        if identity_x != identity_y:
+            if identity_x == _VAPOR:
+                return _TwoPhaseNaming(
+                    names=(_VAPOR, _LIQUID),
+                    vapor_fraction=1.0 - beta,
+                    regime="VLE",
+                    method=_LABEL_COMPRESSIBILITY,
+                    identities=identities,
+                )
+            return _TwoPhaseNaming(
+                names=(_LIQUID, _VAPOR),
+                vapor_fraction=beta,
+                regime="VLE",
+                method=_LABEL_COMPRESSIBILITY,
+                identities=identities,
+            )
+        if identity_x == _LIQUID:
+            return _TwoPhaseNaming(
+                names=_liquid_order(x, y),
+                vapor_fraction=None,
+                regime="LLE",
+                method=_LABEL_COMPRESSIBILITY,
+                identities=identities,
+            )
 
-    return (_LIQUID, _VAPOR), beta, _LABEL_WILSON_RANKING
+    return _TwoPhaseNaming(
+        names=(_LIQUID, _VAPOR),
+        vapor_fraction=beta,
+        regime="VLE",
+        method=_LABEL_WILSON_RANKING,
+        identities=identities,
+    )
+
+
+def _phi_phi_roots(
+    eos: EquationOfState,
+    mixture: Mixture,
+    temperature: float,
+    pressure: float,
+    *,
+    feed_branch: str | None,
+    incipient_branch: str | None,
+    incipient_phase: str,
+    seed_label: str,
+) -> tuple[_PhaseRoot, _PhaseRoot]:
+    """The two per-phase root holders of a phi-phi split, pinned (ADR-0019).
+
+    ``_stability_k_seed`` sets ``K = y / x`` so that ``y`` is the phase the
+    Wilson ranking calls vapour-like. Which of ``x`` and ``y`` is therefore the
+    *feed-like* phase and which the *incipient* one depends on
+    ``incipient_phase``:
+
+    - ``incipient_phase == "vapor"``: ``K = W / z``, so ``x`` is feed-like and
+      ``y`` incipient;
+    - ``incipient_phase == "liquid"``: ``K = z / W``, so ``x`` is incipient and
+      ``y`` feed-like.
+
+    Each phase is pinned to the branch the stability test reported for the
+    phase it came from (``feed_branch`` for the feed-like phase,
+    ``phase_branch`` for the incipient one) and stays there for the whole
+    split; see :class:`chemthermo.flash._split._PhaseRoot` for why the branch
+    is held rather than re-selected per iterate. When the Rachford-Rice
+    fallback replaced the stability seed with Wilson K-values
+    (``seed_label == "wilson"``) those roles do not exist, so the historical
+    ``("liquid", "vapor")`` pinning is used instead.
+    """
+    branches: tuple[str | None, str | None]
+    if seed_label != "stability":
+        branches = (_LIQUID, _VAPOR)
+    elif incipient_phase == _VAPOR:
+        branches = (feed_branch, incipient_branch)
+    else:
+        branches = (incipient_branch, feed_branch)
+    return (
+        _PhaseRoot(eos, mixture, temperature, pressure, branch=branches[0]),
+        _PhaseRoot(eos, mixture, temperature, pressure, branch=branches[1]),
+    )
 
 
 def _flash_tp_tangent_plane(
@@ -269,6 +410,17 @@ def _flash_tp_tangent_plane(
                 "Wilson K-values bracket a Rachford-Rice root."
             )
 
+    roots_x, roots_y = _phi_phi_roots(
+        eos,
+        mixture,
+        temperature,
+        pressure,
+        feed_branch=stability.feed_branch,
+        incipient_branch=stability.phase_branch,
+        incipient_phase=incipient_phase,
+        seed_label=seed_label,
+    )
+
     split = _solve_k_loop(
         mixture,
         temperature,
@@ -288,6 +440,8 @@ def _flash_tp_tangent_plane(
         max_iter=settings.max_iter,
         allow_unconverged=settings.second_order,
         extended_rachford_rice=True,
+        roots_x=roots_x,
+        roots_y=roots_y,
     )
 
     x, y, beta = split.x, split.y, split.vapor_fraction
@@ -299,13 +453,11 @@ def _flash_tp_tangent_plane(
         # are added only on this branch: a converged first stage must produce
         # the diagnostics mapping it produced before this slice, bit for bit.
         x, y, beta, ln_f_x, ln_f_y, stage_diagnostics = _phi_phi_second_order(
-            mixture,
-            temperature,
-            pressure,
-            eos=eos,
             settings=settings,
             z=z,
             split=split,
+            roots_x=roots_x,
+            roots_y=roots_y,
         )
 
     if not 0.0 < beta < 1.0:
@@ -332,14 +484,32 @@ def _flash_tp_tangent_plane(
         residual_key="fugacity_residual",
     )
 
-    # ADR-0017: `x` is always the "liquid"-branch composition and `y` always
-    # the "vapor"-branch one (see `_split._ln_phi_function`), whatever seed
-    # orientation found them; only which *name* and which `vapor_fraction`
-    # value go with each may change here. `x`, `y` and `beta` themselves are
-    # untouched.
-    names, vapor_fraction, phase_label_method = _orient_two_phase_labels(
-        eos, mixture, temperature, pressure, x, y, beta
-    )
+    # ADR-0017 / ADR-0019: each phase converged on its *own* density root
+    # (`_split._PhaseRoot`), so the pair of branches is read back from the two
+    # holders rather than assumed to be ("liquid", "vapor"); only which
+    # *name*, which `vapor_fraction` value and which `phase_regime` go with the
+    # already-converged pair are decided here. `x`, `y` and `beta` themselves
+    # are untouched.
+    branches = (roots_x.selected or _LIQUID, roots_y.selected or _VAPOR)
+    naming = _name_two_phase_result(eos, mixture, temperature, pressure, x, y, beta, branches)
+    names = naming.names
+
+    # Conditional keys, on the same principle as ADR-0016's stage keys: a split
+    # whose two phases converged on the historical liquid/vapour pair of roots
+    # carries the diagnostics mapping it carried before ADR-0019, bit for bit,
+    # and the keys appear exactly when the per-phase selection put the phases
+    # somewhere the pre-slice code could not express. Absent means
+    # ``("liquid", "vapor")``. What is reported is the ADR-0017 *identity* of
+    # each converged root, the same quantity `feed_branch` / `phase_branch`
+    # report for the stability test - not the raw candidate label, which on a
+    # single-real-root state is a tie-break between two names for one root and
+    # would make these keys fire on states where nothing moved.
+    branch_diagnostics: dict[str, float | int | str | bool] = {}
+    if naming.identities != (_LIQUID, _VAPOR):
+        branch_diagnostics = {
+            "phase_i_branch": naming.identities[0],
+            "phase_ii_branch": naming.identities[1],
+        }
 
     post_split = _post_split_stability(
         mixture,
@@ -359,7 +529,7 @@ def _flash_tp_tangent_plane(
         y,
         beta,
         names=names,
-        vapor_fraction=vapor_fraction,
+        vapor_fraction=naming.vapor_fraction,
         diagnostics={
             **base,
             "iterations": split.iterations
@@ -371,10 +541,11 @@ def _flash_tp_tangent_plane(
             "k_max": float(np.max(split.K)),
             "phase_count": 2,
             "phase_state": "two_phase",
-            "phase_regime": "VLE",
+            "phase_regime": naming.regime,
             "k_seed": seed_label,
             "incipient_phase": incipient_phase,
-            "phase_label_method": phase_label_method,
+            "phase_label_method": naming.method,
+            **branch_diagnostics,
             **stage_diagnostics,
             **checks,
             **post_split,
@@ -383,14 +554,12 @@ def _flash_tp_tangent_plane(
 
 
 def _phi_phi_second_order(
-    mixture: Mixture,
-    temperature: float,
-    pressure: float,
     *,
-    eos: EquationOfState,
     settings: FlashSettings,
     z: np.ndarray,
     split: _SplitSolution,
+    roots_x: _PhaseRoot,
+    roots_y: _PhaseRoot,
 ) -> tuple[
     np.ndarray,
     np.ndarray,
@@ -402,10 +571,12 @@ def _phi_phi_second_order(
     """Finish an unconverged phi-phi split with the ADR-0009 Newton stage.
 
     The same Gibbs-energy minimization the liquid-liquid and modified-Raoult
-    splits use, given the EOS tangent-plane terms: ``ln phi`` on the liquid
-    root branch for phase I and on the vapor root branch for phase II, exactly
-    the branches the successive-substitution loop evaluated
-    (:func:`chemthermo.flash._split._solve_k_loop`). The derivation in
+    splits use, given the EOS tangent-plane terms: ``ln phi`` on each phase's
+    **own** density root, from the same two
+    :class:`chemthermo.flash._split._PhaseRoot` holders the
+    successive-substitution loop used (ADR-0019), so the stage continues on the
+    branches the first stage was on rather than on a fixed liquid/vapour pair.
+    The derivation in
     :func:`chemthermo.flash._second_order._second_order_split` is unchanged -
     equation (2) there holds phase by phase, and holds for ``ln phi`` for the
     same reason it holds for ``ln gamma``: the Gibbs-Duhem relation at fixed
@@ -419,8 +590,8 @@ def _phi_phi_second_order(
         ConvergenceError: If neither stage reached ``settings.tol`` on the
             equal-fugacity residual.
     """
-    terms_x = _ln_phi_function(eos, mixture, temperature, pressure, "liquid")
-    terms_y = _ln_phi_function(eos, mixture, temperature, pressure, "vapor")
+    terms_x = roots_x.ln_fugacity_terms
+    terms_y = roots_y.ln_fugacity_terms
 
     x, y, beta = split.x, split.y, split.vapor_fraction
     ln_f_x, ln_f_y = split.ln_f_x, split.ln_f_y
