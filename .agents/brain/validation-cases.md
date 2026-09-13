@@ -636,8 +636,39 @@ Rules:
   tangent-plane disagreements, 5 are Methane/Propane/n-Decane (0.7, 0.2, 0.1) at
   1.98e7-1.22e7 Pa where chemthermo splits (`tpd_min` from -5.2e-2 to -4.0e-3,
   `delta_g_split_rt < 0`) and `thermo` returns `VF = 0`; those 5 disagree with
-  `thermo` **before and after** this slice, so they are not caused by it and are
-  left open. The 6th is the near-critical Methane/n-Pentane state below.
+  `thermo` **before and after** this slice, so they are not caused by it. They
+  are now **adjudicated** (see below) rather than left open. The 6th is the
+  near-critical Methane/n-Pentane state below.
+- **Adjudication of the 5 Methane/Propane/n-Decane disagreements:** at
+  (T, P) = (270 K, 1.22e7 Pa), (300 K, 1.5e7 Pa), (330 K, 1.98e7 Pa),
+  (360 K, 1.5e7 Pa) and (450 K, 1.5e7 Pa), `thermo`'s own fugacity model says
+  the feed is unstable too, so the disagreement is a `thermo` stability-*search*
+  miss, not a chemthermo error. Method: build a `thermo` `PRMIX` `CEOSLiquid`
+  with chemthermo's own `Tc`, `Pc` and `omega` (`kij = 0`, the same constants
+  `flash_tp` used), take chemthermo's `stability_tp` minimizing trial
+  composition `w`, and evaluate `tpd(w) = sum_i w_i [ln w_i + ln phi_i(w) -
+  ln z_i - ln phi_i(z)]` using *thermo's* `lnphis_at_zs(zs, most_stable=True)`
+  (the minimum-Gibbs root) at both `w` and the feed `z`. Results (chemthermo
+  `tpd_min` vs. thermo-evaluated tpd at `w`, both negative; thermo `FlashVL`
+  `VF` at each state):
+
+  | T (K) | P (Pa) | chemthermo `tpd_min` | thermo tpd at `w` | thermo `VF` |
+  | --- | --- | --- | --- | --- |
+  | 270 | 1.22e7 | -5.278114e-2 | -5.278752e-2 | 0.0 |
+  | 300 | 1.5e7  | -3.909584e-2 | -3.910660e-2 | 0.0 |
+  | 330 | 1.98e7 | -6.908276e-3 | -6.914199e-3 | 0.0 |
+  | 360 | 1.5e7  | -4.712275e-2 | -4.713469e-2 | 0.0 |
+  | 450 | 1.5e7  | -3.590357e-2 | -3.593922e-2 | 0.0 |
+
+  All 5 pairs agree to within 6.6e-5 absolute (the known rounded-PR-constants
+  gap between the two implementations); `thermo`'s own model puts a negative
+  tpd at chemthermo's stationary point in every case, and chemthermo's
+  `flash_tp` split lowers the Gibbs energy (`delta_g_split_rt < 0`) at all 5.
+  Asserted (not just recorded, with a 5e-5 absolute tolerance on the tpd match)
+  in `tests/validation/test_flash_thermo_disagreements_adjudicated.py`, which
+  is skipped if `thermo` is not installed and records `thermo`'s `VF` without
+  asserting its value, so the test stays valid (and prints a note instead of
+  failing) if a future `thermo` release finds the split.
 - **Regression:** over the 47 states of the in-repo grid
   (`tests/test_flash_phase_detection.py`) where both paths find two phases, the
   worst relative vapor-fraction difference is **8.60e-07** (asserted < 1e-6).
@@ -654,7 +685,9 @@ Rules:
   the same EOS with its own stability test and phase-split solver.
 - **Test path:** `tests/validation/test_flash_phase_detection_vs_thermo.py`,
   `tests/test_flash_phase_detection.py::test_both_paths_agree_on_every_state_where_both_find_two_phases`,
-  `tests/test_flash_phase_detection.py::test_legacy_path_reproduces_the_pre_slice_numbers_exactly`.
+  `tests/test_flash_phase_detection.py::test_legacy_path_reproduces_the_pre_slice_numbers_exactly`,
+  `tests/validation/test_flash_thermo_disagreements_adjudicated.py` (the 5
+  Methane/Propane/n-Decane adjudication above).
 - **Script:** `examples/basic/flash_tp_auto_phase_demo.py`,
   `examples/validation/00_reference_case.py`.
 
