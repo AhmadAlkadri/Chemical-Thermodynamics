@@ -73,6 +73,8 @@ construction - happens **outside** the timed region. What is timed is
 | --- | --- |
 | `baseline_3ce68df.json` | the reference paths before the `perf-baseline-and-root-reuse` optimizations |
 | `after_2ca41bf.json` | the same workload after them |
+| `baseline_d8814de.json` | the same workload before the ADR-0030 call-local solve memo |
+| `after_07bf0b3.json` | the same workload after it |
 
 Both were measured on the machine named in their own `environment` block
 (Apple M2 Max, Python 3.11.6, numpy 2.4.2), five timed repeats per case, **47
@@ -103,6 +105,93 @@ equation-of-state ratios against that, not against 1.00x exactly.
 
 **Wall times are not portable** between machines. The `result_hash` *is*, and
 is what a comparison on a different machine can still assert.
+
+## The ADR-0030 pair, and a measurement that had to be made differently
+
+`baseline_d8814de.json` / `after_07bf0b3.json` measure the call-local
+equation-of-state solve memo of ADR-0030. They were taken back to back on one
+machine, as the rule requires, and **the machine was not quiet**: an unrelated
+process held about eight of its twelve cores for the whole session. Read the
+three activity-model controls first, because they are what that looks like -
+they touch none of the code this slice changes and they still scatter across
+1.02x, 0.96x and 1.03x at nine timed repeats, against the 1.00x / 1.04x / 1.02x the same three read for
+ADR-0023 on a quiet machine.
+
+```
+case                           before / s    after / s   speedup  result
+------------------------------------------------------------------------------
+modified-raoult-vle              0.024677     0.024191     1.02x  identical
+nrtl-lle-tessier-p1              0.057287     0.059526     0.96x  identical
+pcsaft-lle-water-hexane          1.595234     1.324830     1.20x  identical
+pcsaft-polymer-lle               0.994039     0.851818     1.17x  identical
+pcsaft-vle-methane-hexane        0.216429     0.178299     1.21x  identical
+pr-flash-grid-24                 0.158998     0.120641     1.32x  identical
+pr-flash-ternary                 0.016810     0.013450     1.25x  identical
+pr-stability-ternary             0.004402     0.004119     1.07x  identical
+vlle-364k                        0.137144     0.133123     1.03x  identical
+
+result hashes identical across every shared case
+```
+
+A second measurement was made because of that, and it is the better estimate of
+what the change is worth: **the same workload run in one process with the two
+arms interleaved repeat by repeat**, the only difference between them being
+whether the models' memo lookup returns the call's memo or `None` (the
+pre-ADR-0030 path). Both arms then take the same contention, milliseconds
+apart, 11 repeats each:
+
+| case | off / ms | on / ms | ratio | per-repeat spread |
+| --- | ---: | ---: | ---: | --- |
+| `pr-flash-ternary` | 13.77 | 13.41 | 1.027x | 1.01x .. 1.03x |
+| `pr-stability-ternary` | 4.17 | 4.10 | 1.018x | 1.01x .. 1.02x |
+| `pr-flash-grid-24` | 125.67 | 126.70 | 0.992x | 0.94x .. 1.14x |
+| `nrtl-lle-tessier-p1` (control) | 52.64 | 54.03 | 0.974x | 0.82x .. 1.33x |
+| `modified-raoult-vle` (control) | 22.88 | 24.95 | 0.917x | 0.74x .. 1.13x |
+| `vlle-364k` (control) | 133.49 | 132.40 | 1.008x | 0.63x .. 1.12x |
+| `pcsaft-vle-methane-hexane` | 190.01 | 146.00 | 1.301x | 1.23x .. 1.31x |
+| `pcsaft-lle-water-hexane` | 1363.89 | 1233.82 | 1.105x | 1.01x .. 1.25x |
+| `pcsaft-polymer-lle` | 924.09 | 801.81 | 1.153x | 1.05x .. 1.22x |
+
+Where the two disagree, believe the interleaved one. The committed pair's
+Peng-Robinson ratios (1.25x and 1.32x) are larger than the interleaved
+measurement supports (1.03x and 0.99x, and 1.10x / 1.04x on a second
+31-repeat run): the cubic solve is about a sixth of a Peng-Robinson
+`fugacity_coefficients` call - ADR-0023 measured 8.6 us of 34.8 us - so
+removing a quarter of the solves cannot be worth 30 %. The PC-SAFT cases agree
+between the two measurements to within their spreads: **1.10x - 1.30x**, and
+that is the honest range.
+
+**All nine result hashes are identical**, which is the part of the comparison a
+loaded machine cannot corrupt, and it is the part the acceptance rule is
+actually about.
+
+Because the wall times are not trustworthy here, this slice's ratio is stated
+from something that is: the **number of solves** the same fixed workload makes,
+counted with the models' memo lookup returning `None` and with it active. These
+are integers, they are a property of the workload rather than of the machine,
+and they reproduce exactly on any hardware.
+
+| case | PC-SAFT density solves off -> on | PR cubic solves off -> on |
+| --- | ---: | ---: |
+| `pr-flash-ternary` | - | 230 -> 187 (-18.7 %) |
+| `pr-stability-ternary` | - | 84 -> 73 (-13.1 %) |
+| `pr-flash-grid-24` | - | 2203 -> 1679 (-23.8 %) |
+| `nrtl-lle-tessier-p1` (control) | 0 -> 0 | 0 -> 0 |
+| `modified-raoult-vle` (control) | 0 -> 0 | 0 -> 0 |
+| `vlle-364k` (control) | 0 -> 0 | 0 -> 0 |
+| `pcsaft-vle-methane-hexane` | 137 -> 102 (-25.5 %) | - |
+| `pcsaft-lle-water-hexane` | 275 -> 238 (-13.5 %) | - |
+| `pcsaft-polymer-lle` | 601 -> 512 (-14.8 %) | - |
+
+The three controls making zero solves either way is the control working: no
+activity-coefficient evaluation is memoized, deliberately, so that they go on
+running the same code before and after (ADR-0030 decision 6).
+
+A **three-phase equation-of-state case was considered for the workload and not
+added**: one such state costs 13-40 s, so at five timed repeats plus a warm-up
+it would turn this half-minute instrument into a five-minute one. ADR-0030
+measures the three-phase effect directly instead, and ledger Case B-2 records
+it.
 
 ## Adding a case
 
@@ -149,23 +238,32 @@ ADR-0027 before using it to justify anything.
 
 | file | what it is |
 | --- | --- |
-| `robustness_64831bd.json` | the full 2505-state sweep at `64831bd` |
-| `robustness_64831bd.md` | its summary table |
+| `robustness_f852726.json` | the full 2505-state sweep at `f852726` (ADR-0030) |
+| `robustness_f852726.md` | its summary table |
+| `robustness_64831bd.md` | the summary of the superseded `64831bd` sweep, the *before* measurement for ADR-0030 |
 | `robustness_74820b8.md` | the summary of the superseded `74820b8` sweep, the *before* measurement for ADR-0029 |
 | `robustness_9adf390.md` | the summary of the superseded `9adf390` (2110-state) sweep |
 | `robustness_87f0820.md` | the summary of the superseded `87f0820` sweep |
 
-At `64831bd`: **2500 of 2505 states converge, 5 refuse, 0 converge and violate an invariant**. The 9 `multiphase-solver-failure` states
-`eos-three-phase` refused at `74820b8` are repaired (ADR-0029, ledger Case
-P-18), so what is left is the deprecated `gamma-phi-legacy` path's 5
+At `f852726`: **2500 of 2505 states converge, 5 refuse, 0 converge and violate an invariant**, unchanged from `64831bd` - the ADR-0030 call-local solve
+memo is a performance change and the whole sweep was re-run to say so. The
+comparison is **0 differences over all 2505 states and every aggregate field**,
+wall time excluded, which is the strongest of this repository's three
+bit-identity gates because it is the widest. The 9 `multiphase-solver-failure`
+states `eos-three-phase` refused at `74820b8` were repaired by ADR-0029 (ledger
+Case P-18), so what is left is the deprecated `gamma-phi-legacy` path's 5
 `rr-no-bracket` states, which are by design (ADR-0016 decision 8) and are
-pinned as such rather than as a defect queue. Every state that converged at
-`74820b8` is unchanged, checked field by field.
+pinned as such rather than as a defect queue.
 
-`robustness_74820b8.json` and `robustness_9adf390.json` were pruned when their
-successors superseded them, per the pruning policy at the end of this section;
-their `.md` summaries are kept, because the counts in them are what ADR-0027,
-ADR-0028, ADR-0029 and Cases R-MAP-1 / R-MAP-2 / P-17 quote.
+The sweep itself read **2017.3 s (33:37)** against 2202.5 s (36:43) at
+`64831bd`. Both were taken on a loaded machine in different sessions, so read
+that pair as indicative of the direction and not as a ratio.
+
+`robustness_64831bd.json`, `robustness_74820b8.json` and
+`robustness_9adf390.json` were pruned when their successors superseded them,
+per the pruning policy at the end of this section; their `.md` summaries are
+kept, because the counts in them are what ADR-0027, ADR-0028, ADR-0029,
+ADR-0030 and Cases R-MAP-1 / R-MAP-2 / P-17 / P-18 quote.
 
 Adding a system or a state to `chemthermo/bench/robustness.py` is a normal
 change - unlike the timing workload above, this grid is *meant* to grow -
