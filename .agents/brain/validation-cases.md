@@ -3656,7 +3656,17 @@ recorded in Case P-10; the binary window is Case P-9.
   the slice design anticipated there was therefore **not added**: there is no
   measured failure behind it.
 
-### (vi) A gap in the phi-phi split, pinned and not patched
+### (vi) A gap in the phi-phi split, pinned and not patched - **RESOLVED by ADR-0024**
+
+> **Amendment (slice `pcsaft-polymer-vle`, ADR-0024).** Both states below now
+> converge and are pinned the other way round in **Case P-14**. The text is
+> kept as written because it is the measured record of what the pre-ADR-0024
+> code produced, and because the diagnosis in it - "a gap in the split, not a
+> property of the polymer support" - is what the fix turned out to confirm. The
+> two numbered facts that changed: `flash_tp` at 1 and 2 MPa returns a verified
+> vapour-liquid split, and the ternary at 3 MPa returns a verified
+> liquid-liquid one. The named later candidate
+> `pcsaft-polymer-vle-ethylene` was delivered as `pcsaft-polymer-vle`.
 
 - **Below about 3 MPa** at 453 K, n-pentane is subcritical and the mixture has
   **two** density roots, so the equilibrium in question is vapour-liquid rather
@@ -3683,7 +3693,8 @@ recorded in Case P-10; the binary window is Case P-9.
   in the example; FeOs's chemical potentials; FeOs's own flash where it
   converges.
 - **Negative control:** two states that must keep raising (`1 MPa` binary,
-  `3 MPa` ternary), the 155-state bit-identity fixture, which does not move,
+  `3 MPa` ternary) - **superseded by Case P-14**, where the same two states are
+  the positive result; the 155-state bit-identity fixture, which does not move,
   and the guard instrumentation showing the log-space route is dormant on every
   pre-ADR-0022 state.
 - **Test path:** `tests/test_pcsaft_polymer.py` (23 by default, 5 `slow`),
@@ -3692,6 +3703,198 @@ recorded in Case P-10; the binary window is Case P-9.
 - **Script:** `examples/basic/pcsaft_polymer_demo.py` (about 5 s; `--full` for
   the cloud-point bisection and the `Mw = 53000` chain) and
   `examples/validation/20_pcsaft_polymer_vs_feos.py`.
+
+---
+
+## Case P-14: The polyethylene / n-pentane vapour-liquid split, in log mole numbers
+
+- **Source:** a **one-dimensional** equal-fugacity solve written independently
+  in the test, in the validation test and in the example (the vapour taken as
+  *exactly* pure solvent, one unknown carried as `ln x_solvent`,
+  finite-difference Newton started a thousandth away from `flash_tp`'s answer);
+  **FeOs 0.10.1** chemical potentials at chemthermo's converged phases and
+  densities.
+- **Location:** `chemthermo/flash/_log_space.py` (new),
+  `chemthermo/flash/_detect.py`; slice `pcsaft-polymer-vle` (ADR-0024). No
+  model equation and no stability-solver equation changed.
+- **Parameters and provenance:** exactly Case P-13's - `k_ij = -0.006` for
+  routes that use one, `k_ij = 0` for every FeOs comparison because feos 0.10.1
+  cannot be given one from Python. Nothing here is compared against
+  measurement.
+- **Assumptions:** monodisperse polymer; 453.0 K throughout; feeds stated as
+  polymer **mass** fractions.
+
+### (i) The three vapour-liquid states, and what they are
+
+The feed is `z = (2.3148042237948336e-04, 0.9997685195776205)` (5 wt% polymer).
+Below about 2.59 MPa the mixture has two density roots at the feed, the
+min-Gibbs one is the **vapour**, and the answer is a solvent vapour over a
+solvent-swollen melt. All three converge with `k_seed = "stability-log"` and
+`converged_stage = "second-order-log"`; both phases are named from a measured
+compressibility.
+
+| P / MPa | melt `x` (polymer, solvent) | melt, wt% solvent | melt phase fraction | `ln y_polymer` | log-space iterations |
+| --- | --- | --- | --- | --- | --- |
+| 0.5 | `(0.06482279502229682, 0.9351772049777032)` | 5.97 | 0.003570972561424801 | **-466.9816656241** | 7 |
+| 1.0 | `(0.02853164733532448, 0.9714683526646756)` | 13.03 | 0.008113111018756114 | **-450.5307940617** | 12 |
+| 2.0 | `(0.008772681701263427, 0.9912273182987366)` | 33.20 | 0.026386506459723290 | **-408.9441806100** | 31 |
+
+- Residuals, in the same order: `fugacity_residual` 5.68e-13 / 7.39e-13 /
+  2.27e-13 (identical to the stage's own `log_space_residual` here, because no
+  mole fraction underflowed); `mass_balance_residual` 2.77e-18 / 1.22e-18 /
+  3.52e-19; `delta_g_split_rt` -1.0575e-01 / -1.0172e-01 / -9.1180e-02; every
+  phase post-split **stable**.
+- The compressibility identity of ADR-0017, computed from the public
+  `pressure_Pa` routine rather than from `phase_identity`: vapour `kappa`
+  1.0680 / 1.1603 / 1.5282, melt `kappa` 0.0011 / 0.0024 / 0.0068 against the
+  0.5 threshold.
+- **Before ADR-0024** every one of these raised `ConvergenceError`
+  (Case P-13 (vi)).
+
+### (ii) The independent one-dimensional solve
+
+- **Expected outcome:** because the vapour is pure solvent to `1e-196`, the
+  melt must satisfy `ln phi_s^V(pure solvent vapour) = ln x_s + ln phi_s^L(x)`
+  exactly, in one unknown. Nothing of the flash is used - no stability test,
+  no Rachford-Rice, no stage, no phase-count logic.
+- **Achieved:** `|x_solvent(flash) - x_solvent(1-D)|` = **2.53e-14** (0.5 MPa),
+  **5.55e-15** (1 MPa), **1.22e-15** (2 MPa), against an asserted 1e-10. The
+  flash's own vapour-phase solvent fugacity equals the pure-solvent value to
+  better than 1e-08 at all three.
+- **The polymer's own condition**, which cannot be written in linear mole
+  numbers at all: `ln x_PE + ln phi_PE^L` = **-492.6311005272** (0.5 MPa),
+  **-504.1563775561** (1 MPa), **-530.5415518401** (2 MPa), against
+  `ln y_PE + ln phi_PE^V` to **5.68e-13 / 7.39e-13 / 2.27e-13**.
+
+### (iii) FeOs at chemthermo's phases
+
+- **Achieved** (`k_ij = 0` on both sides, the flash re-run there): the worst
+  `|d mu_i / RT|` between the two phases over the three states is
+  **2.615e-12** with FeOs's fourteen-figure universal constants substituted
+  into chemthermo, and **2.537e-07** as shipped. The difference between those
+  two is the constants table, not the model - the same floor Cases P-6 to P-12
+  record. Asserted 1e-08 with matched constants.
+- FeOs evaluates a state at `y_polymer = 1e-196` without complaint, and
+  reproduces `P` at both of chemthermo's densities to 1e-06 relative.
+
+### (iv) An exactly zero mole fraction
+
+- For `Mw = 53000` (`m = 1393.9`) at 2 MPa the vapour's polymer mole fraction
+  is `exp(-1314.9852395489)`, which is **not a double**. The result carries
+  `y = (0.0, 1.0)`, `diagnostics["log_space_zero_fractions"] = 1` and the
+  logarithm in `["log_space_ln_x_min"]` (ADR-0024 decision 3). The melt is
+  `(0.0027736965292611865, 0.9972263034707388)` at a phase fraction of
+  0.025828116111173305.
+- Two consequences, both measured: the material balance is **exact** rather
+  than approximate (`1.11e-16`, i.e. round-off in the sum only), because the
+  melt holds every mole of polymer the feed had; and `fugacity_residual`
+  (2.29e-14) does **not** see the polymer, because it is taken over components
+  present in both phases - the stage's own `log_space_residual` (9.09e-13)
+  does. `delta_g_split_rt = -9.2125e-02`, post-split stable.
+- This state reached the log-space stage through the *third* trigger: the
+  K-loop raised `ModelError` because the two phases' `ln phi` differ by more
+  than the exponential's range.
+
+### (v) The ternary, and the second entry point
+
+- Polyethylene / n-pentane / n-hexane,
+  `z = (2.519896558373394e-04, 0.5441741521284267, 0.45557385821573587)`, 3 MPa:
+  before ADR-0024 successive substitution converged on the **trivial**
+  solution (`x = y` to twelve figures, `beta = -6.33e+10`) and `flash_tp`
+  raised. Handing that to the second-order stage gives two liquids,
+  `(1.3272336238799715e-03, 0.5402484470355627, 0.45842431934055733)` at a
+  phase fraction of 0.18872173701842598 and
+  `(1.863504765793684e-06, 0.5450873602321722, 0.45491077626306187)` at
+  0.811278262981574, with `fugacity_residual` 6.82e-13,
+  `mass_balance_residual` 5.55e-17, `delta_g_split_rt = -4.5325e-04`,
+  post-split stable.
+- The stage used is the **linear** one (`converged_stage = "second-order"`, no
+  `log_space_*` keys): no composition here is outside machine range. That is
+  what makes this state the evidence that the two ADR-0024 entry points are
+  separate.
+
+### (vi) Verdict continuity across the whole pressure range
+
+- 25 pressures from 0.3 to 12 MPa at 453 K, 5 wt%, `k_ij = -0.006`, **no
+  `ConvergenceError` anywhere**:
+
+  | range | verdict | stage |
+  | --- | --- | --- |
+  | 0.300 - 2.250 MPa (5 points) | VLE | `second-order-log` |
+  | 2.737 - 8.100 MPa (12 points) | LLE | `second-order` |
+  | 8.588 - 9.562 MPa (3 points) | LLE | successive substitution |
+  | 10.050 - 12.000 MPa (5 points) | single liquid | - |
+
+- The single-phase switch is Case P-13 (i)'s cloud point, **9.7518 MPa**,
+  unchanged. Bisecting the VLE / LLE change of character to 1 kPa puts it
+  between **2.5868 and 2.5873 MPa**; both sides return `delta_g_split_rt < 0`
+  (-4.1536e-03 and -4.1421e-03) and are post-split stable. What changes there
+  is the *density root* the incipient phase sits on, and it is a property of
+  the model rather than of the route: running the same two states through the
+  Wilson-seeded successive-substitution path instead of the log-space one
+  reproduces both answers to the printed digits.
+- **Only the VLE band is new.** Instrumented pressure by pressure, the LLE band
+  takes exactly the path it took before ADR-0024 (the second-order stage from a
+  stability seed, or successive substitution alone above 8.5 MPa), which is why
+  the 8 MPa numbers of Case P-13 (ii) and the `pcsaft-polymer-lle` benchmark
+  hash are unchanged.
+
+### (vii) The two entry points reach the same answer
+
+- Forcing the Wilson K-seed at 1 MPa sends the same state down the other route:
+  one successive-substitution step, a linear second-order stage that spends its
+  whole 100-iteration budget, and only then the log-space stage seeded from
+  that failed iterate. It converges to
+  `x_solvent = 0.9714683526646756` and `ln y_PE = -450.5307940616794`, against
+  `0.9714683526646756` and `-450.5307940616726` from the stationary-point seed:
+  **agreement to the thirteenth figure of a quantity 450 decades below
+  machine-representable**, from two seeds and two code paths.
+- Seed-independence of the stage itself: the same split comes back from
+  `n = 0.5 z`, `0.9 z` and `0.99 z` - three starting points that know nothing
+  about the model - to `rel=1e-12` on both quantities.
+
+### Negative controls and what is *not* claimed
+
+- **Dormancy.** No state that converged before ADR-0024 carries a single
+  `log_space_*` key: asserted for Peng-Robinson methane/ethane at 240 K /
+  3 MPa, PC-SAFT water/n-hexane at 298.15 K / 1 atm and the Case P-13 polymer
+  liquid-liquid split at 8 MPa.
+- **The fixture did not move.** `refactor_bit_identity_v3.json` (155 states)
+  passes unchanged and was **not** regenerated. All nine ADR-0023 benchmark
+  cases report **identical result hashes**.
+- **A remaining limitation, pinned rather than worked around.** `Mw = 53000` at
+  0.5 and 1 MPa still raises. The cause is upstream of this slice:
+  `stability_tp`'s deepest stationary point there is a shallow *vapour-side*
+  one (`tpd_min` = -1.05e-04 and -3.38e-04), so the melt is never found and the
+  stage is seeded 1300 orders of magnitude from the answer. That is a
+  **stability trial set** limitation for `m = 1393.9`.
+- **Nothing here is compared against measurement.** The parameters are the
+  Case P-12 fixture, the `k_ij` was fitted elsewhere, and the polymer is
+  modelled as monodisperse.
+- **Tolerance:** asserted 1e-10 absolute on the melt's solvent mole fraction
+  against the 1-D solve (achieved 2.53e-14); 1e-12 on the mass balance
+  (achieved 2.77e-18); 1e-08 on the fugacity residual and on the log-space
+  residual (achieved 7.39e-13 / 9.09e-13); 1e-08 on the polymer's log fugacity
+  (achieved 7.39e-13); `dG < 0` and post-split stable at every state; 1e-08 on
+  FeOs's chemical potentials with matched constants (achieved 2.615e-12);
+  `rel=1e-12` on seed-independence.
+- **Independent route:** the one-dimensional equal-fugacity solve, written
+  three times over (unit test, validation test, example); FeOs's chemical
+  potentials; and the Wilson-seeded path, which is an independent *solver* path
+  to the same state.
+- **Suite time:** `pytest -q` **224.17 s for 809 tests at `5949a8e` -> 237.18 s
+  (3:57) for 830**, uncontended on the one machine; `pytest -q -m slow`
+  **694.93 s (11:34) for 34 tests**, against 691.22 s for 28 at the previous
+  slice. 27 tests added, none removed; the six marked `slow` are all
+  *repetitions* of a map point the default run already covers (another pressure
+  on the same three-state map, another model on the same dormancy check).
+- **Test path:** `tests/test_flash_log_space_stage.py` (15 by default, 2
+  `slow`), `tests/test_pcsaft_polymer.py` (23 by default, 5 `slow`),
+  `tests/validation/test_pcsaft_polymer_vle_vs_feos.py` (5 by default, 4
+  `slow`).
+- **Script:** `python examples/validation/21_pcsaft_polymer_vle.py` (routes 1,
+  2, 3 and 5 need no optional dependency; about 5 s; `--full` adds the 25-point
+  pressure scan and the bisected VL/LL boundary, about 30 s).
 
 ---
 

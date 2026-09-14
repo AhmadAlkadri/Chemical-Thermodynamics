@@ -368,6 +368,26 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
     says so and still exits 0). About 4 s by default; `--full` adds the
     FeOs-flash survey across 3-15 MPa, the `Mw = 53000` chain and the bisected
     cloud point (about 20 s).
+- `examples/validation/21_pcsaft_polymer_vle.py`
+  - **Polymer/solvent vapour-liquid equilibrium** (ADR-0024, validation Case
+    P-14), with PASS/FAIL per check. Below n-pentane's saturation pressure at
+    453 K the polyethylene / n-pentane equilibrium is a solvent vapour over a
+    solvent-swollen melt, the vapour's polymer mole fraction is `exp(-450)`,
+    and `flash_tp` reaches it only by seeding and finishing the split in log
+    mole numbers. Five routes: the split itself at 0.5, 1 and 2 MPa with both
+    phases named from a measured compressibility and every residual reported;
+    a one-dimensional equal-fugacity solve written in the script, with the
+    vapour taken as *exactly* pure solvent, which reproduces the melt's solvent
+    content to 1.2e-15 - 2.5e-14 absolute; the polymer's own equal-fugacity
+    condition checked in logarithms (`ln f` of about -500, closing to 7.4e-13);
+    FeOs's chemical potentials at chemthermo's converged phases (2.6e-12 with
+    matched universal constants, 2.5e-07 as shipped, at `k_ij = 0` because
+    feos 0.10.1 cannot be given one); and the ternary with n-hexane at 3 MPa,
+    the second state ADR-0022 pinned as a runaway. Routes 1, 2, 3 and 5 run
+    without `feos` (the script says so and still exits 0). About 5 s by
+    default; `--full` adds the 25-point pressure scan from 0.3 to 12 MPa - the
+    VLE -> LLE -> single-liquid verdict sequence - and the bisected
+    vapour-liquid / liquid-liquid boundary (about 30 s).
 - `examples/validation/*.py`
   - Optional validation sweeps against `thermo` (requires `pip install -e ".[validation]"`).
   - CSV output is disabled by default; pass `--outdir <dir>` or set `CHEMTHERMO_OUTDIR`.
