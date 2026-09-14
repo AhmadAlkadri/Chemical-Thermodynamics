@@ -479,13 +479,17 @@ def test_the_modified_raoult_trial_set_names_one_surface_per_trial(propanol_wate
     ]
 
 
-def test_the_other_two_families_name_no_surface(butanol_water) -> None:
+def test_the_activity_only_family_names_no_surface(butanol_water) -> None:
     """The bit-identity guard at its source: no surface means the old iteration.
 
     An estimate that carries no surface makes the solver call
-    `ln_fugacity_terms` exactly as it did before ADR-0012, so the equation-of-
-    state and activity-only paths are untouched. The whole-result version of
-    this statement is `tests/test_flash_refactor_bit_identity.py`.
+    `ln_fugacity_terms` exactly as it did before ADR-0012, so the activity-only
+    path is untouched. The whole-result version of this statement is
+    `tests/test_flash_refactor_bit_identity.py`.
+
+    The equation-of-state family *did* take surfaces, in ADR-0021; its
+    counterpart to this test is
+    `tests/test_stability_eos_surfaces.py::test_every_multicomponent_eos_trial_names_the_root_its_start_estimates`.
     """
     ll_names, ll_model = butanol_water
     activity = _ActivityTangentPlane(
@@ -493,15 +497,6 @@ def test_the_other_two_families_name_no_surface(butanol_water) -> None:
     )
     z = np.array([0.2, 0.8])
     assert all(estimate.surface is None for estimate in activity.initial_estimates(z, z > 0.0))
-
-    eos = _EOSTangentPlane(
-        ct.PengRobinsonEOS(),
-        mixture=_mixture(("Methane", "Ethane"), (0.5, 0.5)),
-        temperature=240.0,
-        pressure=3.0e6,
-    )
-    zz = np.array([0.5, 0.5])
-    assert all(estimate.surface is None for estimate in eos.initial_estimates(zz, zz > 0.0))
 
     result = ct.stability_tp(
         _mixture(ll_names, (0.2, 0.8)),
@@ -512,15 +507,6 @@ def test_the_other_two_families_name_no_surface(butanol_water) -> None:
     assert all(trial.surface is None for trial in result.trials)
     assert all(trial.surface_fallback is False for trial in result.trials)
     assert "trial_surfaces" not in result.diagnostics
-
-    eos_result = ct.stability_tp(
-        _mixture(("Methane", "Ethane"), (0.5, 0.5)),
-        temperature_K=240.0,
-        pressure_Pa=3.0e6,
-        eos=ct.PengRobinsonEOS(),
-    )
-    assert all(trial.surface is None for trial in eos_result.trials)
-    assert "trial_surfaces" not in eos_result.diagnostics
 
 
 def test_the_vapor_surface_is_reached_in_one_substitution(near_plait_ternary) -> None:
@@ -670,18 +656,18 @@ def test_an_unavailable_optional_surface_falls_back_and_says_so() -> None:
             return np.full(composition.shape, -0.25)
 
     w = np.array([0.4, 0.6])
-    terms, label, fell_back = _select_surface(
+    evaluated = _select_surface(
         (_Missing(), _Present()), w, "vapor", failure_message="no candidate"
     )
-    assert fell_back is True
-    assert label == "liquid"
-    assert np.array_equal(terms, np.full(2, -0.25))
+    assert evaluated.fell_back is True
+    assert evaluated.label == "liquid"
+    assert np.array_equal(evaluated.terms, np.full(2, -0.25))
 
-    terms, label, fell_back = _select_surface(
+    evaluated = _select_surface(
         (_Missing(), _Present()), w, "liquid", failure_message="no candidate"
     )
-    assert fell_back is False
-    assert label == "liquid"
+    assert evaluated.fell_back is False
+    assert evaluated.label == "liquid"
 
 
 def test_the_pure_water_trial_stalls_near_the_plait_point(near_plait_ternary) -> None:

@@ -13,7 +13,7 @@ Every field a caller of ``flash_tp`` can observe - phase names, every phase's
 composition, phase fractions, ``vapor_fraction`` and the full ``diagnostics``
 mapping - is captured for a fixed set of states and pinned, bit-for-bit
 (floats compared with ``==``, ints/bools/strings exact), against
-``tests/fixtures/flash/refactor_bit_identity_v2.json``.
+``tests/fixtures/flash/refactor_bit_identity_v3.json``.
 
 Fixture history:
 
@@ -24,7 +24,7 @@ Fixture history:
   ``test(flash): capture pre-refactor bit-identity fixture`` commit versus
   ``refactor(flash): split tp.py into single-purpose internal modules``. It
   stayed the active fixture through ADR-0008 - ADR-0016.
-- ``refactor_bit_identity_v2.json`` (this test) was regenerated for ADR-0017:
+- ``refactor_bit_identity_v2.json`` was regenerated for ADR-0017:
   every one of the 155 states was audited state by state against v1 first (see
   validation Case F-5 in ``.agents/brain/validation-cases.md`` for the full
   table) - 46 phi-phi grid states changed, all single-phase, all a min-Gibbs
@@ -33,9 +33,25 @@ Fixture history:
   ``1.0 -> 0.0`` and a new ``diagnostics["phase_label_method"] =
   "compressibility"`` key; every other field of every one of the 155 states -
   compositions, phase-fraction *values*, every other diagnostics number - is
-  unchanged. ``refactor_bit_identity_v1.json`` is kept in the repository
-  (unreferenced by this test) so that history - what ADR-0008's tie-break
-  actually produced - stays inspectable.
+  unchanged. It stayed the active fixture through ADR-0020.
+- ``refactor_bit_identity_v3.json`` (this test) was regenerated for ADR-0021,
+  which pins each equation-of-state stability trial to one density root. All
+  155 states were audited state by state against v2 first (validation Case
+  P-11 in ``.agents/brain/validation-cases.md`` carries the full table):
+  **122 states are bit-identical to v2**; **18** changed one field and one
+  only, ``diagnostics["tpd_min"]`` going from ``0.0`` (the value the summary
+  reports when no non-trivial stationary point was reachable) to a
+  **positive** number, because a vapour-root-pinned trial now reaches a real
+  stationary point that lies *above* the tangent plane - all 18 are
+  single-phase ``"stable"`` states, and a positive ``tpd_min`` decides nothing;
+  the remaining **15** changed only in the last bits of iterative quantities
+  (worst composition move ``1.1e-16``, worst diagnostics move ``5.3e-15``,
+  against an audited tolerance of ``1e-09``). No state changed its phase names,
+  its phase set, any composition or any phase fraction beyond those last bits,
+  and no state gained or lost a diagnostics key.
+  ``refactor_bit_identity_v1.json`` and ``..._v2.json`` are both kept in the
+  repository (unreferenced by this test) so that history - what ADR-0008's
+  tie-break and what ADR-0017's labels actually produced - stays inspectable.
 
 States captured (see :func:`_build_states`):
 
@@ -69,7 +85,7 @@ from typing import Any, Callable, Sequence
 import chemthermo as ct
 
 FIXTURE_PATH = (
-    Path(__file__).resolve().parent / "fixtures" / "flash" / "refactor_bit_identity_v2.json"
+    Path(__file__).resolve().parent / "fixtures" / "flash" / "refactor_bit_identity_v3.json"
 )
 
 EOS = ct.PengRobinsonEOS()
@@ -253,10 +269,10 @@ def _build_states(
     return states
 
 
-def test_flash_tp_is_bit_identical_to_the_v2_capture(
+def test_flash_tp_is_bit_identical_to_the_v3_capture(
     tessier2000_names: list[str], tessier2000_model: ct.NRTL
 ) -> None:
-    """Pinned against ``refactor_bit_identity_v2.json`` (ADR-0017; see module docstring)."""
+    """Pinned against ``refactor_bit_identity_v3.json`` (ADR-0021; see module docstring)."""
     with FIXTURE_PATH.open("r", encoding="utf-8") as handle:
         fixture: dict[str, dict[str, Any]] = json.load(handle)
 

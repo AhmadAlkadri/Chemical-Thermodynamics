@@ -661,7 +661,7 @@ def test_no_bit_identity_fixture_state_carries_a_phase_search_key() -> None:
     those states carries a diagnostics key the search produces, so the fixture
     itself is evidence that the new code path is not reached by any of them.
     """
-    path = Path(__file__).resolve().parent / "fixtures" / "flash" / "refactor_bit_identity_v2.json"
+    path = Path(__file__).resolve().parent / "fixtures" / "flash" / "refactor_bit_identity_v3.json"
     with path.open(encoding="utf-8") as handle:
         fixture = json.load(handle)
     assert len(fixture) == 155
@@ -686,13 +686,13 @@ def test_no_bit_identity_fixture_state_carries_a_phase_search_key() -> None:
 def test_the_window_scan_never_raises(binary_reference, z_water: float) -> None:
     """Case P-9 (iv): 41 temperatures per feed across `T3`, no `ConvergenceError`.
 
-    At `z = 0.3` the verdict switches `LLE -> VLE` at `T3`. At `z = 0.7` it does
-    **not**: the feed is water-rich enough that the two-liquid answer above
-    `T3` is metastable-but-returned, because the deterministic stability trial
-    set misses the vapour stationary point from the hexane-rich liquid. That is
-    a limitation of the stability test, not of the search (validation Case
-    P-9 (iv) records the measured Gibbs-energy gap), and it is pinned here so
-    that improving the trial set is noticed rather than silently absorbed.
+    Both feeds switch `LLE -> VLE` exactly once, at `T3`. At `z = 0.7` that is
+    what ADR-0021 repaired: until the equation-of-state trials were pinned to a
+    density root, the vapour stationary point reachable from the hexane-rich
+    liquid was missed and every temperature above `T3` came back as two liquids
+    that are metastable by up to 6.5e-03 RT (validation Cases P-9 (iv) and
+    P-11 carry the measured Gibbs-energy gaps). The two feeds are checked
+    together, and the switch is located against the independently computed `T3`.
     """
     t3 = float(binary_reference["T3"])
     verdicts = []
@@ -706,16 +706,13 @@ def test_the_window_scan_never_raises(binary_reference, z_water: float) -> None:
         verdicts.append(str(result.diagnostics["phase_regime"]))
 
     assert len(verdicts) == 41
-    if z_water == 0.3:
-        assert set(verdicts) == {"LLE", "VLE"}
-        assert verdicts[0] == "LLE" and verdicts[-1] == "VLE"
-        # One switch, and it is at T3.
-        switches = [i for i in range(1, 41) if verdicts[i] != verdicts[i - 1]]
-        assert len(switches) == 1
-        boundary = float(np.linspace(t3 - 1.0, t3 + 1.0, 41)[switches[0]])
-        assert abs(boundary - t3) <= 0.05
-    else:
-        assert set(verdicts) == {"LLE"}
+    assert set(verdicts) == {"LLE", "VLE"}
+    assert verdicts[0] == "LLE" and verdicts[-1] == "VLE"
+    # One switch, and the grid point it lands on brackets T3 within one step.
+    switches = [i for i in range(1, 41) if verdicts[i] != verdicts[i - 1]]
+    assert len(switches) == 1
+    boundary = float(np.linspace(t3 - 1.0, t3 + 1.0, 41)[switches[0]])
+    assert abs(boundary - t3) <= 0.05
 
 
 @pytest.mark.slow
