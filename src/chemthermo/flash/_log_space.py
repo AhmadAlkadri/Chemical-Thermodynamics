@@ -197,6 +197,7 @@ def log_space_seed(
     w: np.ndarray,
     tpd_min: float,
     incipient_vapor: bool,
+    ln_capital_w: np.ndarray | None = None,
 ) -> np.ndarray:
     """Phase-II log mole numbers from the tangent-plane stationary point.
 
@@ -237,6 +238,15 @@ def log_space_seed(
         tpd_min: Reduced tangent-plane distance at ``w``.
         incipient_vapor: Whether the stationary point is the vapour-like phase,
             i.e. whether phase II of the split is the incipient one.
+        ln_capital_w: ``ln W`` at the stationary point, taken from the
+            stability test rather than rebuilt from ``w`` and ``tpd_min``
+            (ADR-0025). It is passed only where the rebuild cannot work - a
+            stationary point whose ``w`` has already rounded to an exact
+            ``0.0`` because ``ln W`` spans 1450 - and where it is passed the
+            rebuild is not executed at all, so every seed that existed before
+            ADR-0025 is formed by the same expression it was formed by then.
+            The two agree to rounding wherever both are defined; ``ln W`` is
+            the accurate one, being what the iteration carried.
 
     Returns:
         ``u = ln n`` for the components present in the feed; entries for absent
@@ -247,7 +257,10 @@ def log_space_seed(
     with np.errstate(divide="ignore"):
         ln_w = np.log(np.maximum(np.asarray(w, dtype=float), tiny))
         ln_z = np.log(np.where(active, z, 1.0))
-    ln_capital_w = ln_w - (tpd_min if math.isfinite(tpd_min) else 0.0)
+    if ln_capital_w is None:
+        ln_capital_w = ln_w - (tpd_min if math.isfinite(tpd_min) else 0.0)
+    else:
+        ln_capital_w = np.asarray(ln_capital_w, dtype=float)
     ln_k = (ln_capital_w - ln_z) if incipient_vapor else (ln_z - ln_capital_w)
     ln_k = np.clip(ln_k, -_SEED_LN_K_CLAMP, _SEED_LN_K_CLAMP)
 

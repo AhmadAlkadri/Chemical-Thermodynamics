@@ -234,6 +234,10 @@ from ._evaluator import (
 from .results import StabilityResult, StabilityTrial
 from .settings import StabilitySettings
 
+#: The range of ``ln W`` over which ``W = exp(ln W)`` is an ordinary double.
+#: Before ADR-0025 these were a **clamp** on the iterate; they are now only the
+#: gate that decides which of two algebraically identical normalizations is
+#: executed (see :func:`_normalize`), so no iterate is bounded by them.
 _LN_W_MIN = -700.0
 _LN_W_MAX = 700.0
 _JACOBIAN_STEP = 1e-6
@@ -459,6 +463,82 @@ def _reported_terms(
     return terms, evaluator.identity_label(w, branch), int(surface is not None and report.fell_back)
 
 
+def _ln_of(total: float) -> float:
+    """``ln(total)``, extended to the values ``sum_W`` can take in log space.
+
+    ``0.0`` and ``inf`` are not failures once the sum is allowed to leave the
+    exponential's range; they are the two ends of it, and their logarithms are
+    the finite numbers the caller actually wants.
+    """
+    if math.isfinite(total) and total > 0.0:
+        return math.log(total)
+    if total == 0.0:
+        return -math.inf
+    return math.inf if total > 0.0 else math.nan
+
+
+def _logsumexp(values: np.ndarray) -> float:
+    """``ln sum_i exp(values_i)`` without ever forming ``exp(values_i)``.
+
+    ``-inf`` entries contribute nothing (an absent component). An all-``-inf``
+    input returns ``-inf``; a ``+inf`` or ``nan`` entry is propagated, and both
+    are refused by the caller.
+    """
+    largest = float(np.max(values))
+    if not math.isfinite(largest):
+        return largest
+    with np.errstate(under="ignore"):
+        return largest + float(np.log(np.sum(np.exp(values - largest))))
+
+
+def _normalize(
+    ln_w_capital: np.ndarray, active: np.ndarray
+) -> tuple[np.ndarray, float, float, bool] | None:
+    """``w = W / sum_j W_j`` from ``ln W``, in whichever arithmetic survives.
+
+    Returns ``(w, sum_W, ln_sum_W, log_space)``, or None when the sum is
+    degenerate (not positive, or not finite in ``ln``).
+
+    Two algebraically identical routes, and which one runs is the whole of the
+    ADR-0025 gate:
+
+    - **every** ``ln W_i`` inside ``[-700, 700]``: form ``W = exp(ln W)``, sum,
+      divide. This is the pre-ADR-0025 expression, character for character,
+      and it runs wherever the pre-ADR-0025 ``np.clip(..., -700, 700)`` would
+      have returned its argument untouched - which is to say wherever the old
+      clamp was dormant. Every result that existed before this slice is
+      therefore bit-identical by construction.
+    - otherwise: ``ln sum_W = logsumexp(ln W)`` and
+      ``w_i = exp(ln W_i - ln sum_W)``, which is accurate for any magnitude.
+      ``w_i`` may underflow to an exact ``0.0`` (the melt over a
+      polymer/solvent feed has ``ln W`` spanning ~1450, so the solvent's
+      normalized mole fraction is ``exp(-1449)``) and ``sum_W`` itself may
+      overflow to ``inf`` or underflow to ``0.0``; ``ln_sum_W`` is the one that
+      is always meaningful, and equation (7) ``tpd = -ln sum_W`` is read from
+      it rather than from ``sum_W``.
+
+    The old clamp was not protecting a result: it was keeping ``exp`` in range
+    so that the *normalization* stayed finite. Doing the normalization in logs
+    removes the need for it, which is why it is gone rather than widened.
+    """
+    values = ln_w_capital[active]
+    if np.any(values < _LN_W_MIN) or np.any(values > _LN_W_MAX):
+        ln_total = _logsumexp(values)
+        if not math.isfinite(ln_total):
+            return None
+        w = np.zeros(ln_w_capital.shape, dtype=float)
+        with np.errstate(over="ignore", under="ignore"):
+            w[active] = np.exp(values - ln_total)
+            total = float(np.exp(ln_total))
+        return w, total, ln_total, True
+
+    w_capital = np.where(active, np.exp(np.where(active, ln_w_capital, 0.0)), 0.0)
+    total = float(np.sum(w_capital))
+    if not math.isfinite(total) or total <= 0.0:
+        return None
+    return w_capital / total, total, math.log(total), False
+
+
 def _run_trial(
     *,
     label: str,
@@ -476,6 +556,8 @@ def _run_trial(
     branch: str | None = None
     residual = math.inf
     sum_w_capital = 1.0
+    ln_sum_w_capital = 0.0
+    log_space = False
     iterations = 0
     fallbacks = 0
 
@@ -510,6 +592,9 @@ def _run_trial(
                 iterations=iterations,
                 tpd=tpd,
                 sum_W=sum_w_capital,
+                ln_W=tuple(ln_w_capital.tolist()),
+                ln_sum_W=ln_sum_w_capital,
+                log_space=log_space,
                 trivial=_is_trivial(ln_w_capital, z, active, settings.trivial_tol),
                 residual=residual,
                 phase_branch=branch,
@@ -523,19 +608,30 @@ def _run_trial(
                 surface_fallback_count=fallbacks,
             )
 
-        # Equation (8): ln W_i <- d_i - ln phi_i(w).
+        # Equation (8): ln W_i <- d_i - ln phi_i(w). ADR-0025: the proposal is
+        # *not* clamped to [-700, 700] any more - a stationary point may
+        # legitimately sit at ln W ~ 1450 - and the normalization that used to
+        # need the clamp is done by `_normalize` in whichever arithmetic the
+        # magnitudes allow.
+        proposed = d[active] - ln_f[active]
+        if not np.all(np.isfinite(proposed)):
+            # The pre-ADR-0025 clamp also absorbed an infinite proposal, and
+            # left a NaN to the check below. Neither has been observed - the
+            # evaluators refuse a non-finite term - so this keeps that
+            # behaviour rather than changing an unreachable branch.
+            proposed = np.clip(proposed, _LN_W_MIN, _LN_W_MAX)
         ln_w_new = np.full(z.shape, -np.inf, dtype=float)
-        ln_w_new[active] = np.clip(d[active] - ln_f[active], _LN_W_MIN, _LN_W_MAX)
+        ln_w_new[active] = proposed
         if np.any(~np.isfinite(ln_w_new[active])):
             return _failed_trial(label, iterations, "non_finite_ln_W", surface)
 
-        w_capital = np.where(active, np.exp(np.where(active, ln_w_new, 0.0)), 0.0)
-        sum_w_capital = float(np.sum(w_capital))
-        if not math.isfinite(sum_w_capital) or sum_w_capital <= 0.0:
+        normalized = _normalize(ln_w_new, active)
+        if normalized is None:
             return _failed_trial(label, iterations, "degenerate_sum_W", surface)
+        w, sum_w_capital, ln_sum_w_capital, step_in_log_space = normalized
+        log_space = log_space or step_in_log_space
 
         ln_w_capital = ln_w_new
-        w = w_capital / sum_w_capital
 
         if _is_trivial(ln_w_capital, z, active, settings.trivial_tol):
             try:
@@ -553,6 +649,9 @@ def _run_trial(
                 iterations=iterations,
                 tpd=_tpd(w, report_f, d, active),
                 sum_W=sum_w_capital,
+                ln_W=tuple(ln_w_capital.tolist()),
+                ln_sum_W=ln_sum_w_capital,
+                log_space=log_space,
                 trivial=True,
                 residual=float(np.max(np.abs(ln_w_capital[active] + ln_f[active] - d[active]))),
                 phase_branch=report_branch,
@@ -573,6 +672,9 @@ def _run_trial(
             iterations=iterations,
             tpd=float("nan"),
             sum_W=sum_w_capital,
+            ln_W=tuple(ln_w_capital.tolist()),
+            ln_sum_W=ln_sum_w_capital,
+            log_space=log_space,
             trivial=False,
             residual=residual,
             phase_branch=branch,
@@ -590,6 +692,7 @@ def _run_trial(
         label=label,
         surface=surface,
         surface_fallback_count=fallbacks,
+        log_space=log_space,
         ln_w_capital=ln_w_capital,
         z=z,
         d=d,
@@ -605,6 +708,7 @@ def _second_order_stage(
     label: str,
     surface: str | None,
     surface_fallback_count: int,
+    log_space: bool,
     ln_w_capital: np.ndarray,
     z: np.ndarray,
     d: np.ndarray,
@@ -625,21 +729,31 @@ def _second_order_stage(
     ``settings.second_order_max_step`` and then backtracked until
     ``max_i |g_i|`` decreases, which keeps ``W > 0`` (automatic in ``ln W``) and
     prevents the iteration from being thrown out of the model's domain.
+
+    ADR-0025 removed the ``[-700, 700]`` clamp from both places it appeared
+    here - the normalization inside ``evaluate`` and the line search's
+    candidate - because it was not a safeguard on the *step* but on ``exp``.
+    ``u`` is the natural variable of this stage and a stationary point at
+    ``u ~ 1450`` is an ordinary double; what could not survive was
+    ``exp(1450)``, and :func:`_normalize` no longer forms it. The line search
+    keeps a finiteness test instead of a box: a candidate carrying ``inf`` or
+    ``nan`` is rejected and the scale halved, which is what the clamp was
+    doing for such a candidate anyway.
     """
     index = np.flatnonzero(active)
     d_active = d[index]
     fallbacks = surface_fallback_count
+    used_log_space = log_space
 
     def evaluate(u: np.ndarray) -> tuple[np.ndarray, np.ndarray, str | None]:
-        nonlocal fallbacks
+        nonlocal fallbacks, used_log_space
         ln_w_full = np.full(z.shape, -np.inf, dtype=float)
         ln_w_full[index] = u
-        w_capital = np.zeros(z.shape, dtype=float)
-        w_capital[index] = np.exp(np.clip(u, _LN_W_MIN, _LN_W_MAX))
-        total = float(np.sum(w_capital))
-        if not math.isfinite(total) or total <= 0.0:
+        normalized = _normalize(ln_w_full, active)
+        if normalized is None:
             raise ModelError("Second-order stage produced a degenerate sum of mole numbers.")
-        w_local = w_capital / total
+        w_local, _total, _ln_total, step_in_log_space = normalized
+        used_log_space = used_log_space or step_in_log_space
         evaluated = _terms(evaluator, w_local, surface)
         fallbacks += int(evaluated.fell_back)
         return u + evaluated.terms[index] - d_active, w_local, evaluated.label
@@ -689,7 +803,10 @@ def _second_order_stage(
         scale = 1.0
         accepted = False
         while scale >= _MIN_LINE_SEARCH_SCALE:
-            candidate = np.clip(u + scale * step, _LN_W_MIN, _LN_W_MAX)
+            candidate = u + scale * step
+            if not np.all(np.isfinite(candidate)):
+                scale *= 0.5
+                continue
             try:
                 g_trial, w_trial, branch_trial = evaluate(candidate)
             except ModelError:
@@ -717,7 +834,16 @@ def _second_order_stage(
 
     ln_w_capital_final = np.full(z.shape, -np.inf, dtype=float)
     ln_w_capital_final[index] = u
-    sum_w_capital = float(np.sum(np.exp(np.clip(u, _LN_W_MIN, _LN_W_MAX))))
+    if np.any(u < _LN_W_MIN) or np.any(u > _LN_W_MAX):
+        used_log_space = True
+        ln_sum_w_capital = _logsumexp(u)
+        with np.errstate(over="ignore", under="ignore"):
+            sum_w_capital = float(np.exp(ln_sum_w_capital))
+    else:
+        # The pre-ADR-0025 expression, untouched: `np.clip` returned its
+        # argument here whenever this branch is the one taken.
+        sum_w_capital = float(np.sum(np.exp(u)))
+        ln_sum_w_capital = _ln_of(sum_w_capital)
     converged = residual < settings.tol
     trivial = converged and _is_trivial(ln_w_capital_final, z, active, settings.trivial_tol)
 
@@ -734,6 +860,9 @@ def _second_order_stage(
         iterations=ssi_iterations + iterations,
         tpd=_tpd(w, ln_f, d, active) if converged else float("nan"),
         sum_W=sum_w_capital,
+        ln_W=tuple(ln_w_capital_final.tolist()),
+        ln_sum_W=ln_sum_w_capital,
+        log_space=used_log_space,
         trivial=trivial,
         residual=residual,
         phase_branch=branch,
@@ -815,10 +944,12 @@ def _summarize(
     tpd_min = best.tpd if best is not None else 0.0
 
     trial_composition: tuple[float, ...] | None = None
+    trial_ln_capital_w: tuple[float, ...] | None = None
     k_values: tuple[float, ...] | None = None
     phase_branch: str | None = None
     if best is not None and best.composition is not None:
         trial_composition = best.composition
+        trial_ln_capital_w = best.ln_W
         phase_branch = best.phase_branch
         w = np.array(best.composition, dtype=float)
         with np.errstate(divide="ignore", invalid="ignore"):
@@ -848,6 +979,13 @@ def _summarize(
     for trial in trials:
         if trial.surface is not None:
             surface_counts[trial.surface] = surface_counts.get(trial.surface, 0) + 1
+    log_space_trials = [trial for trial in trials if trial.log_space]
+    if log_space_trials:
+        # Written only when the ADR-0025 route actually engaged, so its absence
+        # is the assertion that nothing left the pre-ADR-0025 arithmetic.
+        diagnostics["log_space_trial_count"] = len(log_space_trials)
+        diagnostics["log_space_trials"] = ",".join(trial.label for trial in log_space_trials)
+
     if surface_counts:
         # Deterministic: insertion order is the deterministic trial order.
         diagnostics["trial_surfaces"] = ",".join(
@@ -863,6 +1001,11 @@ def _summarize(
         diagnostics["feed_branch"] = feed_branch
     if best is not None:
         diagnostics["minimizing_trial"] = best.label
+        if best.log_space:
+            # Conditional for the same reason as `log_space_trial_count`: its
+            # absence is what a consumer reads as "the normalized `w` carries
+            # this stationary point, as it always did".
+            diagnostics["minimizing_trial_log_space"] = True
         if best.surface is not None:
             diagnostics["minimizing_trial_surface"] = best.surface
         diagnostics["minimizing_trial_iterations"] = best.iterations
@@ -872,7 +1015,8 @@ def _summarize(
         if best.converged_stage is not None:
             diagnostics["minimizing_trial_stage"] = best.converged_stage
         diagnostics["sum_W"] = best.sum_W
-        if best.sum_W > 0.0 and math.isfinite(best.sum_W):
+        diagnostics["ln_sum_W"] = best.ln_sum_W
+        if math.isfinite(best.ln_sum_W):
             # Equation (7), evaluated on the surface the trial iterated on. It
             # equals `tpd_min` whenever the trial's surface is also the
             # lowest-Gibbs candidate where it stopped - always so for a cubic
@@ -883,7 +1027,15 @@ def _summarize(
             # positive number that decides nothing) the two differ, and
             # `tpd_min` is the smaller, correct one: the tangent-plane distance
             # is measured to the lower envelope of the candidates.
-            diagnostics["tpd_from_sum_W"] = -math.log(best.sum_W)
+            #
+            # ADR-0025: both are read from `ln_sum_W`, which is `math.log` of
+            # `sum_W` exactly wherever `sum_W` is a positive, finite double -
+            # so this is the same number as before wherever the old guard let
+            # it be written - and is finite where `sum_W` has overflowed.
+            # `tm*` itself cannot be: `1 - exp(1452)` is `-inf`, which is
+            # reported as such rather than omitted, because the sign is the
+            # verdict and the magnitude is in `tpd_from_sum_W`.
+            diagnostics["tpd_from_sum_W"] = -best.ln_sum_W
             diagnostics["tm_at_stationary_point"] = 1.0 - best.sum_W
 
     return StabilityResult(
@@ -899,4 +1051,5 @@ def _summarize(
         feed_branch=feed_branch,
         trials=trials,
         diagnostics=diagnostics,
+        trial_ln_W=trial_ln_capital_w,
     )
