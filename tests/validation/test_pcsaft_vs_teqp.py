@@ -298,7 +298,13 @@ def _pure_saturation(
     return p_sat, rho_l, rho_v
 
 
-@pytest.mark.parametrize("temperature", [300.0, 400.0])
+@pytest.mark.parametrize(
+    "temperature",
+    # 400 K is `slow`: a further temperature on the same saturation curve
+    # 300 K already checks against teqp's own `pure_VLE_T`; 300 K also has its
+    # own coarser sanity check below (`..._is_in_the_right_range_at_300_K`).
+    [300.0, pytest.param(400.0, marks=pytest.mark.slow)],
+)
 def test_pure_hexane_saturation_matches_teqp_pure_vle(temperature: float) -> None:
     """Case P-2: equal fugacity on the two density roots reproduces teqp's VLE.
 
