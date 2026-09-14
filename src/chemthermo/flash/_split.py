@@ -26,6 +26,10 @@ subject of ADR-0016:
   above one (the "negative flash" of Whitson & Michelsen 1989). That is what
   lets successive substitution pass through iterates whose ``K`` has no
   in-window root instead of failing there.
+
+Both take a ``convex_denominators`` flag, off by default, which is ADR-0026's
+repair for a ``K`` that has underflowed the spacing of doubles at one; see
+:func:`_rr_denominators` for what it does and why it is not the default.
 """
 
 from __future__ import annotations
@@ -536,12 +540,61 @@ class _PhaseRoot:
             return None
 
 
-def _rachford_rice(z: np.ndarray, K: np.ndarray) -> tuple[float | None, float, float]:
-    """Solve the Rachford-Rice equation; returns (vapor_fraction, f0, f1)."""
+#: What ``convex_denominators`` means, in one place (ADR-0026).
+#:
+#: ``t_i = 1 + v (K_i - 1)`` is how every Rachford-Rice evaluation in this
+#: module has always formed its denominator, and it has one failure mode:
+#: ``K_i - 1`` rounds to exactly ``-1`` for any ``K_i`` below the spacing of
+#: doubles at one, so at ``v = 1`` the sum cancels to an exact ``0.0`` and the
+#: positivity guard reports "no admissible vapour fraction" for an equation
+#: whose ``f(1) = sum_i z_i (K_i - 1) / K_i`` is an ordinary large negative
+#: number. A polymer against a near-pure solvent is exactly that: the
+#: ``Mw = 53 000`` chain at 453 K and 3.0 MPa has ``K = 1.1e-18`` and a feed
+#: mole fraction of ``7.2e-05``, and ``f(0) = +1.3e-03``, ``f(1) = -6.4e+13``
+#: bracket a root the solver declined to look for (validation Case P-16).
+#:
+#: ``t_i = (1 - v) + v K_i`` is the same quantity written as the convex
+#: combination it is: strictly positive for every ``K_i > 0`` and
+#: ``0 <= v <= 1``, with no cancellation at either endpoint. It is **not** the
+#: default, because it is not the same double as the naive form for an
+#: ordinary ``K`` and this module's answers are pinned bit for bit; it is
+#: switched on by the one caller whose alternative is to refuse an answer
+#: (:func:`chemthermo.flash._detect._flash_tp_tangent_plane`), which is where
+#: the naive form has already reported no root and the Wilson fallback has too.
+
+
+def _rr_denominators(v: float, K: np.ndarray, *, convex: bool) -> np.ndarray | None:
+    """``t_i = 1 + v (K_i - 1)``, or ``None`` where no admissible ``t`` exists.
+
+    The naive form is returned unchanged whenever it is admissible, so no value
+    that was ever finite moves. ``convex`` decides only what happens where it
+    is *not*: the pre-ADR-0026 ``None`` (and with it a ``nan`` value and a
+    "no root" verdict), or one recomputation in the cancellation-free form.
+    """
+    denom = 1.0 + v * (K - 1.0)
+    if not np.any(denom <= 0.0):
+        return denom
+    if not convex:
+        return None
+    denom = (1.0 - v) + v * K
+    if np.any(denom <= 0.0):
+        return None
+    return denom
+
+
+def _rachford_rice(
+    z: np.ndarray, K: np.ndarray, *, convex_denominators: bool = False
+) -> tuple[float | None, float, float]:
+    """Solve the Rachford-Rice equation; returns (vapor_fraction, f0, f1).
+
+    ``convex_denominators`` is ADR-0026's repair for a ``K`` below the spacing
+    of doubles at one; see :func:`_rr_denominators`. It is off by default and
+    the function is then the pre-ADR-0026 one, expression for expression.
+    """
 
     def f(v: float) -> float:
-        denom = 1.0 + v * (K - 1.0)
-        if np.any(denom <= 0.0):
+        denom = _rr_denominators(v, K, convex=convex_denominators)
+        if denom is None:
             return float("nan")
         return float(np.sum(z * (K - 1.0) / denom))
 
@@ -611,7 +664,9 @@ def _rachford_rice_window(K: np.ndarray) -> tuple[float, float] | None:
     return 1.0 / (1.0 - k_max), 1.0 / (1.0 - k_min)
 
 
-def _extended_rachford_rice(z: np.ndarray, K: np.ndarray) -> tuple[float | None, str]:
+def _extended_rachford_rice(
+    z: np.ndarray, K: np.ndarray, *, convex_denominators: bool = False
+) -> tuple[float | None, str]:
     """Rachford-Rice on the Leibovici-Neoschil window (the "negative flash").
 
     ``f(beta) = sum_i z_i (K_i - 1) / (1 + beta (K_i - 1))`` is strictly
@@ -636,7 +691,7 @@ def _extended_rachford_rice(z: np.ndarray, K: np.ndarray) -> tuple[float | None,
         one side of 1) or ``"no-root"`` (a window with no sign change).
         ``beta`` is ``None`` for the last two.
     """
-    in_window, _f0, _f1 = _rachford_rice(z, K)
+    in_window, _f0, _f1 = _rachford_rice(z, K, convex_denominators=convex_denominators)
     if in_window is not None:
         return in_window, "bracketed"
 
@@ -649,13 +704,15 @@ def _extended_rachford_rice(z: np.ndarray, K: np.ndarray) -> tuple[float | None,
     slope = K - 1.0
 
     def f(v: float) -> float:
-        denom = 1.0 + v * slope
-        if np.any(denom <= 0.0):
+        denom = _rr_denominators(v, K, convex=convex_denominators)
+        if denom is None:
             return float("nan")
         return float(np.sum(z * slope / denom))
 
     def derivative(v: float) -> float:
-        denom = 1.0 + v * slope
+        denom = _rr_denominators(v, K, convex=convex_denominators)
+        if denom is None:  # pragma: no cover - only called where `f` is finite
+            return math.nan
         return float(-np.sum(z * slope * slope / (denom * denom)))
 
     low = high = math.nan
@@ -689,8 +746,10 @@ def _extended_rachford_rice(z: np.ndarray, K: np.ndarray) -> tuple[float | None,
             high, f_high = beta, value
         # Scale-free stopping test: |f| is a sum of terms that cancel at the
         # root, so its attainable size is set by their magnitude, not by 1.
-        denom = 1.0 + beta * slope
-        magnitude = float(np.sum(np.abs(z * slope / denom)))
+        # `f(beta)` is finite here, so the denominators are admissible.
+        denominators = _rr_denominators(beta, K, convex=convex_denominators)
+        assert denominators is not None
+        magnitude = float(np.sum(np.abs(z * slope / denominators)))
         if abs(value) <= 1e-14 * max(magnitude, 1.0):
             break
         if high - low <= 1e-15 * max(1.0, abs(low), abs(high)):
