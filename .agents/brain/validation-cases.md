@@ -14,6 +14,28 @@ Rules:
 
 ---
 
+## Table of contents: case families
+
+One family letter per capability area; case numbers are listed in the order
+they appear below, not necessarily numeric order (an amended case keeps its
+original number). "Slice (ADR)" names the slice that created the family, in
+delivery order; later slices that amended a case in place are named in that
+case's own entry.
+
+| Family | Cases | Capability | Slice (ADR) |
+| --- | --- | --- | --- |
+| **S** | S-1..S-4, S-5 (not found), S-6..S-8 | Michelsen tangent-plane stability (`stability_tp`): the feed-tangent identity, stationarity/tm/tpd relations, marginal stability, cross-checks against `thermo` and against Tessier (2000)'s published NRTL stationary points | `stability-tpd-pr` (ADR-0005/0007), `stability-tpd-nrtl` (ADR-0007) |
+| **K** | K-1 | Peng-Robinson per-pair `kij` (scalar or name-keyed mapping), the fixed diagonal-corruption bug | `pr-kij-matrix` (ADR-0006) |
+| **N** | N-1..N-3 | NRTL activity coefficients: Gibbs-Duhem consistency, cross-check against an independent implementation, reproduction of Tessier (2000) Table 2 stationary points | `nrtl-gibbs-duhem-fix` (no ADR; signature unchanged) |
+| **F** | F-1..F-5 | `flash_tp` phi-phi phase detection and split robustness: verdicts against `thermo`'s `FlashVL`, the Wilson-vs-tangent-plane disagreement, split verification invariants, the negative-flash/second-order stage, phase identity by compressibility | `flash-auto-phase-detection` (ADR-0008), `flash-phi-phi-second-order` (ADR-0016), `flash-phase-labels-by-compressibility` (ADR-0017) |
+| **L** | L-1..L-4 | `gamma-gamma` liquid-liquid `flash_tp` (activity model, no EOS): Tessier (2000) tie-lines, binodal/lever-rule cross-check, post-split stability of every two-phase phi-phi flash | `flash-lle-activity` (ADR-0009) |
+| **R** | R-1..R-4 | `modified-raoult` mode (activity liquid + ideal vapor): VLE/LLE from one tangent plane, the three-phase neighbourhood refusal window, cross-check against `thermo` | `flash-modified-raoult` (ADR-0010) |
+| **V** | V-1..V-5 | Three-phase (VLLE) discovery: the ternary tie-triangle, stability misses fixed by fixed candidate surfaces, the binary refusal window, multiphase Rachford-Rice against Okuno et al. (2010), the ternary verdict map | `flash-vlle-phase-addition` (ADR-0011), `stability-candidate-surfaces` (ADR-0012) |
+| **P** | P-0..P-15 | PC-SAFT: residual Helmholtz/derivatives against teqp, density roots, flash/stability integration, split robustness re-measured on the PC-SAFT grid, phase identity, association against FeOs, per-phase density roots (LLE), EOS phase addition/removal (VLLE), fixed EOS stability surfaces, polymer components, the polymer liquid-liquid split, the polymer vapour-liquid split in log mole numbers, the log-space stability normalization | `pcsaft-residual-helmholtz` (ADR-0014), `pcsaft-density-roots-flash` (ADR-0015), `pcsaft-association` (ADR-0018), `flash-eos-per-phase-roots` (ADR-0019), `flash-phase-addition-eos` (ADR-0020), `stability-eos-root-surfaces` (ADR-0021), `pcsaft-polymer-solvent` (ADR-0022), `pcsaft-polymer-vle` (ADR-0024), `stability-log-space-sums` (ADR-0025) |
+| **B** | B-1 | The `chemthermo.bench` measurement harness and its acceptance rule (baseline + after + identical result hashes + measured ratio) | `perf-baseline-and-root-reuse` (ADR-0023) |
+
+---
+
 ## Case S-1: Michelsen tangent-plane identity at the feed
 
 - **Source:** M. L. Michelsen, "The isothermal flash problem. Part I.

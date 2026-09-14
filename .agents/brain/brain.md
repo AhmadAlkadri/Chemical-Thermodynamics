@@ -82,16 +82,63 @@ CLI entry points
 - The ADR-0011 phase addition/removal search now also serves the **phi-phi** (equation-of-state) path (ADR-0020), so `flash_tp(mixture, ..., eos=...)` discovers the phase count up to `FlashSettings.max_phases` exactly as `modified-raoult` does. No public name and no signature changed. The internal generalization is that **a phase carries its own model surface**: `chemthermo.flash._multiphase._PhaseSetModel` with `_ActivityPhaseSet` (a label names a phase *candidate*; the label is the identity) and `_EosPhaseSet` (a label names a *density root*; each phase gets its own `_split._PhaseRoot`, pinned as in ADR-0019, and the identity is measured with `EquationOfState.phase_identity`). That is what lets a three-phase EOS set hold two phases labelled `"liquid"` on two different roots. An added phase is pinned to the branch the post-split stability minimizer reported; removal is unchanged. A three-phase EOS result is named `liquid1` / `liquid2` / `vapor` with the liquids ordered by the **first component's mole fraction** (ADR-0019's rule, extended past two), `vapor_fraction` = the vapour's fraction, `phase_regime = "VLLE"`, and a new `phase_label_method` key on multiphase EOS results; a set with no vapour is `"LLE"` with `vapor_fraction = None` however many liquids it has. One new rule in the search itself: when the phase just added is the phase the next solve removes, the **next** stationary point of the same post-split report is tried instead, each at most once (measured: water / n-hexane at 330 K cycles `LV -> LLV -> LV -> ...` otherwise). `max_phases=2` reproduces the pre-slice refusal on phi-phi; `gamma-gamma` is unchanged and still stops at two phases. **Bit-identity by non-entry**: the search runs only after a post-split failure, and every state of the 155-state fixture and of the PR / PC-SAFT grids is post-split stable, so the fixture passes unchanged (no v3) and a test asserts directly on the fixture JSON that no pinned state carries a search key. Validated in Cases P-9 (binary window, FeOs) and P-10 (ternary tie triangles, including a three-*liquid* Peng-Robinson state). (source: src/chemthermo/flash/_multiphase.py, src/chemthermo/flash/_detect.py, .agents/brain/adr/0020-flash-phase-addition-eos.md)
 
 ## 3) Architecture
-Text-only diagram
+One current text diagram (source: src/chemthermo/data/components.json, src/chemthermo/core/, src/chemthermo/models/, src/chemthermo/eos/, src/chemthermo/stability/, src/chemthermo/flash/):
 ```
-src/chemthermo/data/components.json -> data loaders -> Component/Composition/Mixture -> models (PR/NRTL) -> flash_tp -> stability -> split -> post-split stability -> add/remove phases -> FlashResult
-  (i.e. flash_tp -> stability_tp(feed) -> seeded Rachford-Rice/SSI split (+ second-order stage for LLE and modified-Raoult) -> post-split stability of each phase -> multiphase Rachford-Rice with phase addition/removal, up to FlashSettings.max_phases -> FlashResult)
-src/chemthermo/data/components.json -> Component/Composition/Mixture -> models (PR | NRTL | NRTL+Antoine+ideal gas) -> stability_tp -> internal _TangentPlaneEvaluator (a set of _PhaseCandidates; the min-Gibbs one wins) -> Michelsen TPD (SSI + Newton) -> StabilityResult
-chemthermo CLI -> parser -> Mixture + PengRobinsonEOS -> flash_tp -> text/json output
-src/chemthermo/parameters/data/eos/pcsaft.json -> PCSAFTParameters -> PCSAFTEOS(T, molar density, x) -> A^res/RT, Z, P, ln phi   (ADR-0014)
-PCSAFTEOS(T, P, x, phase) -> _pcsaft_density: eta-grid scan -> safeguarded Newton -> dP/drho > 0 filter -> density roots -> ln phi on the named root -> EquationOfState.fugacity_coefficients -> the unchanged stability_tp / flash_tp (ADR-0015)
-phase set = [(label, surface, composition)] -> _PhaseSetModel (activity candidates | per-phase _PhaseRoot) -> multiphase SSI + second-order -> post-split report -> add / remove -> names measured by phase_identity   (ADR-0020)
+components.json -> data loaders -> Component/Mixture
+  -> models (PR | NRTL | PC-SAFT(+assoc, polymers) | ideal vapor)
+  -> stability (tangent-plane evaluator with candidate surfaces: cubic roots | activity liquid | modified-Raoult pair | EOS density roots)
+  -> flash (detect -> split -> second-order/log-space -> verify -> add/remove phases)
+  -> FlashResult
+```
+Expanded per stage: `flash_tp` resolves the mode and calls `stability_tp(feed)` to
+decide phase count (phi-phi, gamma-gamma, modified-raoult) or uses the legacy
+Wilson heuristic (gamma-phi); the seeded split runs shared Rachford-Rice/SSI,
+handing over to a second-order Newton stage for LLE/modified-Raoult (ADR-0009)
+and phi-phi (ADR-0016), or to the log-mole-number sibling where linear mole
+numbers leave machine range (ADR-0024, gated so pre-ADR-0024 numbers are
+untouched); every converged phase is re-verified by `stability_tp`
+(post-split stability), and a failure there feeds the phase addition/removal
+search (`_multiphase*`, ADR-0011 for modified-raoult, ADR-0020 for phi-phi),
+capped at `FlashSettings.max_phases`. `stability_tp` itself runs one or more
+deterministic trials of `_TangentPlaneEvaluator`'s fixed phase-candidate
+surfaces (ADR-0012 for the modified-Raoult pair, ADR-0021 for EOS density
+roots) to a Michelsen TPD stationary point (SSI + damped Newton), normalizing
+in `ln W` with a `logsumexp` fallback rather than a `[-700, 700]` clamp where
+the unnormalized mole numbers leave the exponential's range (ADR-0025). The
+CLI (`chemthermo` / `python -m chemthermo`) is a thin parser in front of
+`Mixture + PengRobinsonEOS -> flash_tp -> text/json`. `chemthermo.bench` runs
+the same reference paths as a fixed, hashed workload for performance
+measurement (ADR-0023) and is not itself public API.
 
+Module map (line counts via `wc -l`, current as of this slice; `src/chemthermo/` total ~15,700 lines across ~90 files):
+```
+core/            component.py 197, mixture.py 66, composition.py 48
+                   Component (+ .custom, ADR-0022), Composition, Mixture
+models/          peng_robinson.py 434, base.py 216, nrtl.py 148,
+                 _antoine.py 125, _kij.py 115
+                   EquationOfState/ActivityModel protocols + phase_identity (ADR-0017)
+eos/             pcsaft.py 1189, _pcsaft_density.py 653,
+                 _pcsaft_association.py 599, registry.py 44
+                   PCSAFTEOS: hard chain + dispersion (ADR-0014), density
+                   roots (ADR-0015), association (ADR-0018)
+stability/       _evaluator.py 1087, tp.py 1055, results.py 221, settings.py 73
+                   stability_tp; _TangentPlaneEvaluator + candidates
+                   (ADR-0007/0010/0012/0021); ln W normalization (ADR-0025)
+flash/           _detect.py 1545, _multiphase.py 1160, _split.py 705,
+                 tp.py 508, _log_space.py 462, _multiphase_rr.py 433,
+                 _verify.py 310, _second_order.py 263, settings.py 154,
+                 _legacy.py 143, _assemble.py 129, results.py 99
+                   flash_tp orchestrator (tp.py) + internal detect/split/
+                   verify/assemble modules (slice `flash-module-split`);
+                   log-space split stage (ADR-0024)
+parameters/      pcsaft.py 458, nrtl.py 163, activity.py 23
+bench/           _cases.py 614, __init__.py 297, _record.py 187
+                   internal, ADR-0023 benchmark harness
+vlle/            __init__.py 40, loader.py 51, types.py 38, api.py 24,
+                 errors.py 15  (deprecated public plugin boundary, ADR-0013)
+top-level        __init__.py 96 (public exports), cli.py 260,
+                 phase_boundary.py 479, schemas.py 93, validation.py 72,
+                 citations.py 59, exceptions.py 25, units.py 10
 ```
 
 Key modules and flow
@@ -271,10 +318,10 @@ Cheap checks
 ## 8) Decisions log (index)
 - ADR folder: `.agents/brain/adr/`
 - Accepted ADRs:
-  - `.agents/brain/adr/0001-public-api-truth-source.md`
-  - `.agents/brain/adr/0002-thin-vertical-slices.md` (Adopted 2026-02-10)
-  - `.agents/brain/adr/0003-cli-entrypoint.md` (Adopted 2026-02-10)
-  - `.agents/brain/adr/0004-cli-tp-flash-gamma-phi.md` (Adopted 2026-02-12)
+  - `.agents/brain/adr/0001-public-api-truth-source.md` (Adopted 2026-02-03; amended by ADR-0013) - defines public API as `chemthermo.__init__.__all__` plus subpackages `README.md` documents explicitly (`chemthermo.eos`, `chemthermo.vlle`), in that order
+  - `.agents/brain/adr/0002-thin-vertical-slices.md` (Adopted 2026-02-10) - every change ships as one end-to-end usable slice with a runnable golden path, never scaffolding alone
+  - `.agents/brain/adr/0003-cli-entrypoint.md` (Adopted 2026-02-10) - adds the public `chemthermo` CLI script and `python -m chemthermo`, v1 scope `tp-flash` phi-phi only, with a defined exit-code contract
+  - `.agents/brain/adr/0004-cli-tp-flash-gamma-phi.md` (Adopted 2026-02-12) - extends `tp-flash` with `--flash-mode {phi-phi,gamma-phi}` (NRTL liquid + Peng-Robinson vapor), `cli_schema_version` unchanged
   - `.agents/brain/adr/0005-stability-tp-public-api.md` (Adopted 2026-09-13)
   - `.agents/brain/adr/0006-pr-kij-matrix.md` (Adopted 2026-09-13)
   - `.agents/brain/adr/0007-stability-tangent-plane-evaluator.md` (Adopted 2026-09-13)
@@ -323,63 +370,49 @@ Cheap checks
   - `pr-kij-matrix`: fixed the diagonal-kij bug and added per-pair `kij` support (`float` or name-keyed `Mapping`) to `PengRobinsonEOS`; `flash_tp` and `stability_tp` results for nonzero kij are now trustworthy. See ADR-0006 and validation Case K-1.
   - `stability-tpd-nrtl`: `stability_tp` now accepts `activity_model=` for liquid-liquid tangent-plane stability, behind an internal `_TangentPlaneEvaluator` contract (ADR-0007) that also serves the Peng-Robinson path unchanged; added a damped-Newton second stage (required near plait points), the cited Tessier (2000) Problem 2 fixture, and golden paths `examples/basic/stability_tp_nrtl_lle_demo.py` and `examples/validation/08_stability_nrtl_tessier2000.py`. Reproduces the published tangent-plane global minima of Problems 1 and 2. See validation Cases S-6, S-7, S-8.
   - `nrtl-gibbs-duhem-fix`: corrected the NRTL activity-coefficient equation (column sums, single first-term denominator); added Gibbs-Duhem / binary-reduction / permutation / regression tests, a tight `thermo` cross-check with asymmetric parameters, the cited Tessier (2000) Problem 1 fixture, and the Table 2 reproduction golden path `examples/validation/07_nrtl_tessier_stationary_points.py`. Packaged NRTL pairs are now labelled synthetic. No ADR (public signature unchanged). See validation Cases N-1, N-2, N-3.
-- **Slice 1: `eos-solve-cache` - item 2 of the ADR-0023 profile - recommended next**
-  - What it is: the 37 duplicate density solves per water/n-hexane flash that
-    the ADR-0023 `ln_fugacity_branches` capability cannot see - `phase_identity`
-    and the post-split re-evaluation asking the model for a state it has just
-    solved. ADR-0023 rejected a model-instance cache on design grounds; the
-    alternative it named is to thread the already-solved root through those
-    call sites explicitly.
-  - Why **now**: it is the largest remaining *rearrangement* (as opposed to a
-    new numerical method), the instrument to prove it moved nothing already
-    exists (`python -m chemthermo.bench --compare`), and it needs no new
-    physics, no new ADR-scale contract and no new reference. Item 1 of the same
-    profile - an analytic or structured Hessian for the **multiphase**
-    second-order stage - is the bigger prize (~35 s and ~4,725
-    `fugacity_coefficients` calls for a three-phase PC-SAFT flash, roughly half
-    of them inside a finite-difference Hessian) but is a real change of method
-    and needs its own bit-identity argument and its own ADR; take it after.
-  - The alternative, if a *modelling* slice is wanted instead:
-    `pcsaft-polydispersity` (Slice 3 below), which needs no new public contract
-    at all.
-- **Slice 2: the remaining Stage I items from the ADR-0023 profile (later candidate)**
-  - What is left after ADR-0023's three optimizations, in the order the profile
-    ranks them:
-    1. **The multiphase second-order stage**, still the largest single cost in
-       the library and untouched by this slice: a three-phase PC-SAFT flash is
-       ~35 s and ~4,725 `fugacity_coefficients` calls, roughly half of them
-       inside a *finite-difference* Hessian (12 gradient evaluations per
-       iteration, each evaluating every phase). An analytic or structured
-       Hessian would be a real change, not a rearrangement, so it needs its own
-       bit-identity argument and probably its own ADR.
-    2. **The 37 duplicate density solves per water/n-hexane flash that the
-       branch capability cannot see** - `phase_identity` and the post-split
-       re-evaluation asking for a state already solved. ADR-0023 rejected a
-       model-instance cache on design grounds; the alternative is to thread the
-       already-solved root through those call sites explicitly.
-    3. **The PC-SAFT single-point evaluation itself**: ~19 `pressure_and_slope`
-       calls per density solve at ~100 us each, almost all of it numpy
-       per-operation overhead on one-element arrays. A scalar path would be
-       fast and would have to prove that `np.log`/`np.sqrt` and their `math`
-       equivalents agree to the last bit on every value that occurs - which is
-       a bigger claim than this slice was willing to make.
-- **Slice 3: `pcsaft-polydispersity` (later candidate)**
-  - What it is: ADR-0022 models a polymer as **one** component with **one**
-    chain length. A real sample has a distribution (the cited samples have
-    polydispersities of 1.14 to 2.94), and the standard treatment is several
-    pseudo-components sharing `sigma` and `eps/k` and differing only in `m`.
-  - Why later: it needs no new public contract - `segments_per_g` already
-    expresses each pseudo-component - so it is a modelling slice, not an API
-    one, and it should be taken when there is a reference to validate the
-    *distribution* against rather than only the monodisperse limit.
-- **Also open**
-  - ~~Wiring the phase addition/removal search to the **phi-phi** and **gamma-gamma** paths.~~ **Done for phi-phi** by ADR-0020. What is still open is narrower: **gamma-gamma** has no trigger state - no activity-only system in this repository needs a third liquid - so wiring it would ship a path nothing exercises (ADR-0002).
-  - Performance of the multiphase path: **measured, unoptimized** (ADR-0020). A three-phase PC-SAFT flash is ~35 s and 4,725 `fugacity_coefficients` calls; Peng-Robinson is ~0.1 s. ADR-0023 did **not** touch it: its three optimizations are in the two-phase and stability paths, and the multiphase second-order stage's finite-difference Hessian is item 1 of Slice 2 above.
-  - ~~**The stability trial set for a very long chain.** `Mw = 53000` (`m = 1393.9`) polyethylene in n-pentane at 0.5 and 1 MPa: the deterministic trial set's deepest stationary point is a shallow *vapour-side* one and the melt is missed entirely.~~ **Done** by ADR-0025, and the diagnosis was half wrong: the trial *set* was fine, the `ln W` **clamp** was not. Three of the four trials were walking at the melt and stopped 752.2 short of it, which is exactly `1452.2 - 700`. What is still open is narrower and is recorded in ADR-0025 "What remains": the second-order stage at `|ln W| ~ 1e3` is **untested** (every repaired state converges in 3 successive substitutions, so the Newton stage is never entered there, and its scale-free `1e-6` multiplicative step in `u` is an argument rather than a measurement); and 0.3 MPa and 2.8-3.2 MPa of the same system still raise, for a reason upstream of this slice - a shallow near-critical verdict the ADR-0024 split stage cannot converge from, with `ln W` comfortably inside the window.
-  - **The multiphase split has no log-space form.** `flash/_multiphase.py` is untouched by ADR-0024 and by ADR-0025, so a three-phase state whose compositions leave machine range would fail the way the two-phase one did. (Its *stability* tests run through the same `stability_tp`, so they inherit ADR-0025 for free; it is the split that has no sibling.) No state in this repository needs it, so it is not written (ADR-0002).
-  - ~~The stability trial set for an **equation of state**: `_EOSTangentPlane` keeps per-iterate minimum-Gibbs root selection and names no surface (ADR-0012), and that is what makes it miss the vapour stationary point from a hexane-rich liquid above the three-phase temperature (Case P-9 (iv)).~~ **Done** by ADR-0021: each trial is pinned to one density root, Case P-9 (iv)'s miss is retired, and the fixture was regenerated to `v3` after a state-by-state audit (122 of 155 bit-identical, 18 changed `tpd_min` from `0.0` to a positive number, 15 last-bit). What is still open is narrower and is a *diagnostic*, not a result: the single-root fallback is counted where the solver compares the branches anyway (a pinned trial's stopping point), not at every intermediate iterate, because counting it there would double the model calls; the un-instrumented frequency (roughly nine evaluations in ten sit in a one-root region) is recorded in ADR-0021 and Case P-11 rather than measured at run time.
-  - ~~The stability trial set near a plait point: at 363 K one feed inside the ternary tie-triangle is missed and comes back a single liquid (validation Case V-2).~~ **Resolved** by ADR-0012 (fixed trial surfaces), and checked over a grid rather than at that one feed (Case V-5, zero disagreements at 363/364/365 K). What remains near the plait point is narrower and does not change a verdict: the `pure-Water` liquid-surface trial at that feed still fails to converge, because the stationarity Jacobian there has an eigenvalue of ~3.3e-09 (condition number ~8.2e+08) and the damped Newton stalls at a residual of ~5.4e-04. Recorded, not accommodated.
-  - Full gamma-phi (an EOS vapor against an activity liquid) phase detection, still blocked on a reference fugacity carrying `phi^sat` and a Poynting correction (ADR-0007). ADR-0010 discharges the low-pressure case only. The legacy `flash_mode="gamma-phi"` is deprecated and its removal needs its own ADR.
-  - ~~An accelerated / second-order **phi-phi** split: 1 state in the 1144-state scan is weakly unstable and near-critical (`tpd_min = -1.2e-3`) and still exhausts the iteration limit.~~ **Resolved** by ADR-0016: the stage is wired to phi-phi, gated so no previously converging number moved, and that state now converges (`fugacity_residual = 1.8e-15`, `dG/RT = -1.49e-05`, post-split stable). What remains is narrower: the stage has been *measured* on five states (four PC-SAFT, one Peng-Robinson), so there is no claim that it always succeeds, and its finite-difference Hessian is now exercised on a cubic EOS for the first time.
+- **Prioritized roadmap (short list; see `steering-brief.md` "Next 3 recommended actions" for the top three expanded)**
+  1. **Remaining PE-53000 refusals at 0.3 MPa and 2.8-3.2 MPa** (ADR-0024/0025 "what remains"). The polymer/solvent split stage still cannot converge these two pressures of the `Mw = 53000` polyethylene / n-pentane system even though `stability_tp` now finds the right stationary point (`ln W` comfortably in range) - a shallow near-critical verdict the log-space split stage cannot converge from. Split problem, not a stability or polymer problem.
+  2. **Stage I: EOS solve cache / density-scan cost** (ADR-0023 roadmap). In rank order: (a) an analytic/structured Hessian for the multiphase second-order stage (~35 s, ~4,725 `fugacity_coefficients` calls per three-phase PC-SAFT flash - the biggest cost in the library, needs its own ADR and bit-identity argument); (b) threading the already-solved density root through `phase_identity` and the post-split re-evaluation (~37 duplicate solves per water/n-hexane flash) instead of caching on the model (rejected on design grounds - both EOS classes are frozen dataclasses); (c) a scalar PC-SAFT single-point evaluation path (~19 `pressure_and_slope` calls per density solve, mostly numpy per-operation overhead).
+  3. **PC-SAFT temperature derivatives** (residual enthalpy/entropy; teqp `get_Ar10` comparison). The one gap that blocks a whole class of outputs, not one case - also blocks the Venkatarathnam-Oellrich `Pi` criterion ADR-0017 had to reject for want of it. A second analytic derivative chain through hard chain, dispersion and association (Michelsen-Hendriks again makes the first `T` derivative an explicit partial of `Q`).
+  4. **`pcsaft-polydispersity`.** ADR-0022 models a polymer as one component with one chain length; real samples have a distribution (polydispersities 1.14-2.94 in the cited samples). No new public contract needed (`segments_per_g` already expresses each pseudo-component); wants a reference to validate the *distribution* against, not just the monodisperse limit.
+  5. **CLI exposure of stability/multiphase/PC-SAFT.** ADR-0003/0004 fixed the CLI's v1 contract at `tp-flash` with Peng-Robinson phi-phi/gamma-phi only; exposing `stability_tp`, `max_phases`, or PC-SAFT means deciding whether that is an additive `cli_schema_version` bump or a new subcommand.
+  6. **Exact vs. rounded Peng-Robinson constants.** chemthermo uses the rounded 0.45724/0.07780 where `thermo` uses the exact cubic roots, which bounds external agreement at a few times 1e-4 in `ln phi` (ledger Case S-4). Undecided whether to switch, and no state in this repository depends on the choice.
+- **Narrower open items, not slice-sized on their own**
+  - `flash/_multiphase.py` has no log-space form (ADR-0024/0025 only reached the two-phase split); no state in this repository needs it yet (ADR-0002).
+  - The second-order stage at `|ln W| ~ 1e3` is untested: every state ADR-0025 repairs converges during successive substitution, so that Newton stage is never entered there.
+  - `gamma-gamma` still stops at two phases; no activity-only system in this repository needs a third liquid, so wiring the addition/removal search there would ship a path nothing exercises (ADR-0002).
+  - The `pure-Water` liquid-surface trial at one ternary feed near a plait point still fails to converge (stationarity Jacobian condition number ~8.2e+08); recorded, not accommodated (does not change the verdict).
+  - Full gamma-phi (EOS vapor against an activity liquid) phase detection is still blocked on a reference fugacity carrying `phi^sat` and a Poynting correction (ADR-0007); the legacy `flash_mode="gamma-phi"` stays deprecated, and removal needs its own ADR.
+  - The EOS stability trial's single-root fallback is counted at a trial's stopping point, not at every iterate (ADR-0021); the un-instrumented frequency (~nine evaluations in ten) is recorded rather than measured at run time.
 
 ## 10) Open questions / risks
+Full list, with the evidence behind each, is `.agents/brain/steering-brief.md`'s
+"Risks / unknowns" section; this is a short index into it so the two docs do
+not duplicate prose.
+- **Parameter provenance is second-hand in three places.** PC-SAFT's own
+  parameters and the association equation rest on secondary sources because
+  both primary papers (DOI 10.1021/ie0003887, 10.1021/ie010954d) return HTTP
+  403; the polymer parameters rest on a *single* secondary source
+  (Martini et al. 2009) with no second one found; FeOs's universal constants
+  differ from the printed table in the tenth-to-fourteenth figure, which
+  floors any FeOs comparison at ~1e-9 (`Z`) to ~1e-6 (`ln phi`).
+  (.agents/brain/adr/0014-pcsaft-residual-helmholtz.md,
+  .agents/brain/adr/0018-pcsaft-association.md,
+  .agents/brain/adr/0022-pcsaft-polymer-parameters.md)
+- **`stability_tp` reporting "stable" is bounded by its deterministic trial
+  set, not a global proof**, and a phase count is never better than the
+  stability test that produced it (Case V-2, Case P-9 (iv), Cases S-6/S-7).
+- **PC-SAFT has no temperature derivative** (no residual enthalpy/entropy;
+  roadmap item 3 above) and its density-root scan can miss a pair of roots
+  narrower than its grid step near a spinodal (ADR-0015, Case P-3).
+- **A polymer here is monodisperse** (roadmap item 4) and no polymer
+  parameters are packaged - only a cited test fixture (ADR-0022).
+- **Suite time is a standing budget, not a one-time target**: `pytest -q`
+  is tracked against a ~240 s ceiling every slice; see `.agents/dev-contract.md`
+  "The `slow` marker" for the policy on what may be deselected to hold it.
+- Everything else - the multiphase Rachford-Rice's sign convention, the
+  negative-flash window, liquid-phase-label identity, the second-order
+  stage's finite-difference Jacobian, the five external-library caveats
+  (`thermo` PR constants, `thermo` root-solver order-sensitivity, FeOs's own
+  flash convergence, FeOs's missing `k_ij` plumbing) - is in section 4 above
+  and in the steering brief; nothing here repeats it.

@@ -10,6 +10,9 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
 
 - `examples/database/01_component_database_demo.py`
   - Inspects canonical packaged runtime DB metadata and sample records.
+- `examples/basic/citation_demo.py`
+  - Looks up a property's citation (`chemthermo.cite`) directly and via
+    `Component.get_citation`, including the "no citation available" case.
 - `examples/basic/tp_flash_pr_pure.py`
   - Pure-component TP flash with Peng-Robinson EOS.
 - `examples/basic/tp_flash_pr_mixture.py`
@@ -169,6 +172,24 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
   - Deterministic single-case comparison against `thermo` (optional dependency).
     Unchanged by the tangent-plane phase-detection slice: beta 0.46829044 vs
     thermo 0.46976460, |delta| = 1.474e-03.
+- `examples/validation/01_pure_props_grid.py`
+  - Peng-Robinson pure-component `Psat(T)` and saturated `Z` against `thermo`
+    for methane, 110-180 K; requires `thermo` (exits with a message if absent).
+    Optionally writes a CSV to `--outdir` / `CHEMTHERMO_OUTDIR`.
+- `examples/validation/02_binary_k_surface.py`
+  - Binary methane/ethane TP-flash K-value surface against `thermo` over a
+    composition sweep at fixed T, P; requires `thermo`.
+- `examples/validation/03_txy_pxy_curves.py`
+  - Methane/ethane bubble/dew temperature curve (Txy at fixed P) against
+    `thermo`, with RMS temperature differences; requires `thermo`.
+- `examples/validation/04_multicomponent_flash_sweep.py`
+  - Methane/ethane/propane TP flash over random Dirichlet-sampled
+    compositions against `thermo`: phase-count agreement, vapor-fraction and
+    composition differences; requires `thermo`.
+- `examples/validation/05_robustness_map.py`
+  - Convergence and phase-count agreement between chemthermo and `thermo`
+    over a 10x10 methane/ethane T-P grid, classified into
+    MATCH/PHASE_MISMATCH/CT_FAIL/TH_FAIL/BOTH_FAIL buckets; requires `thermo`.
 - `examples/validation/06_stability_vs_thermo.py`
   - Deterministic stability cross-check against `thermo`'s Michelsen test over 7 states.
 - `examples/validation/07_nrtl_tessier_stationary_points.py`
