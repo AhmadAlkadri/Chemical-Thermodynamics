@@ -72,7 +72,17 @@ import pytest
 import chemthermo as ct
 
 PRESSURE_PA = 101325.0
-TEMPERATURES = (363.0, 364.0, 365.0)
+# 364/365 K are `slow`: a further temperature on the same verdict map that
+# 363 K (kept in the default run, on all six test functions below) already
+# checks - a full 75-76-feed grid, scored against the independent classifier,
+# builds and passes at 363 K, so 364/365 K repeat that same check one
+# temperature closer to (and past) the three-phase boundary. Per
+# `.agents/dev-contract.md`'s slow-marker policy.
+TEMPERATURES = (
+    363.0,
+    pytest.param(364.0, marks=pytest.mark.slow),
+    pytest.param(365.0, marks=pytest.mark.slow),
+)
 FIXTURE_PATH = (
     Path(__file__).resolve().parents[1] / "fixtures" / "nrtl" / "tessier2000_problem1.json"
 )
