@@ -1,0 +1,1678 @@
+{
+  "schema": "chemthermo-bench/1",
+  "generated_utc": "2026-09-14T18:22:42+00:00",
+  "git": {
+    "sha": "07bf0b38e4d052b415f4bc25342269dcf8d8ea60",
+    "dirty": true
+  },
+  "environment": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "system": "Darwin",
+    "machine": "arm64",
+    "cpu": "Apple M2 Max",
+    "cpu_count": 12,
+    "python": "3.11.6",
+    "python_implementation": "CPython",
+    "numpy": "2.4.2",
+    "chemthermo": "0.0.0"
+  },
+  "repeats": 9,
+  "cases": [
+    {
+      "id": "pr-flash-ternary",
+      "description": "Peng-Robinson phi-phi flash, methane/ethane/propane at 240 K and 3 MPa",
+      "model": "Peng-Robinson",
+      "route": "flash_tp (phi-phi)",
+      "components": [
+        "Methane",
+        "Ethane",
+        "Propane"
+      ],
+      "settings": {
+        "flash_max_iter": 100,
+        "flash_tol": 1e-08,
+        "flash_second_order": true,
+        "flash_second_order_tol": 1e-12,
+        "flash_ssi_iterations": 50,
+        "flash_max_phases": 3,
+        "post_split_stability": true,
+        "phase_detection": "tangent-plane",
+        "stability_max_iter": 300,
+        "stability_tol": 1e-10,
+        "stability_tpd_tol": 1e-08,
+        "stability_trivial_tol": 1e-08
+      },
+      "derivative_mode": "analytic",
+      "repeats": 9,
+      "status": "ok",
+      "states": 1,
+      "refusals": 0,
+      "phase_counts": [
+        2
+      ],
+      "wall_time_s": {
+        "median": 0.013450041995383799,
+        "min": 0.013354333001188934,
+        "max": 0.013937792042270303,
+        "samples": [
+          0.013531250064261258,
+          0.013937792042270303,
+          0.013441457995213568,
+          0.01346425001975149,
+          0.013583958963863552,
+          0.01344016706570983,
+          0.013409500010311604,
+          0.013354333001188934,
+          0.013450041995383799
+        ]
+      },
+      "peak_memory_bytes": 47373,
+      "result_hash": "sha256:a8d7d2e66f627dd273ea9361373872183b701301ac08bd77322a0826d8a9b390",
+      "outcomes": [
+        {
+          "temperature_K": 240.0,
+          "pressure_Pa": 3000000.0,
+          "composition": [
+            0.5,
+            0.3,
+            0.2
+          ],
+          "phases": [
+            "liquid",
+            "vapor"
+          ],
+          "phase_compositions": [
+            [
+              0.2561702641262199,
+              0.4018426139611814,
+              0.3419871219125986
+            ],
+            [
+              0.7768508428047598,
+              0.184365155843058,
+              0.03878400135218233
+            ]
+          ],
+          "phase_fractions": [
+            0.5317095627178787,
+            0.4682904372821213
+          ],
+          "iterations": {
+            "iterations": 12,
+            "stability_trials": 5,
+            "phase_count": 2
+          },
+          "initialization": {
+            "k_seed": "stability",
+            "phase_detection": "tangent-plane",
+            "incipient_phase": "vapor",
+            "feed_branch": "liquid"
+          },
+          "status": "ok",
+          "error": null
+        }
+      ]
+    },
+    {
+      "id": "pr-stability-ternary",
+      "description": "Tangent-plane stability test alone, at the pr-flash-ternary state",
+      "model": "Peng-Robinson",
+      "route": "stability_tp",
+      "components": [
+        "Methane",
+        "Ethane",
+        "Propane"
+      ],
+      "settings": {
+        "stability_max_iter": 300,
+        "stability_tol": 1e-10,
+        "stability_tpd_tol": 1e-08,
+        "stability_trivial_tol": 1e-08,
+        "stability_second_order": true,
+        "stability_ssi_iterations": 50
+      },
+      "derivative_mode": "analytic",
+      "repeats": 9,
+      "status": "ok",
+      "states": 1,
+      "refusals": 0,
+      "phase_counts": [
+        1
+      ],
+      "wall_time_s": {
+        "median": 0.004118915996514261,
+        "min": 0.004077665973454714,
+        "max": 0.0042334579629823565,
+        "samples": [
+          0.004118915996514261,
+          0.004119207966141403,
+          0.004098959034308791,
+          0.004200417082756758,
+          0.0042334579629823565,
+          0.004225000040605664,
+          0.004104541032575071,
+          0.004088083980605006,
+          0.004077665973454714
+        ]
+      },
+      "peak_memory_bytes": 17633,
+      "result_hash": "sha256:cf4be49adbbb21b6ffc7f13177f18b78d190d044134587f2421e64186e37bf03",
+      "outcomes": [
+        {
+          "temperature_K": 240.0,
+          "pressure_Pa": 3000000.0,
+          "composition": [
+            0.5,
+            0.3,
+            0.2
+          ],
+          "phases": [
+            "unstable"
+          ],
+          "phase_compositions": [
+            [
+              0.8806836820185336,
+              0.10057663206852038,
+              0.018739685912945978
+            ]
+          ],
+          "phase_fractions": [
+            -0.34927702066775673
+          ],
+          "iterations": {
+            "stability_trials": 5,
+            "trial_iterations": 69
+          },
+          "initialization": {
+            "phase_detection": "tangent-plane",
+            "feed_branch": "liquid"
+          },
+          "status": "ok",
+          "error": null
+        }
+      ]
+    },
+    {
+      "id": "pr-flash-grid-24",
+      "description": "24 states of the ADR-0017 Peng-Robinson grid (six mixtures, 240 K, four pressures)",
+      "model": "Peng-Robinson",
+      "route": "flash_tp (phi-phi)",
+      "components": [
+        "mixed"
+      ],
+      "settings": {
+        "flash_max_iter": 100,
+        "flash_tol": 1e-08,
+        "flash_second_order": true,
+        "flash_second_order_tol": 1e-12,
+        "flash_ssi_iterations": 50,
+        "flash_max_phases": 3,
+        "post_split_stability": true,
+        "phase_detection": "tangent-plane",
+        "stability_max_iter": 300,
+        "stability_tol": 1e-10,
+        "stability_tpd_tol": 1e-08,
+        "stability_trivial_tol": 1e-08
+      },
+      "derivative_mode": "analytic",
+      "repeats": 9,
+      "status": "ok",
+      "states": 24,
+      "refusals": 0,
+      "phase_counts": [
+        1,
+        1,
+        2,
+        1,
+        1,
+        2,
+        2,
+        1,
+        2,
+        1,
+        1,
+        1,
+        2,
+        2,
+        2,
+        2,
+        1,
+        2,
+        2,
+        1,
+        1,
+        1,
+        1,
+        1
+      ],
+      "wall_time_s": {
+        "median": 0.12064079206902534,
+        "min": 0.11848220799583942,
+        "max": 0.13261787500232458,
+        "samples": [
+          0.1235438339645043,
+          0.12064079206902534,
+          0.12555341701954603,
+          0.1193222920410335,
+          0.12017470900900662,
+          0.11967437504790723,
+          0.11848220799583942,
+          0.12364200002048165,
+          0.13261787500232458
+        ]
+      },
+      "peak_memory_bytes": 79339,
+      "result_hash": "sha256:c4ba9aba2bd0c9ffbc338f36442997854c6a7bcd0d619f79b0c6b3f716275948",
+      "outcomes": [
+        {
+          "temperature_K": 240.0,
+          "pressure_Pa": 200000.0,
+          "composition": [
+            0.5,
+            0.5
+          ],
+          "phases": [
+            "vapor"
+          ],
+          "phase_compositions": [
+            [
+              0.5,
+              0.5
+            ]
+          ],
+          "phase_fractions": [
+            1.0
+          ],
+          "iterations": {
+            "iterations": 0,
+            "stability_trials": 4,
+            "phase_count": 1
+          },
+          "initialization": {
+            "phase_detection": "tangent-plane",
+            "feed_branch": "vapor"
+          },
+          "status": "ok",
+          "error": null
+        },
+        {
+          "temperature_K": 240.0,
+          "pressure_Pa": 1000000.0,
+          "composition": [
+            0.5,
+            0.5
+          ],
+          "phases": [
+            "vapor"
+          ],
+          "phase_compositions": [
+            [
+              0.5,
+              0.5
+            ]
+          ],
+          "phase_fractions": [
+            1.0
+          ],
+          "iterations": {
+            "iterations": 0,
+            "stability_trials": 4,
+            "phase_count": 1
+          },
+          "initialization": {
+            "phase_detection": "tangent-plane",
+            "feed_branch": "vapor"
+          },
+          "status": "ok",
+          "error": null
+        },
+        {
+          "temperature_K": 240.0,
+          "pressure_Pa": 3000000.0,
+          "composition": [
+            0.5,
+            0.5
+          ],
+          "phases": [
+            "liquid",
+            "vapor"
+          ],
+          "phase_compositions": [
+            [
+              0.2306379720657268,
+              0.7693620279342732
+            ],
+            [
+              0.6299778799587319,
+              0.37002212004126817
+            ]
+          ],
+          "phase_fractions": [
+            0.32548181984748226,
+            0.6745181801525177
+          ],
+          "iterations": {
+            "iterations": 10,
+            "stability_trials": 4,
+            "phase_count": 2
+          },
+          "initialization": {
+            "k_seed": "stability",
+            "phase_detection": "tangent-plane",
+            "incipient_phase": "liquid",
+            "feed_branch": "vapor"
+          },
+          "status": "ok",
+          "error": null
+        },
+        {
+          "temperature_K": 240.0,
+          "pressure_Pa": 8000000.0,
+          "composition": [
+            0.5,
+            0.5
+          ],
+          "phases": [
+            "liquid"
+          ],
+          "phase_compositions": [
+            [
+              0.5,
+              0.5
+            ]
+          ],
+          "phase_fractions": [
+            1.0
+          ],
+          "iterations": {
+            "iterations": 0,
+            "stability_trials": 4,
+            "phase_count": 1
+          },
+          "initialization": {
+            "phase_detection": "tangent-plane",
+            "feed_branch": "liquid"
+          },
+          "status": "ok",
+          "error": null
+        },
+        {
+          "temperature_K": 240.0,
+          "pressure_Pa": 200000.0,
+          "composition": [
+            0.7,
+            0.3
+          ],
+          "phases": [
+            "vapor"
+          ],
+          "phase_compositions": [
+            [
+              0.7,
+              0.3
+            ]
+          ],
+          "phase_fractions": [
+            1.0
+          ],
+          "iterations": {
+            "iterations": 0,
+            "stability_trials": 4,
+            "phase_count": 1
+          },
+          "initialization": {
+            "phase_detection": "tangent-plane",
+            "feed_branch": "vapor"
+          },
+          "status": "ok",
+          "error": null
+        },
+        {
+          "temperature_K": 240.0,
+          "pressure_Pa": 1000000.0,
+          "composition": [
+            0.7,
+            0.3
+          ],
+          "phases": [
+            "liquid",
+            "vapor"
+          ],
+          "phase_compositions": [
+            [
+              0.08856486794093944,
+              0.9114351320590607
+            ],
+            [
+              0.8334293442418268,
+              0.16657065575817323
+            ]
+          ],
+          "phase_fractions": [
+            0.17913237707944063,
+            0.8208676229205594
+          ],
+          "iterations": {
+            "iterations": 7,
+            "stability_trials": 4,
+            "phase_count": 2
+          },
+          "initialization": {
+            "k_seed": "stability",
+            "phase_detection": "tangent-plane",
+            "incipient_phase": "liquid",
+            "feed_branch": "vapor"
+          },
+          "status": "ok",
+          "error": null
+        },
+        {
+          "temperature_K": 240.0,
+          "pressure_Pa": 3000000.0,
+          "composition": [
+            0.7,
+            0.3
+          ],
+          "phases": [
+            "liquid",
+            "vapor"
+          ],
+          "phase_compositions": [
+            [
+              0.2829019575413311,
+              0.7170980424586689
+            ],
+            [
+              0.9263888882194639,
+              0.07361111178053618
+            ]
+          ],
+          "phase_fractions": [
+            0.3518158293918532,
+            0.6481841706081468
+          ],
+          "iterations": {
+            "iterations": 11,
+            "stability_trials": 4,
+            "phase_count": 2
+          },
+          "initialization": {
+            "k_seed": "stability",
+            "phase_detection": "tangent-plane",
+            "incipient_phase": "liquid",
+            "feed_branch": "vapor"
+          },
+          "status": "ok",
+          "error": null
+        },
+        {
+          "temperature_K": 240.0,
+          "pressure_Pa": 8000000.0,
+          "composition": [
+            0.7,
+            0.3
+          ],
+          "phases": [
+            "liquid"
+          ],
+          "phase_compositions": [
+            [
+              0.7,
+              0.3
+            ]
+          ],
+          "phase_fractions": [
+            1.0
+          ],
+          "iterations": {
+            "iterations": 0,
+            "stability_trials": 4,
+            "phase_count": 1
+          },
+          "initialization": {
+            "phase_detection": "tangent-plane",
+            "feed_branch": "liquid"
+          },
+          "status": "ok",
+          "error": null
+        },
+        {
+          "temperature_K": 240.0,
+          "pressure_Pa": 200000.0,
+          "composition": [
+            0.7,
+            0.3
+          ],
+          "phases": [
+            "liquid",
+            "vapor"
+          ],
+          "phase_compositions": [
+            [
+              0.22547321879672313,
+              0.7745267812032769
+            ],
+            [
+              0.9992778499411401,
+              0.00072215005885985
+            ]
+          ],
+          "phase_fractions": [
+            0.386761513042984,
+            0.613238486957016
+          ],
+          "iterations": {
+            "iterations": 5,
+            "stability_trials": 4,
+            "phase_count": 2
+          },
+          "initialization": {
+            "k_seed": "stability",
+            "phase_detection": "tangent-plane",
+            "incipient_phase": "vapor",
+            "feed_branch": "liquid"
+          },
+          "status": "ok",
+          "error": null
+        },
+        {
+          "temperature_K": 240.0,
+          "pressure_Pa": 1000000.0,
+          "composition": [
+            0.7,
+            0.3
+          ],
+          "phases": [
+            "liquid"
+          ],
+          "phase_compositions": [
+            [
+              0.7,
+              0.3
+            ]
+          ],
+          "phase_fractions": [
+            1.0
+          ],
+          "iterations": {
+            "iterations": 0,
+            "stability_trials": 4,
+            "phase_count": 1
+          },
+          "initialization": {
+            "phase_detection": "tangent-plane",
+            "feed_branch": "liquid"
+          },
+          "status": "ok",
+          "error": null
+        },
+        {
+          "temperature_K": 240.0,
+          "pressure_Pa": 3000000.0,
+          "composition": [
+            0.7,
+            0.3
+          ],
+          "phases": [
+            "liquid"
+          ],
+          "phase_compositions": [
+            [
+              0.7,
+              0.3
+            ]
+          ],
+          "phase_fractions": [
+            1.0
+          ],
+          "iterations": {
+            "iterations": 0,
+            "stability_trials": 4,
+            "phase_count": 1
+          },
+          "initialization": {
+            "phase_detection": "tangent-plane",
+            "feed_branch": "liquid"
+          },
+          "status": "ok",
+          "error": null
+        },
+        {
+          "temperature_K": 240.0,
+          "pressure_Pa": 8000000.0,
+          "composition": [
+            0.7,
+            0.3
+          ],
+          "phases": [
+            "liquid"
+          ],
+          "phase_compositions": [
+            [
+              0.7,
+              0.3
+            ]
+          ],
+          "phase_fractions": [
+            1.0
+          ],
+          "iterations": {
+            "iterations": 0,
+            "stability_trials": 4,
+            "phase_count": 1
+          },
+          "initialization": {
+            "phase_detection": "tangent-plane",
+            "feed_branch": "liquid"
+          },
+          "status": "ok",
+          "error": null
+        },
+        {
+          "temperature_K": 240.0,
+          "pressure_Pa": 200000.0,
+          "composition": [
+            0.6,
+            0.4
+          ],
+          "phases": [
+            "liquid",
+            "vapor"
+          ],
+          "phase_compositions": [
+            [
+              0.019058484715548538,
+              0.9809415152844514
+            ],
+            [
+              0.9768453065686417,
+              0.02315469343135837
+            ]
+          ],
+          "phase_fractions": [
+            0.39345426139789197,
+            0.606545738602108
+          ],
+          "iterations": {
+            "iterations": 5,
+            "stability_trials": 4,
+            "phase_count": 2
+          },
+          "initialization": {
+            "k_seed": "stability",
+            "phase_detection": "tangent-plane",
+            "incipient_phase": "liquid",
+            "feed_branch": "vapor"
+          },
+          "status": "ok",
+          "error": null
+        },
+        {
+          "temperature_K": 240.0,
+          "pressure_Pa": 1000000.0,
+          "composition": [
+            0.6,
+            0.4
+          ],
+          "phases": [
+            "liquid",
+            "vapor"
+          ],
+          "phase_compositions": [
+            [
+              0.09403818443519465,
+              0.9059618155648053
+            ],
+            [
+              0.9942170043108581,
+              0.00578299568914187
+            ]
+          ],
+          "phase_fractions": [
+            0.43793188154040763,
+            0.5620681184595924
+          ],
+          "iterations": {
+            "iterations": 7,
+            "stability_trials": 4,
+            "phase_count": 2
+          },
+          "initialization": {
+            "k_seed": "stability",
+            "phase_detection": "tangent-plane",
+            "incipient_phase": "vapor",
+            "feed_branch": "liquid"
+          },
+          "status": "ok",
+          "error": null
+        },
+        {
+          "temperature_K": 240.0,
+          "pressure_Pa": 3000000.0,
+          "composition": [
+            0.6,
+            0.4
+          ],
+          "phases": [
+            "liquid",
+            "vapor"
+          ],
+          "phase_compositions": [
+            [
+              0.2624101840232757,
+              0.7375898159767242
+            ],
+            [
+              0.9964991259531857,
+              0.003500874046814319
+            ]
+          ],
+          "phase_fractions": [
+            0.5401240957407936,
+            0.45987590425920644
+          ],
+          "iterations": {
+            "iterations": 10,
+            "stability_trials": 4,
+            "phase_count": 2
+          },
+          "initialization": {
+            "k_seed": "stability",
+            "phase_detection": "tangent-plane",
+            "incipient_phase": "vapor",
+            "feed_branch": "liquid"
+          },
+          "status": "ok",
+          "error": null
+        },
+        {
+          "temperature_K": 240.0,
+          "pressure_Pa": 8000000.0,
+          "composition": [
+            0.6,
+            0.4
+          ],
+          "phases": [
+            "liquid",
+            "vapor"
+          ],
+          "phase_compositions": [
+            [
+              0.5889569750783005,
+              0.41104302492169936
+            ],
+            [
+              0.991723316391121,
+              0.008276683608879084
+            ]
+          ],
+          "phase_fractions": [
+            0.9725820561725413,
+            0.027417943827458657
+          ],
+          "iterations": {
+            "iterations": 17,
+            "stability_trials": 4,
+            "phase_count": 2
+          },
+          "initialization": {
+            "k_seed": "stability",
+            "phase_detection": "tangent-plane",
+            "incipient_phase": "vapor",
+            "feed_branch": "liquid"
+          },
+          "status": "ok",
+          "error": null
+        },
+        {
+          "temperature_K": 240.0,
+          "pressure_Pa": 200000.0,
+          "composition": [
+            0.5,
+            0.3,
+            0.2
+          ],
+          "phases": [
+            "vapor"
+          ],
+          "phase_compositions": [
+            [
+              0.5,
+              0.3,
+              0.2
+            ]
+          ],
+          "phase_fractions": [
+            1.0
+          ],
+          "iterations": {
+            "iterations": 0,
+            "stability_trials": 5,
+            "phase_count": 1
+          },
+          "initialization": {
+            "phase_detection": "tangent-plane",
+            "feed_branch": "vapor"
+          },
+          "status": "ok",
+          "error": null
+        },
+        {
+          "temperature_K": 240.0,
+          "pressure_Pa": 1000000.0,
+          "composition": [
+            0.5,
+            0.3,
+            0.2
+          ],
+          "phases": [
+            "liquid",
+            "vapor"
+          ],
+          "phase_compositions": [
+            [
+              0.06451021945426443,
+              0.30691549559488035,
+              0.6285742849508552
+            ],
+            [
+              0.5831828494567245,
+              0.2986790720363938,
+              0.1181380785068816
+            ]
+          ],
+          "phase_fractions": [
+            0.16037640053673385,
+            0.8396235994632661
+          ],
+          "iterations": {
+            "iterations": 7,
+            "stability_trials": 5,
+            "phase_count": 2
+          },
+          "initialization": {
+            "k_seed": "stability",
+            "phase_detection": "tangent-plane",
+            "incipient_phase": "liquid",
+            "feed_branch": "vapor"
+          },
+          "status": "ok",
+          "error": null
+        },
+        {
+          "temperature_K": 240.0,
+          "pressure_Pa": 3000000.0,
+          "composition": [
+            0.5,
+            0.3,
+            0.2
+          ],
+          "phases": [
+            "liquid",
+            "vapor"
+          ],
+          "phase_compositions": [
+            [
+              0.2561702641262199,
+              0.4018426139611814,
+              0.3419871219125986
+            ],
+            [
+              0.7768508428047598,
+              0.184365155843058,
+              0.03878400135218233
+            ]
+          ],
+          "phase_fractions": [
+            0.5317095627178787,
+            0.4682904372821213
+          ],
+          "iterations": {
+            "iterations": 12,
+            "stability_trials": 5,
+            "phase_count": 2
+          },
+          "initialization": {
+            "k_seed": "stability",
+            "phase_detection": "tangent-plane",
+            "incipient_phase": "vapor",
+            "feed_branch": "liquid"
+          },
+          "status": "ok",
+          "error": null
+        },
+        {
+          "temperature_K": 240.0,
+          "pressure_Pa": 8000000.0,
+          "composition": [
+            0.5,
+            0.3,
+            0.2
+          ],
+          "phases": [
+            "liquid"
+          ],
+          "phase_compositions": [
+            [
+              0.5,
+              0.3,
+              0.2
+            ]
+          ],
+          "phase_fractions": [
+            1.0
+          ],
+          "iterations": {
+            "iterations": 0,
+            "stability_trials": 5,
+            "phase_count": 1
+          },
+          "initialization": {
+            "phase_detection": "tangent-plane",
+            "feed_branch": "liquid"
+          },
+          "status": "ok",
+          "error": null
+        },
+        {
+          "temperature_K": 240.0,
+          "pressure_Pa": 200000.0,
+          "composition": [
+            0.4,
+            0.3,
+            0.3
+          ],
+          "phases": [
+            "liquid"
+          ],
+          "phase_compositions": [
+            [
+              0.4,
+              0.3,
+              0.3
+            ]
+          ],
+          "phase_fractions": [
+            1.0
+          ],
+          "iterations": {
+            "iterations": 0,
+            "stability_trials": 5,
+            "phase_count": 1
+          },
+          "initialization": {
+            "phase_detection": "tangent-plane",
+            "feed_branch": "liquid"
+          },
+          "status": "ok",
+          "error": null
+        },
+        {
+          "temperature_K": 240.0,
+          "pressure_Pa": 1000000.0,
+          "composition": [
+            0.4,
+            0.3,
+            0.3
+          ],
+          "phases": [
+            "liquid"
+          ],
+          "phase_compositions": [
+            [
+              0.4,
+              0.3,
+              0.3
+            ]
+          ],
+          "phase_fractions": [
+            1.0
+          ],
+          "iterations": {
+            "iterations": 0,
+            "stability_trials": 5,
+            "phase_count": 1
+          },
+          "initialization": {
+            "phase_detection": "tangent-plane",
+            "feed_branch": "liquid"
+          },
+          "status": "ok",
+          "error": null
+        },
+        {
+          "temperature_K": 240.0,
+          "pressure_Pa": 3000000.0,
+          "composition": [
+            0.4,
+            0.3,
+            0.3
+          ],
+          "phases": [
+            "liquid"
+          ],
+          "phase_compositions": [
+            [
+              0.4,
+              0.3,
+              0.3
+            ]
+          ],
+          "phase_fractions": [
+            1.0
+          ],
+          "iterations": {
+            "iterations": 0,
+            "stability_trials": 5,
+            "phase_count": 1
+          },
+          "initialization": {
+            "phase_detection": "tangent-plane",
+            "feed_branch": "liquid"
+          },
+          "status": "ok",
+          "error": null
+        },
+        {
+          "temperature_K": 240.0,
+          "pressure_Pa": 8000000.0,
+          "composition": [
+            0.4,
+            0.3,
+            0.3
+          ],
+          "phases": [
+            "liquid"
+          ],
+          "phase_compositions": [
+            [
+              0.4,
+              0.3,
+              0.3
+            ]
+          ],
+          "phase_fractions": [
+            1.0
+          ],
+          "iterations": {
+            "iterations": 0,
+            "stability_trials": 5,
+            "phase_count": 1
+          },
+          "initialization": {
+            "phase_detection": "tangent-plane",
+            "feed_branch": "liquid"
+          },
+          "status": "ok",
+          "error": null
+        }
+      ]
+    },
+    {
+      "id": "nrtl-lle-tessier-p1",
+      "description": "NRTL gamma-gamma liquid-liquid split, Tessier (2000) Problem 1 feed",
+      "model": "NRTL",
+      "route": "flash_tp (gamma-gamma)",
+      "components": [
+        "1-Propanol",
+        "n-Butanol",
+        "Water"
+      ],
+      "settings": {
+        "flash_max_iter": 100,
+        "flash_tol": 1e-08,
+        "flash_second_order": true,
+        "flash_second_order_tol": 1e-12,
+        "flash_ssi_iterations": 50,
+        "flash_max_phases": 3,
+        "post_split_stability": true,
+        "phase_detection": "tangent-plane",
+        "stability_max_iter": 300,
+        "stability_tol": 1e-10,
+        "stability_tpd_tol": 1e-08,
+        "stability_trivial_tol": 1e-08
+      },
+      "derivative_mode": "analytic",
+      "repeats": 9,
+      "status": "ok",
+      "states": 1,
+      "refusals": 0,
+      "phase_counts": [
+        2
+      ],
+      "wall_time_s": {
+        "median": 0.05952570808585733,
+        "min": 0.053612417075783014,
+        "max": 0.07168666692450643,
+        "samples": [
+          0.07168666692450643,
+          0.0648806249955669,
+          0.05919929104857147,
+          0.056224333005957305,
+          0.05435854208189994,
+          0.06202254199888557,
+          0.06501170899719,
+          0.05952570808585733,
+          0.053612417075783014
+        ]
+      },
+      "peak_memory_bytes": 19460,
+      "result_hash": "sha256:326201acf08424b66f558dc71489245c757858a476123e72de4c222720a08c93",
+      "outcomes": [
+        {
+          "temperature_K": 298.15,
+          "pressure_Pa": 101325.0,
+          "composition": [
+            0.148,
+            0.052,
+            0.8
+          ],
+          "phases": [
+            "liquid1",
+            "liquid2"
+          ],
+          "phase_compositions": [
+            [
+              0.15447363046658763,
+              0.05509005817404164,
+              0.7904363113593706
+            ],
+            [
+              0.11672729207943833,
+              0.03707259763542141,
+              0.8462001102851402
+            ]
+          ],
+          "phase_fractions": [
+            0.8284964650030374,
+            0.17150353499696258
+          ],
+          "iterations": {
+            "iterations": 55,
+            "ssi_iterations": 50,
+            "second_order_iterations": 5,
+            "stability_trials": 3,
+            "phase_count": 2
+          },
+          "initialization": {
+            "k_seed": "stability",
+            "phase_detection": "tangent-plane"
+          },
+          "status": "ok",
+          "error": null
+        }
+      ]
+    },
+    {
+      "id": "modified-raoult-vle",
+      "description": "Modified-Raoult vapour-liquid split, 1-propanol/water at 361 K and 1 atm",
+      "model": "NRTL + ideal gas (Antoine reference)",
+      "route": "flash_tp (modified-raoult)",
+      "components": [
+        "1-Propanol",
+        "Water"
+      ],
+      "settings": {
+        "flash_max_iter": 100,
+        "flash_tol": 1e-08,
+        "flash_second_order": true,
+        "flash_second_order_tol": 1e-12,
+        "flash_ssi_iterations": 50,
+        "flash_max_phases": 3,
+        "post_split_stability": true,
+        "phase_detection": "tangent-plane",
+        "stability_max_iter": 300,
+        "stability_tol": 1e-10,
+        "stability_tpd_tol": 1e-08,
+        "stability_trivial_tol": 1e-08
+      },
+      "derivative_mode": "analytic",
+      "repeats": 9,
+      "status": "ok",
+      "states": 1,
+      "refusals": 0,
+      "phase_counts": [
+        2
+      ],
+      "wall_time_s": {
+        "median": 0.0241907499730587,
+        "min": 0.022640917100943625,
+        "max": 0.03003741696011275,
+        "samples": [
+          0.024122957955114543,
+          0.029821542091667652,
+          0.025000334018841386,
+          0.022640917100943625,
+          0.024171833996661007,
+          0.0241907499730587,
+          0.03003741696011275,
+          0.023271750076673925,
+          0.028027250082232058
+        ]
+      },
+      "peak_memory_bytes": 20701,
+      "result_hash": "sha256:9698f36d0565c7200a80ec1b76693722d09af8fdee883e5ea7a031bbc145cd94",
+      "outcomes": [
+        {
+          "temperature_K": 361.0,
+          "pressure_Pa": 101325.0,
+          "composition": [
+            0.5,
+            0.5
+          ],
+          "phases": [
+            "liquid",
+            "vapor"
+          ],
+          "phase_compositions": [
+            [
+              0.5054911810025342,
+              0.4945088189974658
+            ],
+            [
+              0.44232092608407636,
+              0.5576790739159236
+            ]
+          ],
+          "phase_fractions": [
+            0.9130733125958977,
+            0.08692668740410228
+          ],
+          "iterations": {
+            "iterations": 33,
+            "ssi_iterations": 32,
+            "second_order_iterations": 1,
+            "stability_trials": 4,
+            "phase_count": 2
+          },
+          "initialization": {
+            "k_seed": "stability",
+            "phase_detection": "tangent-plane",
+            "incipient_phase": "vapor",
+            "feed_branch": "liquid"
+          },
+          "status": "ok",
+          "error": null
+        }
+      ]
+    },
+    {
+      "id": "vlle-364k",
+      "description": "Three-phase modified-Raoult search, 364 K tie-triangle centroid feed",
+      "model": "NRTL + ideal gas (Antoine reference)",
+      "route": "flash_tp (modified-raoult, phase addition)",
+      "components": [
+        "1-Propanol",
+        "n-Butanol",
+        "Water"
+      ],
+      "settings": {
+        "flash_max_iter": 100,
+        "flash_tol": 1e-08,
+        "flash_second_order": true,
+        "flash_second_order_tol": 1e-12,
+        "flash_ssi_iterations": 50,
+        "flash_max_phases": 3,
+        "post_split_stability": true,
+        "phase_detection": "tangent-plane",
+        "stability_max_iter": 300,
+        "stability_tol": 1e-10,
+        "stability_tpd_tol": 1e-08,
+        "stability_trivial_tol": 1e-08
+      },
+      "derivative_mode": "analytic",
+      "repeats": 9,
+      "status": "ok",
+      "states": 1,
+      "refusals": 0,
+      "phase_counts": [
+        3
+      ],
+      "wall_time_s": {
+        "median": 0.13312258408404887,
+        "min": 0.12047087494283915,
+        "max": 0.1429082079557702,
+        "samples": [
+          0.1256812500068918,
+          0.13312258408404887,
+          0.12047087494283915,
+          0.13784354098606855,
+          0.13698308309540153,
+          0.13456416595727205,
+          0.1306159159867093,
+          0.1429082079557702,
+          0.12568387505598366
+        ]
+      },
+      "peak_memory_bytes": 30618,
+      "result_hash": "sha256:b520abf85cd8a66cec992cea355c3da2d28c3e67294930508c8d6e3ba45cabc4",
+      "outcomes": [
+        {
+          "temperature_K": 364.0,
+          "pressure_Pa": 101325.0,
+          "composition": [
+            0.13418838,
+            0.08427618,
+            0.78153544
+          ],
+          "phases": [
+            "liquid1",
+            "liquid2",
+            "vapor"
+          ],
+          "phase_compositions": [
+            [
+              0.1396394360006432,
+              0.12347805282418728,
+              0.7368825111751696
+            ],
+            [
+              0.05214424243271442,
+              0.029171565506450357,
+              0.9186841920608352
+            ],
+            [
+              0.21078145575267032,
+              0.1001789279363087,
+              0.689039616311021
+            ]
+          ],
+          "phase_fractions": [
+            0.3333332797191171,
+            0.3333333451605264,
+            0.33333337512035655
+          ],
+          "iterations": {
+            "iterations": 55,
+            "ssi_iterations": 50,
+            "second_order_iterations": 5,
+            "stability_trials": 5,
+            "phase_count": 3
+          },
+          "initialization": {
+            "k_seed": "stability",
+            "phase_detection": "tangent-plane",
+            "feed_branch": "liquid"
+          },
+          "status": "ok",
+          "error": null
+        }
+      ]
+    },
+    {
+      "id": "pcsaft-vle-methane-hexane",
+      "description": "PC-SAFT phi-phi vapour-liquid flash, methane/n-hexane at 300 K and 3 MPa",
+      "model": "PC-SAFT",
+      "route": "flash_tp (phi-phi)",
+      "components": [
+        "Methane",
+        "n-Hexane"
+      ],
+      "settings": {
+        "flash_max_iter": 100,
+        "flash_tol": 1e-08,
+        "flash_second_order": true,
+        "flash_second_order_tol": 1e-12,
+        "flash_ssi_iterations": 50,
+        "flash_max_phases": 3,
+        "post_split_stability": true,
+        "phase_detection": "tangent-plane",
+        "stability_max_iter": 300,
+        "stability_tol": 1e-10,
+        "stability_tpd_tol": 1e-08,
+        "stability_trivial_tol": 1e-08
+      },
+      "derivative_mode": "analytic",
+      "repeats": 9,
+      "status": "ok",
+      "states": 1,
+      "refusals": 0,
+      "phase_counts": [
+        2
+      ],
+      "wall_time_s": {
+        "median": 0.1782992909429595,
+        "min": 0.16614262491930276,
+        "max": 0.2050458750454709,
+        "samples": [
+          0.18622233404312283,
+          0.1821132090408355,
+          0.17215379199478775,
+          0.18333345896098763,
+          0.1782992909429595,
+          0.2050458750454709,
+          0.17387266701553017,
+          0.16614262491930276,
+          0.16627816704567522
+        ]
+      },
+      "peak_memory_bytes": 561821,
+      "result_hash": "sha256:ef9127be9fb01bbd3a1ac2fcd2fb0f61ceb5c28932737e624965d9ca699311a9",
+      "outcomes": [
+        {
+          "temperature_K": 300.0,
+          "pressure_Pa": 3000000.0,
+          "composition": [
+            0.5,
+            0.5
+          ],
+          "phases": [
+            "liquid",
+            "vapor"
+          ],
+          "phase_compositions": [
+            [
+              0.1608697413086767,
+              0.8391302586913233
+            ],
+            [
+              0.986862493391056,
+              0.013137506608943895
+            ]
+          ],
+          "phase_fractions": [
+            0.589427076888569,
+            0.410572923111431
+          ],
+          "iterations": {
+            "iterations": 8,
+            "stability_trials": 4,
+            "phase_count": 2
+          },
+          "initialization": {
+            "k_seed": "stability",
+            "phase_detection": "tangent-plane",
+            "incipient_phase": "vapor",
+            "feed_branch": "liquid"
+          },
+          "status": "ok",
+          "error": null
+        }
+      ]
+    },
+    {
+      "id": "pcsaft-lle-water-hexane",
+      "description": "PC-SAFT associating liquid-liquid flash, water/n-hexane at 298.15 K and 1 atm",
+      "model": "PC-SAFT (2B association)",
+      "route": "flash_tp (phi-phi)",
+      "components": [
+        "Water",
+        "n-Hexane"
+      ],
+      "settings": {
+        "flash_max_iter": 100,
+        "flash_tol": 1e-08,
+        "flash_second_order": true,
+        "flash_second_order_tol": 1e-12,
+        "flash_ssi_iterations": 50,
+        "flash_max_phases": 3,
+        "post_split_stability": true,
+        "phase_detection": "tangent-plane",
+        "stability_max_iter": 300,
+        "stability_tol": 1e-10,
+        "stability_tpd_tol": 1e-08,
+        "stability_trivial_tol": 1e-08
+      },
+      "derivative_mode": "analytic",
+      "repeats": 9,
+      "status": "ok",
+      "states": 1,
+      "refusals": 0,
+      "phase_counts": [
+        2
+      ],
+      "wall_time_s": {
+        "median": 1.3248297909740359,
+        "min": 1.0958050839835778,
+        "max": 1.3876219999510795,
+        "samples": [
+          1.1639420420397073,
+          1.3288369160145521,
+          1.3623524999711663,
+          1.3876219999510795,
+          1.3382625830126926,
+          1.3248297909740359,
+          1.0958050839835778,
+          1.0964647500077263,
+          1.1556250000139698
+        ]
+      },
+      "peak_memory_bytes": 925744,
+      "result_hash": "sha256:a9e8a00c63db500ee05da5be67d76108454efa5fa357259f7d28e52e5fbbea94",
+      "outcomes": [
+        {
+          "temperature_K": 298.15,
+          "pressure_Pa": 101325.0,
+          "composition": [
+            0.5,
+            0.5
+          ],
+          "phases": [
+            "liquid1",
+            "liquid2"
+          ],
+          "phase_compositions": [
+            [
+              0.999983257204303,
+              1.6742795697016702e-05
+            ],
+            [
+              0.006312223543853401,
+              0.9936877764561466
+            ]
+          ],
+          "phase_fractions": [
+            0.49683221079476425,
+            0.5031677892052357
+          ],
+          "iterations": {
+            "iterations": 44,
+            "stability_trials": 4,
+            "phase_count": 2
+          },
+          "initialization": {
+            "k_seed": "stability",
+            "phase_detection": "tangent-plane",
+            "incipient_phase": "liquid",
+            "feed_branch": "liquid"
+          },
+          "status": "ok",
+          "error": null
+        }
+      ]
+    },
+    {
+      "id": "pcsaft-polymer-lle",
+      "description": "PC-SAFT polymer/solvent split, polyethylene(16400)/n-pentane at 453 K and 8 MPa",
+      "model": "PC-SAFT (polymer, k_ij = -0.006)",
+      "route": "flash_tp (phi-phi)",
+      "components": [
+        "Polyethylene",
+        "n-Pentane"
+      ],
+      "settings": {
+        "flash_max_iter": 100,
+        "flash_tol": 1e-08,
+        "flash_second_order": true,
+        "flash_second_order_tol": 1e-12,
+        "flash_ssi_iterations": 50,
+        "flash_max_phases": 3,
+        "post_split_stability": true,
+        "phase_detection": "tangent-plane",
+        "stability_max_iter": 300,
+        "stability_tol": 1e-10,
+        "stability_tpd_tol": 1e-08,
+        "stability_trivial_tol": 1e-08
+      },
+      "derivative_mode": "analytic",
+      "repeats": 9,
+      "status": "ok",
+      "states": 1,
+      "refusals": 0,
+      "phase_counts": [
+        2
+      ],
+      "wall_time_s": {
+        "median": 0.8518181659746915,
+        "min": 0.712049667024985,
+        "max": 0.8925344169838354,
+        "samples": [
+          0.8892581659602001,
+          0.8518181659746915,
+          0.8746764590032399,
+          0.881880542030558,
+          0.8925344169838354,
+          0.7172253330936655,
+          0.712049667024985,
+          0.7151977079920471,
+          0.7140887919813395
+        ]
+      },
+      "peak_memory_bytes": 730326,
+      "result_hash": "sha256:e63bb4f81c09bd4de32d5b1e8e9cfd994af787eeaa1fff17e3035e4ec3439f1a",
+      "outcomes": [
+        {
+          "temperature_K": 453.0,
+          "pressure_Pa": 8000000.0,
+          "composition": [
+            0.00023148042237948336,
+            0.9997685195776205
+          ],
+          "phases": [
+            "liquid1",
+            "liquid2"
+          ],
+          "phase_compositions": [
+            [
+              0.0009751377286389989,
+              0.999024862271361
+            ],
+            [
+              1.1478711124039875e-05,
+              0.9999885212888759
+            ]
+          ],
+          "phase_fractions": [
+            0.22829829561785675,
+            0.7717017043821432
+          ],
+          "iterations": {
+            "iterations": 106,
+            "ssi_iterations": 100,
+            "second_order_iterations": 6,
+            "stability_trials": 4,
+            "phase_count": 2
+          },
+          "initialization": {
+            "k_seed": "stability",
+            "phase_detection": "tangent-plane",
+            "incipient_phase": "vapor",
+            "feed_branch": "liquid"
+          },
+          "status": "ok",
+          "error": null
+        }
+      ]
+    }
+  ]
+}
