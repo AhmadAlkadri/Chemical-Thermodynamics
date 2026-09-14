@@ -5000,13 +5000,38 @@ residuals in every family are the same doubles as at `87f0820`.
   the `polymer` family's wall time rises 311.9 s -> 352.1 s (+12.9 %) for
   36 more answers. The other five families move by less than 3 %, which on this
   machine is noise.
-- **Suite time:** `pytest -q` **262.09 s (4:22) for 891 tests at `3ab783a` ->
-  258.35 s (4:18) for 881**, measured on the one machine, the baseline in a
-  detached worktree at `3ab783a` with `PYTHONPATH` pointing at its own `src`
-  (the editable install otherwise resolves to the working tree). 23 tests
-  added, none removed; 969 collected against 948. **31 parameters moved into
-  `slow`**, 11 of them this slice's own and 20 pre-existing, and every one is a
-  *repetition* of something the default run still does:
+- **Suite time: parity, and the ~4:20 target is not reliably met.** Five runs
+  on the one machine, the baselines in a detached worktree at `3ab783a` with
+  `PYTHONPATH` pointing at its own `src` (the editable install otherwise
+  resolves to the working tree, so a worktree would measure this code):
+
+  | tree | `pytest -q` | tests |
+  | --- | --- | ---: |
+  | `3ab783a` | 262.09 s (4:22) | 891 |
+  | this slice | 258.35 s (4:18) | 881 |
+  | this slice | 267.06 s (4:27) | 881 |
+  | `3ab783a` | **261.67 s (4:21)** | 891 |
+  | this slice | **264.22 s (4:24)** | 881 |
+
+  The last two are the pair that was run **immediately back to back**, and they
+  are the ones to read: **261.67 s -> 264.22 s, i.e. +1.0 %, which is inside
+  this machine's noise** (the same tree read 258.35 s and 267.06 s, a 3.4 %
+  spread, and Case R-MAP-1 measured 7 %). So the honest statement is *parity*,
+  not a saving, and **the ~4:20 target is met on some runs and missed on
+  others - as it was before this slice, the pre-slice suite reading 4:21 and
+  4:22 on this machine.** The trim is what bought the parity: it moved 20
+  pre-existing parameters (~13 s) into `slow`, which is roughly what this
+  slice's own new default coverage costs (~17 s).
+
+  Where the remaining time is, measured: `tests/test_examples.py` is **85.6 s**
+  of the ~264 s, 69.7 s of it the 23 validation examples. That is a smoke test
+  with one run per example, so none of it is a *repetition* and none of it may
+  be marked `slow`; the dev contract's mechanism for it is a `--full` flag on
+  the example itself, which is a different change and was not made here.
+
+  23 tests added, none removed; 969 collected against 948. **31 parameters
+  moved into `slow`**, 11 of them this slice's own and 20 pre-existing, and
+  every one is a *repetition* of something the default run still does:
 
   | where | newly `slow` | what still runs by default |
   | --- | ---: | --- |
