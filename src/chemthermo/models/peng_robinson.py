@@ -8,6 +8,7 @@ from typing import Sequence
 
 import numpy as np
 
+from .._eos_memo import MISS, active_memo
 from ..core import Mixture
 from ..exceptions import CompositionError, ModelError
 from ..validation import (
@@ -383,6 +384,17 @@ class PengRobinsonEOS(EquationOfState):
     def _compressibility_roots(A: float, B: float) -> list[float]:
         """The positive real roots of the Peng-Robinson cubic in ``Z``, ascending.
 
+        Inside a ``flash_tp`` / ``stability_tp`` call this is served from the
+        call-local memo of :mod:`chemthermo._eos_memo` (ADR-0030) when the same
+        ``(A, B)`` has already been solved in that call. ``A`` and ``B`` are the
+        *only* inputs - the cubic's coefficients are functions of them alone -
+        so the key needs neither the mixture nor the model instance, and a hit
+        returns the roots the first solve produced rather than a re-solve of
+        them. ``fugacity_coefficients``, ``ln_fugacity_branches``,
+        ``compressibility_factor`` and ``phase_identity`` all reach this with
+        the same ``(A, B)`` at one state, which is where the repeats are.
+        Outside such a call there is no memo and this runs exactly as before.
+
         ``numpy.roots`` is what this has always used and what it still means:
         for a monic polynomial with a non-zero constant term that function is
         exactly "build the companion matrix, take its eigenvalues", and the
@@ -406,6 +418,16 @@ class PengRobinsonEOS(EquationOfState):
         and it does **not** reproduce these doubles, and bit-identity is the
         gate this slice is held to; see ADR-0023.
         """
+        memo = active_memo()
+        key: tuple[object, ...] | None = None
+        if memo is not None:
+            key = ("pr-compressibility-roots", A, B)
+            cached = memo.lookup(key)
+            if cached is not MISS:
+                # A fresh list of the stored doubles: the caller owns its list,
+                # and the memo's copy cannot be mutated underneath a later hit.
+                return list(cached)
+
         c1 = -(1.0 - B)
         c2 = A - 3.0 * B**2 - 2.0 * B
         c3 = -(A * B - B**2 - B**3)
@@ -422,7 +444,10 @@ class PengRobinsonEOS(EquationOfState):
             roots = np.linalg.eigvals(companion)
 
         real_roots = [float(root.real) for root in roots if abs(root.imag) < 1e-8]
-        return sorted(root for root in real_roots if root > 0.0)
+        positive = sorted(root for root in real_roots if root > 0.0)
+        if memo is not None and key is not None:
+            memo.store(key, tuple(positive))
+        return positive
 
     @staticmethod
     def _log_term(Z: float, B: float) -> float:

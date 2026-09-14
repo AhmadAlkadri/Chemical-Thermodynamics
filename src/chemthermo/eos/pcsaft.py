@@ -171,6 +171,7 @@ from typing import NamedTuple, Sequence
 
 import numpy as np
 
+from .._eos_memo import MISS, active_memo, composition_key
 from ..core import Mixture
 from ..data import normalize_name
 from ..exceptions import CompositionError, InputRangeError, ModelError
@@ -1102,13 +1103,51 @@ class PCSAFTEOS(EquationOfState, EOSProtocol):
         pressure_Pa: float,
         composition: Sequence[float],
     ) -> DensityRoots:
+        """The admissible density roots at ``(T, P, x)``, through the call memo (ADR-0030).
+
+        Every ``(T, P, x)`` entry point of this class funnels through here -
+        :meth:`fugacity_coefficients`, :meth:`log_fugacity_coefficients`,
+        :meth:`ln_fugacity_branches`, :meth:`density_roots`,
+        :meth:`molar_volume` and :meth:`phase_identity` - and it is where
+        essentially all of a PC-SAFT evaluation's time goes: a 1599-point
+        isotherm scan plus a safeguarded Newton per bracket. Inside a
+        ``flash_tp`` / ``stability_tp`` call a memo is active
+        (:mod:`chemthermo._eos_memo`) and a repeat of an argument list solved
+        earlier in *that call* returns the identical :class:`DensityRoots`
+        object rather than an equal one, so nothing downstream can see a
+        different double. Outside such a call there is no memo and this runs
+        exactly as it did before.
+
+        The key carries ``id(self)`` because two ``PCSAFTEOS`` instances may
+        differ in parameters or ``kij`` while agreeing on every argument here;
+        the memo keeps the instance alive for as long as the entry lives, so
+        that id cannot be reused underneath it.
+        """
+        memo = active_memo()
+        key: tuple[object, ...] | None = None
+        if memo is not None:
+            key = (
+                "pcsaft-density-roots",
+                id(self),
+                names,
+                temperature_K,
+                pressure_Pa,
+                composition_key(composition),
+            )
+            cached = memo.lookup(key)
+            if cached is not MISS:
+                return cached
+
         pressure = validate_pressure(pressure_Pa)
         isotherm = self._isotherm(names=names, temperature_K=temperature_K, composition=composition)
         description = (
             f" at T = {float(temperature_K)!r} K, x = {list(map(float, composition))!r} "
             f"for {names!r}"
         )
-        return solve_density_roots(isotherm, pressure, state_description=description)
+        roots = solve_density_roots(isotherm, pressure, state_description=description)
+        if memo is not None and key is not None:
+            memo.store(key, roots, self)
+        return roots
 
     def _root_for_phase(
         self,
