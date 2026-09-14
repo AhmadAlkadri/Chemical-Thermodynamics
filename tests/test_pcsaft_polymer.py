@@ -20,8 +20,10 @@ What is checked here (the external cross-checks are in
 - the qualitative behaviour the source describes: an LCST-type switch with
   temperature, a cloud-point pressure rising with ``k_ij``;
 - permutation invariance and determinism under a mass ratio of 1e5 : 1;
-- and two states where the split does **not** converge, pinned as limitations
-  rather than worked around.
+- and the **vapour**-liquid split below the solvent's saturation pressure
+  (validation Case P-14, ADR-0024), which was pinned here as a defect until
+  the split learned to run in log mole numbers. The stage that does that is
+  tested in ``tests/test_flash_log_space_stage.py``.
 """
 
 from __future__ import annotations
@@ -35,7 +37,6 @@ import pytest
 
 import chemthermo as ct
 from chemthermo.eos import PCSAFTEOS
-from chemthermo.exceptions import ConvergenceError
 from chemthermo.models.base import KAPPA_LIQUID_THRESHOLD
 from chemthermo.parameters import PCSAFTParameters, PCSAFTRecord
 
@@ -635,28 +636,43 @@ def test_a_polymer_in_two_solvents_runs() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Limitations, pinned rather than worked around
+# Vapour-liquid below the solvent's saturation pressure (Case P-14)
+#
+# Both states below were pinned as *defects* by ADR-0022 (Case P-13 (vi)) and
+# are resolved by the log-space split stage of ADR-0024. The stage itself is
+# tested in ``tests/test_flash_log_space_stage.py``; what is pinned here is the
+# answer for this system.
 # ---------------------------------------------------------------------------
+
+
+#: ``(melt composition, melt phase fraction, ln y_polymer)`` per pressure, at
+#: 5 wt% polymer, 453 K and ``k_ij = -0.006``. The melt's solvent content is
+#: reproduced to 1e-10 by an independent one-dimensional equal-fugacity solve
+#: in ``examples/validation/21_pcsaft_polymer_vle.py``, which shares no code
+#: with the flash.
+VLE_STATES = {
+    1.0e6: ((0.028531647335324484, 0.9714683526646756), 0.008113111018756114, -450.5307940616726),
+    2.0e6: ((0.008772681701263427, 0.9912273182987366), 0.026386506459723290, -408.9441806099687),
+}
 
 
 @pytest.mark.parametrize(
     "pressure_Pa",
-    [1.0e6, pytest.param(2.0e6, marks=pytest.mark.slow)],  # the second is the same gap
+    [1.0e6, pytest.param(2.0e6, marks=pytest.mark.slow)],  # the second is the same state
 )
-def test_the_split_does_not_converge_below_the_solvents_saturation_pressure(
+def test_the_split_below_the_solvents_saturation_pressure_is_a_vapour_and_a_melt(
     pressure_Pa: float,
 ) -> None:
-    """A vapour root exists there, and the split fails - recorded, not patched.
+    """Case P-14 (i): a solvent vapour over a solvent-swollen melt.
 
-    n-pentane is subcritical at 453 K, so below roughly 3 MPa the mixture has a
-    vapour density root as well as a liquid one and the equilibrium in question
-    is vapour-liquid, not liquid-liquid. ``stability_tp`` still reports the feed
-    unstable; the split then stops after one successive-substitution step with
-    an equal-fugacity residual of order 1e+02 and ``flash_tp`` raises. This is a
-    genuine gap in the phi-phi split for this system, not a property of the
-    polymer support added by ADR-0022, and it is pinned here so that any future
-    change to it is deliberate. Polymer/solvent *vapour*-liquid equilibrium is
-    named as a later slice candidate, not delivered here.
+    n-pentane is subcritical at 453 K, so below roughly 2.6 MPa the mixture has
+    a vapour density root as well as a liquid one and the equilibrium in
+    question is vapour-liquid, not liquid-liquid. Before ADR-0024 the split
+    stopped after one successive-substitution step with an equal-fugacity
+    residual of order 1e+02 and ``flash_tp`` raised: the tangent-plane
+    minimizer here is an essentially pure polymer melt whose K-values bracket
+    no vapour fraction at all, and the equilibrium vapour's polymer content is
+    ``exp(-450)``. Both are now carried in log mole numbers.
     """
     mixture = _mixture()
     eos = _eos()
@@ -677,12 +693,66 @@ def test_the_split_does_not_converge_below_the_solvents_saturation_pressure(
         )
         == 2
     )
-    with pytest.raises(ConvergenceError):
-        ct.flash_tp(mixture, temperature_K=TEMPERATURE_K, pressure_Pa=pressure_Pa, eos=eos)
+
+    result = ct.flash_tp(mixture, temperature_K=TEMPERATURE_K, pressure_Pa=pressure_Pa, eos=eos)
+    diagnostics = result.diagnostics
+    melt, melt_fraction, ln_y_polymer = VLE_STATES[pressure_Pa]
+
+    assert sorted(result.phases) == ["liquid", "vapor"]
+    assert diagnostics["phase_regime"] == "VLE"
+    assert diagnostics["phase_label_method"] == "compressibility"
+    assert diagnostics["k_seed"] == "stability-log"
+    assert diagnostics["converged_stage"] == "second-order-log"
+
+    assert result.phases["liquid"].composition.fractions == pytest.approx(melt, rel=1e-12)
+    assert result.phase_fractions["liquid"] == pytest.approx(melt_fraction, rel=1e-12)
+    assert result.phases["vapor"].composition.fractions[1] == 1.0
+    assert math.log(result.phases["vapor"].composition.fractions[0]) == pytest.approx(
+        ln_y_polymer, rel=1e-12
+    )
+    assert float(diagnostics["log_space_ln_x_min"]) == pytest.approx(ln_y_polymer, rel=1e-12)
+    assert result.vapor_fraction == pytest.approx(1.0 - melt_fraction, rel=1e-12)
+
+    assert float(diagnostics["mass_balance_residual"]) < 1e-12
+    assert float(diagnostics["fugacity_residual"]) < 1e-8
+    assert float(diagnostics["log_space_residual"]) < 1e-8
+    assert float(diagnostics["delta_g_split_rt"]) < 0.0
+    assert diagnostics["post_split_status"] == "stable"
+
+    # The compressibility identity of ADR-0017, computed here from the public
+    # pressure routine: the vapour is one side of the 0.5 threshold and the
+    # melt is far on the other (measured 1.16 and 0.0024 at 1 MPa).
+    bound = PCSAFTEOS(components=("Polyethylene", "n-Pentane"), parameters=_parameters(), kij=KIJ)
+    kappa = {}
+    for name, index in (("vapor", 0), ("liquid", -1)):
+        x = list(result.phases[name].composition.fractions)
+        density = eos.density_roots(
+            mixture=mixture, temperature_K=TEMPERATURE_K, pressure_Pa=pressure_Pa, composition=x
+        )[index]
+        step = 1e-4 * density
+        slope = (
+            bound.pressure_Pa(
+                temperature_K=TEMPERATURE_K, density_mol_m3=density + step, composition=x
+            )
+            - bound.pressure_Pa(
+                temperature_K=TEMPERATURE_K, density_mol_m3=density - step, composition=x
+            )
+        ) / (2.0 * step)
+        kappa[name] = pressure_Pa / (density * slope)
+    assert kappa["vapor"] > KAPPA_LIQUID_THRESHOLD
+    assert 0.0 < kappa["liquid"] < KAPPA_LIQUID_THRESHOLD
 
 
-def test_the_ternary_split_runs_away_at_3_mpa() -> None:
-    """The same gap, in the ternary: pinned with the ``beta`` the split reached."""
+def test_the_ternary_converges_at_3_mpa() -> None:
+    """Case P-14 (ii): the state that used to run away to ``beta = -6.3e+10``.
+
+    Successive substitution converges here - on the **trivial** solution, whose
+    vapour fraction is outside ``[0, 1]``; before ADR-0024 that was refused and
+    ``flash_tp`` raised. It is now handed to the second-order stage, which
+    finds the real split. The stage is the *linear* one: no composition here is
+    outside machine range, and this state is in the ledger as the one that
+    shows the two ADR-0024 entry points are separate.
+    """
     parameters = PCSAFTParameters.from_records(
         [
             _polymer_record(PE_MW_G_MOL),
@@ -702,8 +772,24 @@ def test_the_ternary_split_runs_away_at_3_mpa() -> None:
         normalize=True,
     )
     eos = PCSAFTEOS(parameters=parameters, kij=KIJ)
-    with pytest.raises(ConvergenceError, match="outside"):
-        ct.flash_tp(mixture, temperature_K=TEMPERATURE_K, pressure_Pa=3.0e6, eos=eos)
+    result = ct.flash_tp(mixture, temperature_K=TEMPERATURE_K, pressure_Pa=3.0e6, eos=eos)
+    diagnostics = result.diagnostics
+
+    assert sorted(result.phases) == ["liquid1", "liquid2"]
+    assert diagnostics["converged_stage"] == "second-order"
+    assert not [key for key in diagnostics if key.startswith("log_space_")]
+    polymer_rich, solvent_rich = _phase_by_polymer(result)
+    assert result.phases[polymer_rich].composition.fractions == pytest.approx(
+        (0.0013272336238799715, 0.5402484470355627, 0.45842431934055733), rel=1e-9
+    )
+    assert result.phases[solvent_rich].composition.fractions == pytest.approx(
+        (1.863504765793684e-06, 0.5450873602321722, 0.45491077626306187), rel=1e-9
+    )
+    assert result.phase_fractions[polymer_rich] == pytest.approx(0.18872173701842598, rel=1e-9)
+    assert float(diagnostics["mass_balance_residual"]) < 1e-12
+    assert float(diagnostics["fugacity_residual"]) < 1e-8
+    assert float(diagnostics["delta_g_split_rt"]) < 0.0
+    assert diagnostics["post_split_status"] == "stable"
 
 
 def test_a_record_without_a_molar_mass_cannot_use_the_mass_based_parameter() -> None:
