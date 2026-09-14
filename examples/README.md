@@ -319,6 +319,21 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
     and still exits 0. About 15 s by default; `--full` adds the 41-point scan
     at two feeds and the ternary vapour-liquid-liquid tie triangle (several
     minutes).
+- `examples/validation/19_eos_stability_surfaces.py`
+  - **Fixed density-root surfaces in the equation-of-state stability trials**
+    (ADR-0021, validation Case P-11), with PASS/FAIL per check. A 4-equation
+    Newton written in the script locates `T3`; above it, a water-rich
+    water / n-hexane feed now returns a vapour-liquid pair where it used to
+    return two liquids, and a two-equation Newton plus reduced Gibbs energies
+    say which of the two is the equilibrium; the per-trial table shows which
+    root surface each trial ran on and which one found the vapour stationary
+    point that used to be missed; FeOs supplies chemical potentials at
+    chemthermo's converged phases. Runs without `feos` (it says so and still
+    exits 0). About 5 s by default; `--full` adds `T3 + 0.05 K` and
+    `T3 + 0.5 K`, the matched-universal-constants comparison asserted at 1e-08,
+    the two 41-point scans with the verdict boundary bisected to 1e-06 K, and
+    the per-surface trial statistics over the 144-state Peng-Robinson grid
+    (several minutes).
 - `examples/validation/*.py`
   - Optional validation sweeps against `thermo` (requires `pip install -e ".[validation]"`).
   - CSV output is disabled by default; pass `--outdir <dir>` or set `CHEMTHERMO_OUTDIR`.

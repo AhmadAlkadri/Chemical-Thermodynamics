@@ -498,17 +498,17 @@ def the_scan(t3: float) -> None:
         counts = {value: verdicts.count(value) for value in sorted(set(verdicts))}
         print(f"    z_water = {z_water}: {counts}")
         record(f"z_water = {z_water}: no ConvergenceError in 41 points", raised == 0)
-        if z_water == 0.3:
-            switches = [i for i in range(1, 41) if verdicts[i] != verdicts[i - 1]]
-            boundary = float(np.linspace(t3 - 1.0, t3 + 1.0, 41)[switches[0]]) if switches else 0.0
-            print(f"    one switch LLE -> VLE at {boundary:.6f} K (T3 = {t3:.6f} K)")
-            record("z_water = 0.3: exactly one verdict switch, at T3", len(switches) == 1)
-        else:
+        switches = [i for i in range(1, 41) if verdicts[i] != verdicts[i - 1]]
+        boundary = float(np.linspace(t3 - 1.0, t3 + 1.0, 41)[switches[0]]) if switches else 0.0
+        print(f"    one switch LLE -> VLE at {boundary:.6f} K (T3 = {t3:.6f} K)")
+        record(f"z_water = {z_water}: exactly one verdict switch, at T3", len(switches) == 1)
+        if z_water == 0.7:
             print(
-                "    z_water = 0.7 stays LLE on both sides. Above T3 that pair is\n"
-                "    metastable: the deterministic stability trial set does not find the\n"
-                "    vapour stationary point from the hexane-rich liquid. A limitation of\n"
-                "    the stability test, not of the search - recorded, not worked around."
+                "    Until ADR-0021 this feed stayed LLE on both sides: above T3 the\n"
+                "    stability trial set missed the vapour stationary point reachable from\n"
+                "    the hexane-rich liquid, and the two-liquid pair it returned instead is\n"
+                "    metastable. Fixing the trials to one density root each removed the\n"
+                "    miss; see examples/validation/19_eos_stability_surfaces.py."
             )
 
 
