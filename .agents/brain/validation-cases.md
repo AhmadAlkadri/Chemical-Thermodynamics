@@ -31,9 +31,9 @@ case's own entry.
 | **L** | L-1..L-4 | `gamma-gamma` liquid-liquid `flash_tp` (activity model, no EOS): Tessier (2000) tie-lines, binodal/lever-rule cross-check, post-split stability of every two-phase phi-phi flash | `flash-lle-activity` (ADR-0009) |
 | **R** | R-1..R-4 | `modified-raoult` mode (activity liquid + ideal vapor): VLE/LLE from one tangent plane, the three-phase neighbourhood refusal window, cross-check against `thermo` | `flash-modified-raoult` (ADR-0010) |
 | **V** | V-1..V-5 | Three-phase (VLLE) discovery: the ternary tie-triangle, stability misses fixed by fixed candidate surfaces, the binary refusal window, multiphase Rachford-Rice against Okuno et al. (2010), the ternary verdict map | `flash-vlle-phase-addition` (ADR-0011), `stability-candidate-surfaces` (ADR-0012) |
-| **P** | P-0..P-16 | PC-SAFT: residual Helmholtz/derivatives against teqp, density roots, flash/stability integration, split robustness re-measured on the PC-SAFT grid, phase identity, association against FeOs, per-phase density roots (LLE), EOS phase addition/removal (VLLE), fixed EOS stability surfaces, polymer components, the polymer liquid-liquid split, the polymer vapour-liquid split in log mole numbers, the log-space stability normalization, the curvature safeguard and the Rachford-Rice denominator that close the 0.3-3.6 MPa sweep | `pcsaft-residual-helmholtz` (ADR-0014), `pcsaft-density-roots-flash` (ADR-0015), `pcsaft-association` (ADR-0018), `flash-eos-per-phase-roots` (ADR-0019), `flash-phase-addition-eos` (ADR-0020), `stability-eos-root-surfaces` (ADR-0021), `pcsaft-polymer-solvent` (ADR-0022), `pcsaft-polymer-vle` (ADR-0024), `stability-log-space-sums` (ADR-0025), `flash-polymer-edge-cases` (ADR-0026) |
+| **P** | P-0..P-18 | PC-SAFT: residual Helmholtz/derivatives against teqp, density roots, flash/stability integration, split robustness re-measured on the PC-SAFT grid, phase identity, association against FeOs, per-phase density roots (LLE), EOS phase addition/removal (VLLE), fixed EOS stability surfaces, polymer components, the polymer liquid-liquid split, the polymer vapour-liquid split in log mole numbers, the log-space stability normalization, the curvature safeguard and the Rachford-Rice denominator that close the 0.3-3.6 MPa sweep, the seed ladder that retires the map's polymer refusals (P-17), and the reversible removal plus multiphase log-space stage that retire its nine `eos-three-phase` refusals (P-18) | `pcsaft-residual-helmholtz` (ADR-0014), `pcsaft-density-roots-flash` (ADR-0015), `pcsaft-association` (ADR-0018), `flash-eos-per-phase-roots` (ADR-0019), `flash-phase-addition-eos` (ADR-0020), `stability-eos-root-surfaces` (ADR-0021), `pcsaft-polymer-solvent` (ADR-0022), `pcsaft-polymer-vle` (ADR-0024), `stability-log-space-sums` (ADR-0025), `flash-polymer-edge-cases` (ADR-0026), `flash-polymer-robustness` (ADR-0028), `flash-eos-multiphase-robustness` (ADR-0029) |
 | **B** | B-1 | The `chemthermo.bench` measurement harness and its acceptance rule (baseline + after + identical result hashes + measured ratio) | `perf-baseline-and-root-reuse` (ADR-0023) |
-| **R-MAP** | R-MAP-1, R-MAP-2 | The `chemthermo.bench robustness` coverage map: 2110 states over the original six model families (R-MAP-1), grown to 2505 states over ten families - EOS three-phase windows, the legacy `gamma-phi` path, near-critical Peng-Robinson states and associating ternaries (R-MAP-2) - classified into a phase verdict, an invariant violation or one of eight refusal classes, with the ranked classes and their diagnoses | `robustness-map` (ADR-0027), `robustness-map-coverage` (ADR-0027 amendment) |
+| **R-MAP** | R-MAP-1, R-MAP-2 | The `chemthermo.bench robustness` coverage map: 2110 states over the original six model families (R-MAP-1), grown to 2505 states over ten families - EOS three-phase windows, the legacy `gamma-phi` path, near-critical Peng-Robinson states and associating ternaries (R-MAP-2) - classified into a phase verdict, an invariant violation or one of eight refusal classes, with the ranked classes and their diagnoses. Both are amended in place as later slices retire what they found: R-MAP-2 by ADR-0029 (Case P-18), which leaves 5 refusals, all of them the deprecated `gamma-phi` path's | `robustness-map` (ADR-0027), `robustness-map-coverage` (ADR-0027 amendment) |
 
 ---
 
@@ -5080,6 +5080,19 @@ residuals in every family are the same doubles as at `87f0820`.
 
 ## Case R-MAP-2: Four new families, and the map is hard again
 
+> **Amended by slice `flash-eos-multiphase-robustness` (ADR-0029, Case
+> P-18).** Every measurement below stands as taken at `74820b8`; what changed
+> afterwards is the answer to the question it asked. All **nine**
+> `multiphase-solver-failure` states of (ii) - classes 2, 2 (cont'd) and 3 -
+> now converge to verified answers, and the two root causes the diagnoses
+> below deliberately stopped short of are in Case P-18 (i) and (ii): an
+> irreversible phase removal, and a second-order Hessian that cannot be formed
+> on a phase set holding a component at `x ~ 1e-12`. Class 1's five
+> `rr-no-bracket` states are untouched and remain by design. The map's totals
+> after the repair are in Case P-18 (v); this case's `74820b8` record is kept
+> as the *before* measurement and its JSON is pruned per the
+> `benchmarks/README.md` policy, its `.md` summary retained.
+
 - **Source:** none, for the same reason as Case R-MAP-1 - this is the
   *coverage* case, not a thermodynamics one. What is measured is where
   `flash_tp` refuses on four grids ADR-0027's own roadmap named as gaps, how it
@@ -5089,8 +5102,9 @@ residuals in every family are the same doubles as at `87f0820`.
   K-loop), the same standard R-MAP-1 held itself to.
 - **Where:** ADR-0027's amendment (slice `robustness-map-coverage`); harness
   `src/chemthermo/bench/robustness.py`; record
-  `benchmarks/robustness_74820b8.json`; summary
-  `benchmarks/robustness_74820b8.md`; `benchmarks/README.md`.
+  `benchmarks/robustness_74820b8.json` (pruned when ADR-0029's sweep
+  superseded it, per the `benchmarks/README.md` policy); summary
+  `benchmarks/robustness_74820b8.md` (kept); `benchmarks/README.md`.
 - **Assumptions:** every state is `flash_tp` at default `FlashSettings`, as in
   Case R-MAP-1, with one exception the `gamma-phi-legacy` family exists to
   exercise: `flash_mode="gamma-phi"` uses the pre-`flash-auto-phase-detection`
@@ -5202,6 +5216,10 @@ emphatic (`tpd_min = -0.409`, `feed_branch = "liquid"`), so the diagnosis
 stops at "the search enters and does not settle" rather than a traced root
 cause, in the same spirit R-MAP-1 left its own class 1 - a defect's *extent*
 is evidence; its mechanism is a further slice's work, not assumed here.
+*(Traced in Case P-18 (i): the `LLV` set recedes, the recession direction
+names the hexane-rich liquid - 95 % of the feed - as the phase leaving, and
+the water-rich pair left over negative-flashes. The answer is the other
+removal, and all four states now return a verified `VLE`.)*
 
 **Class 2 (cont'd) - the one ternary state here is not a new defect.** PC-SAFT
 water/ethanol/n-hexane, `(0.1, 0.1, 0.8)`, 333 K, is the *same* feed Case P-10
@@ -5210,7 +5228,9 @@ the edge of the triangle where the water-rich liquid's amount is tiny." The
 wider grid here rediscovers it rather than finding something new - checked:
 with `post_split_stability=False` the direct two-liquid split is doubly
 unstable (`post_split_status = "unstable"`) exactly as at `z_water = 0.05`
-above, the same mechanism at a different system.
+above, the same mechanism at a different system. *(Retired with class 2 by
+ADR-0029; it returns a verified `VLE` - two phases, not three, the `LLV` set
+at this feed having no Rachford-Rice solution. Case P-18 (i).)*
 
 **Class 3 - the Peng-Robinson three-liquid region moves or narrows between 280
 and 300 K, and one feed sits close enough to its edge to refuse at both.**
@@ -5228,6 +5248,17 @@ convergence at the higher one, consistent with the three-liquid region having
 moved or shrunk between 280 and 300 K rather than with a defect that appears
 abruptly. Not traced further than that - which edge, and by how much, needs a
 scan across temperature this slice did not run.
+
+*Superseded by the trace in Case P-18 (ii), and the reading above turns out to
+have been wrong in its causal half.* The region does not move or narrow: all
+three 300 K feeds converge to the **same** tie triangle once the solver can
+finish, and the spread of refused residuals (`3.31e-06` to `1.478e-04`) is
+simply how far successive substitution had got in its 50 iterations before
+handing over. What made the handover useless is that the second-order stage
+aborts at its first Hessian column on a phase set whose water-rich liquid
+holds n-hexane at `x = 5.3e-14` (280 K) to `1.6e-12` (300 K). The
+"caught mid-convergence, not diverging" half of the reading was right, and is
+what made the states cheap to repair.
 
 ### (iii) The invariants: nothing returned violates one, including the new one
 
@@ -5271,3 +5302,263 @@ deprecated path's documented, by-design behaviour, included so the map's
 - **Script:** `python -m chemthermo.bench robustness --quick` (~14 s) and
   `python -m chemthermo.bench robustness --out record.json --summary-out record.md`
   (~37 min); `--family NAME` runs one family; `--list` prints the grid.
+
+---
+
+## Case P-18: The map's nine multiphase refusals, retired and each one checked
+
+- **Source:** none for the *answers* - there is no published tie triangle for
+  water / ethanol / n-hexane with `k_ij = 0` on either model, and ADR-0027's
+  standing warning (the map measures coverage, not correctness) applies to
+  every state here. What is established is narrower and is stated that way
+  throughout: each returned phase set is an **equilibrium of the model it was
+  given**, verified by a solver sharing no code with `flash_tp`, and it is the
+  **lowest-Gibbs** one among every admissible alternative that was solved.
+- **Where:** slice `flash-eos-multiphase-robustness` (ADR-0029); solver
+  `src/chemthermo/flash/_multiphase.py` and the new
+  `src/chemthermo/flash/_multiphase_log_space.py`; states from ledger Case
+  R-MAP-2 (ii), classes 2 and 3.
+- **Assumptions:** default `FlashSettings` throughout (`tol = 1e-8`,
+  `ssi_iterations = 50`, `second_order_tol = 1e-12`, `max_phases = 3`,
+  `post_split_stability = True`), 1 atm = 101 325 Pa, `k_ij = 0` on both
+  models, PC-SAFT with the 2B association scheme for water and ethanol.
+  Machine: Apple M2 Max, macOS 26.6.2, CPython 3.11.6, numpy 2.4.2.
+- **Components and units:** Water / n-Hexane and Water / Ethanol / n-Hexane,
+  mole fractions, SI throughout.
+- **Parameters and provenance:** unchanged - PC-SAFT from Gross & Sadowski
+  (2001, 2002) as packaged and provenanced in ADR-0014/ADR-0018;
+  Peng-Robinson from the packaged critical constants. No parameter file was
+  touched by this slice.
+
+### (i) Five `collapsed` states: a removal that could not be taken back
+
+PC-SAFT water / n-hexane, `z_water = 0.05`, 1 atm, at `T3 + 0.01`, `+ 0.1`,
+`+ 0.5` and `+ 1.0 K` (`T3 = 334.807826336 K`, Case P-9's Newton), plus the
+PC-SAFT ternary `(0.1, 0.1, 0.8)` at 333 K.
+
+**Mechanism, traced.** The route is `L -> LL -> LLV -> LV -> raise`. Above
+`T3` a binary at fixed pressure has no three-phase state (Gibbs' phase rule),
+so `_multiphase_rachford_rice` correctly reports a receding feasible region
+and `_multiphase_ssi` reads `argmin` of the recession rates. (On the ternary
+the three-phase region is finite but this feed is outside it, so the same
+solve stays inside the Okuno region and returns a converged **negative flash**
+- `beta = (-0.761, -4.309, +6.070)` at the first substitution - and
+`_multiphase_ssi` reads `argmin` of the fractions instead. Two spellings, one
+signal.) At this feed that names the **hexane-rich** liquid - the phase
+holding 95 % of the feed. What is left is the water-rich liquid against the
+vapour, and that pair negative-flashes: `beta = (-0.20747, +1.20747)` at
+`T3 + 0.01 K`. The old code had no way back and raised.
+
+**Why that pair cannot be the answer, computed independently.** The
+water-rich vapour-liquid tie line is a perfectly good tie line; it simply does
+not contain this feed. Solved here by a 2-equation Newton on
+`fugacity_coefficients`, its lever rule gives `beta` of **1.20747, 1.20882,
+1.21490, 1.22273** at the four offsets - outside `(0, 1)` at every one.
+
+**The answer, and the ordering.** The other removal leaves the hexane-rich
+liquid against the vapour, and that is what `flash_tp` now returns:
+
+| state | x_water (liquid) | x_water (vapor) | beta_vapor | equilibrium residual | dG_split/RT | dG vs two-phase |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `T3 + 0.01 K` | 0.02253935 | 0.21284192 | 0.14429996 | 2.95e-13 | -6.879e-03 | -4.902e-05 |
+| `T3 + 0.1 K` | 0.02201259 | 0.21029813 | 0.14864345 | 3.74e-13 | -7.287e-03 | -4.967e-04 |
+| `T3 + 0.5 K` | 0.01980545 | 0.19895982 | 0.16853927 | 3.55e-13 | -9.243e-03 | -2.630e-03 |
+| `T3 + 1.0 K` | 0.01732053 | 0.18470644 | 0.19523428 | 7.43e-13 | -1.2035e-02 | -5.641e-03 |
+
+Reduced Gibbs energies, every one computed in the test file from
+`fugacity_coefficients` and none read out of `flash_tp`:
+
+| state | returned (VL, hexane-rich) | LL (admissible, beta = 0.972) | single liquid | single vapor |
+| --- | ---: | ---: | ---: | ---: |
+| `T3 + 0.01 K` | **-0.341354043232** | -0.341305025321 (+4.902e-05) | -0.334474632405 | -0.236755238610 |
+| `T3 + 0.1 K` | **-0.338912572488** | -0.338415918476 (+4.967e-04) | -0.331625703695 | -0.236726127984 |
+| `T3 + 0.5 K` | **-0.328230732139** | -0.325600989922 (+2.630e-03) | -0.318988149938 | -0.236597106096 |
+| `T3 + 1.0 K` | **-0.315281870162** | -0.309640821300 (+5.641e-03) | -0.303246938939 | -0.236436648189 |
+
+The margin over the two-liquid pair grows monotonically with temperature,
+which is the expected shape: `T3` is where the two coincide. It is also a
+**cross-check on the solver's own bookkeeping**: the solver reports
+`delta_g_vs_two_phase_rt` of `-4.902e-05`, `-4.967e-04`, `-2.630e-03` and
+`-5.641e-03` (the table above), and the independently solved two-liquid pair
+sits `+4.902e-05`, `+4.967e-04`, `+2.630e-03` and `+5.641e-03` above the
+returned answer - the same four numbers, computed twice by routes that share
+no solver code.
+
+The ternary `(0.1, 0.1, 0.8)` at 333 K is the same mechanism on the
+tie-triangle's hexane-rich edge, and Case P-10 (i) had already recorded it as
+a pre-existing failure. It returns `liquid` `(0.0427106, 0.06676041,
+0.89052899)` at `beta = 0.4758653` against `vapor` `(0.15201342, 0.13017844,
+0.71780814)`, equilibrium residual **5.05e-13**, `dG_split/RT = -1.397e-02`,
+`dG` vs the two-phase candidate **-1.209e-02**; `G/RT = -0.691284237040`
+against **-0.677311243024** (single liquid) and **-0.673251317555** (single
+vapor). Two phases, not three: the `LLV` set at this feed has no
+Rachford-Rice solution.
+
+### (ii) Four `split` states: a Hessian that could not be formed
+
+Peng-Robinson water / ethanol / n-hexane, 1 atm: `(0.2, 0.6, 0.2)` at 280 K
+and 300 K, `(0.4, 0.4, 0.2)` and `(0.5, 0.3, 0.2)` at 300 K. All four are
+genuine **three-liquid** states.
+
+**Mechanism, traced.** Every one of the four reports `1` second-order
+iteration in its refusal message, and that is the whole diagnosis: the
+water-rich phase holds n-hexane at `x = 5.32e-14` (280 K) to `1.56e-12`
+(300 K), the linear stage perturbs a non-reference mole number by `1e-7`, the
+reference phase `z - sum n` goes negative on the first Hessian column, and the
+loop breaks having done nothing. Two further measurements decide the fix:
+
+- successive substitution *does* converge these states, in **52, 109, 97 and
+  86** iterations against the multiphase budget of
+  `min(ssi_iterations, max_iter) = 50`, to residuals of 7.9e-09 to 1.0e-08.
+  So the states are reachable and the budget is not the defect - the stage
+  that was supposed to take over at 50 is;
+- a log-space stage written as a straight generalization of ADR-0024 **does
+  not fix it**: keeping the search's own reference phase, it accepts steps on
+  an Armijo test whose energy change is `+-9e-16` (floating-point noise in
+  `g`) and drives the residual from `1.24e-04` to `1.05e-01` in one step and
+  to `1.12e-01` in 100. The reason is structural: `n_hexane` in the reference
+  phase is `0.2 - 0.167 - 0.0326 = 2.0e-13`, a cancellation of `O(1)` doubles,
+  and it is not a variable in any parametrization of the other phases.
+
+With the reference phase re-chosen to the one whose smallest mole fraction is
+largest, the same stage converges from the 50-iteration iterate in **1, 3, 2
+and 2** Newton iterations - the `log_space_iterations` the results now carry -
+and the phase sets it returns have all-pairs equal-fugacity residuals of
+**1.42e-14, 8.88e-15, 1.47e-14 and 1.15e-14**, against an acceptance of
+`1e-08`.
+
+**The answers.** At 300 K all three feeds converge to the *same* tie triangle,
+which is the evidence that the refused residuals were measuring distance and
+not noise:
+
+| state | beta | liquid1 (water-rich) | liquid2 | liquid3 | residual | dG_split/RT | dG vs two-phase | log-space its |
+| --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: |
+| `(0.2, 0.6, 0.2)` 280 K | (0.13802549, 0.54657701, 0.31539750) | (0.998808722, 1.19127789e-03, 5.32400754e-14) | (0.10277099, 0.85987453, 0.03735448) | (0.01891796, 0.41169611, 0.56938593) | 1.42e-14 | -1.5402e-01 | -1.9514e-02 | 1 |
+| `(0.2, 0.6, 0.2)` 300 K | (0.12967906, 0.45994477, 0.41037617) | (0.997834456, 2.16554440e-03, 1.55819339e-12) | (0.11615007, 0.81294684, 0.07090309) | (0.04186195, 0.55024766, 0.40789039) | 8.88e-15 | -8.6890e-02 | -3.2215e-03 | 3 |
+| `(0.4, 0.4, 0.2)` 300 K | (0.36061156, 0.18042342, 0.45896503) | same as above | same as above | same as above | 1.47e-14 | -4.1244e-01 | -1.1243e-03 | 2 |
+| `(0.5, 0.3, 0.2)` 300 K | (0.47607780, 0.04066274, 0.48325946) | same as above | same as above | same as above | 1.15e-14 | -6.3795e-01 | -9.1739e-05 | 2 |
+
+(The phases are reported `liquid1` / `liquid2` / `liquid3` ordered by the
+first component's mole fraction, ADR-0019 decision 3; the middle and last
+columns above are printed in solve order, which is why `liquid2` is the
+ethanol-rich phase at 300 K and the hexane-rich one at 280 K.)
+
+Gibbs ordering, each alternative re-solved in the test file:
+
+| state | three liquids | best admissible pair | single liquid | single vapor |
+| --- | ---: | ---: | ---: | ---: |
+| `(0.2, 0.6, 0.2)` 280 K | **-3.829037668234** | -3.809524142507 (+1.951e-02) | -3.675022625340 | -0.991524792143 |
+| `(0.2, 0.6, 0.2)` 300 K | **-2.683831312913** | -2.680609854845 (+3.221e-03) | -2.596941513508 | -0.984320350053 |
+| `(0.4, 0.4, 0.2)` 300 K | **-2.864109965683** | -2.862985629731 (+1.124e-03) | -2.451669289897 | -1.084466353589 |
+| `(0.5, 0.3, 0.2)` 300 K | **-2.954249292068** | -2.954157553154 (+9.174e-05) | -2.316301718028 | -1.057078515513 |
+
+At 280 K the third pair (`liquid2 + liquid3`) is also admissible and also
+higher (-3.779446163872); at 300 K the feeds `(0.4, 0.4, 0.2)` and
+`(0.5, 0.3, 0.2)` have no admissible two-liquid pair other than the one
+listed, their lever rules putting the feed outside the others.
+
+### (iii) The independent route
+
+Written in `tests/test_flash_eos_multiphase_robustness.py`, sharing no
+*solver* code with `flash_tp` - the model is necessarily shared, through the
+public `EquationOfState.fugacity_coefficients` interface, exactly as Cases
+P-9 and P-10 share it: the full `NC - 1` equilibrium system - `(N - 1) C`
+equal-fugacity equations plus `C - 1` independent mass balances, in
+`N (C - 1)` composition degrees of freedom (carried as `ln(x_k / x_last)`, so
+that a mole fraction of 5e-14 is representable) plus `N - 1` phase fractions.
+That is **3** equations for the binary pair, **5** for the ternary pair and
+**8** for the three-liquid set. Started off `flash_tp`'s answer by `1e-3` in
+every variable, so convergence back onto it is a result and not an identity.
+
+**Tolerances achieved** over all nine states: Newton residual
+`4.89e-15 .. 8.97e-14`; `max |dx|` versus `flash_tp`'s compositions
+**2.98e-12** (worst, `T3 + 0.01 K`) and `<= 3.0e-14` on all four
+Peng-Robinson states; `max |dbeta|` **5.16e-12** (worst) and `<= 3.3e-14` on
+the Peng-Robinson states. Mass balance, recomputed from the returned phases
+rather than read from diagnostics: **0.0** on the five PC-SAFT states and
+`<= 1.11e-16` on the four Peng-Robinson ones, against the asserted 1e-12.
+Post-split stability: `"stable"` on all nine, worst post-split `tpd_min`
+**-2.583e-12 (`T3 + 0.1 K`; three of the nine report a small *positive* value, which is what "no negative tangent-plane distance was found" looks like at this scale)**.
+
+### (iv) FeOs, on the PC-SAFT states
+
+FeOs's own chemical potentials evaluated at chemthermo's converged phases and
+densities, with FeOs's universal constants substituted for the printed ones
+(the standing Case P-6/P-7/P-8/P-9 caveat: as shipped, the constants floor any
+such comparison near 2e-06). Worst difference across the phases of a state:
+**1.61e-12** and **2.06e-12** on the water-lean binary states at
+`T3 + 0.01` and `T3 + 1.0 K`, **3.51e-13** on the ternary `(0.1, 0.1, 0.8)`
+at 333 K, against an asserted 1e-8.
+
+### (v) The map after the repair
+
+| family | states | verdicts | refusal classes | invariant violations | worst mass balance | worst equilibrium residual | worst dG_split/RT | time / s |
+| --- | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: |
+| `eos-three-phase` | 117 | LLE 46, **LLL 12**, **VLE 27**, VLLE 19, single-liquid 10, single-vapor 3 | **-** | 0 | 2.11e-12 | 2.80e-08 | -1.25e-04 | 655.8 |
+| `gamma-phi-legacy` | 30 | VLE 8, single-liquid 3, single-vapor 14 | rr-no-bracket 5 | 0 | 1.02e-13 | 0.00e+00 | - | 0.0 |
+
+**2500 of 2505 converge, 5 refuse, 0 converge and violate an invariant**, in
+2202.5 s (36:43) at `64831bd` (`benchmarks/robustness_64831bd.json` / `.md`;
+tree dirty at measurement - this slice's own documentation was uncommitted -
+with every solver, model and parameter file at `64831bd`). The five are
+`gamma-phi-legacy`'s, unchanged and by design. `eos-three-phase` refuses
+nothing: its `LLL` count goes 8 -> 12 (the four Peng-Robinson three-liquid
+states) and its `VLE` count 22 -> 27 (the four water-lean binary states and
+the ternary corner).
+
+**Exactly nine states changed, and they are exactly the nine that refused.**
+Compared field by field against the committed `74820b8` record on `bucket`,
+`verdict`, `phases`, `phase_fractions`, `invariant_violations`,
+`converged_stage`, `phase_set_history`, `outcome`, `refusal_class` and
+`refusal_stage`: **9 states differ, 2496 are identical**, and every one of the
+nine is a `refused -> converged` transition. Dormancy was argued from the code
+(both repairs sit on the branch that raised) and this is the measurement of
+it.
+
+The two repairs are visible in the record: the five class (i) states carry
+`phase_set_history = "L -> LL -> LLV -> LV -> LV"` and
+`converged_stage = "second-order"`, the four class (ii) states carry
+`converged_stage = "second-order-log"` with `log_space_iterations` of 1, 3, 2
+and 2. Wall time 2202.5 s against 2232.8 s at `74820b8` - a 1.4 % difference,
+inside this machine's run-to-run noise (`benchmarks/README.md`), and not read
+as a speed-up: nine states that used to refuse early now solve.
+
+### (vi) What this case does not establish
+
+- **Not that the model is right at these conditions.** Neither the PC-SAFT nor
+  the Peng-Robinson water / ethanol / n-hexane system at `k_ij = 0` is
+  validated against a published ternary datum; this repository packages no
+  `k_ij` for a water / alcohol or water / alkane cross pair (the same gap
+  brain.md's roadmap item 2 records for water / ethanol). The three-liquid
+  answers are equilibria **of that model**, nothing more.
+- **Not that the removal ranking is now correct**, only that it is no longer
+  final. A geometry in which every candidate on the undo stack dead-ends would
+  still raise the same message; no state in this repository does.
+- **Not a global-minimum proof.** The Gibbs ordering compares the alternatives
+  that were *solved* - the single-phase states, every two-phase subset of the
+  returned phases, and for the binary the three tie lines its two branches
+  admit. A phase set nothing seeded would not appear in it. This is the same
+  bound `stability_tp`'s "stable" verdict carries (brain.md section 10).
+- **Not a statement about `gamma-phi-legacy`'s five refusals**, which are
+  untouched, by design, and pinned as such.
+
+- **Suite time:** `pytest -q` **901 passed, 98 deselected, 267.51 s (4:27)**,
+  on the machine named above, against **894 passed, 91 deselected, 267.04 s**
+  at `74820b8` (Case R-MAP-2) - +0.5 s, inside this machine's noise. The new
+  default-run tests cost 4.1 s of that measured on their own; the slow-marked
+  repetitions (three further `T3` offsets, the ternary corner) cost 18.5 s and
+  the two new FeOs comparisons 19.2 s, neither of which the default run pays.
+  The ~240 s ceiling brain.md section 10 tracks is **still exceeded**, as it
+  was before this slice; nothing here narrowed the gap, and roadmap item 1 is
+  the only thing on the list that would.
+  `pytest -q -m slow tests/test_robustness_map.py` **4 passed, 48 deselected,
+  2294.51 s (38:14)** - the full 2505-state sweep reproducing this record's
+  totals (2202.5 s of that is the sweep itself), plus the three-phase verdict
+  pins.
+- **Test path:** `tests/test_flash_eos_multiphase_robustness.py` (nine states,
+  the independent Newton, the Gibbs ordering, and the two new rules on their
+  own), `tests/validation/test_pcsaft_vlle_water_hexane.py` (the FeOs
+  comparisons, `slow`), `tests/test_robustness_map.py` (the quick counts and
+  the pins).
+- **Script:** `python -m chemthermo.bench robustness --out record.json
+  --summary-out record.md`.

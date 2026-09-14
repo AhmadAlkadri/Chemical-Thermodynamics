@@ -1451,8 +1451,13 @@ polyethylene / n-pentane, and **0 at `9adf390`** after ADR-0028 retired them;
 growing the grid to four more families (three-phase equation-of-state windows,
 the deprecated `gamma-phi` path, near-critical Peng-Robinson states,
 associating ternaries) found **14 more at `74820b8`**, none of them in the
-original 2110 states. See `benchmarks/README.md`, ADR-0027 (and its
-`robustness-map-coverage` amendment) and ADR-0028.
+original 2110 states. Nine of those fourteen were one class,
+`multiphase-solver-failure`, and ADR-0029 repaired all nine - a removal the
+phase-addition search can now take back, and a multiphase log-space stage for
+a three-liquid set holding a component at `x ~ 1e-12` - leaving **5 at
+`64831bd`**, all of them the deprecated `gamma-phi` path's own by-design
+behaviour. See `benchmarks/README.md`, ADR-0027 (and its
+`robustness-map-coverage` amendment), ADR-0028 and ADR-0029.
 
 ## Scope Policy
 
