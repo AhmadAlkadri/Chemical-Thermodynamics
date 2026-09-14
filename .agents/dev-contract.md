@@ -52,7 +52,9 @@ running them. What is marked:
   scans across the water / n-hexane three-phase temperature, the PC-SAFT
   ternary tie triangle, the verdict-boundary bisection;
 - a handful of *repetitions*: a further feed on a tie line the default run
-  already checks, a further pressure or temperature on the same map.
+  already checks, a further pressure or temperature on the same map;
+- the full 2110-state robustness sweep of ADR-0027, whose 171-state `--quick`
+  subset runs the same code over all six families by default.
 
 ```bash
 pytest -q -m slow
@@ -127,6 +129,26 @@ identical result hashes and a measured ratio**, the two records measured back
 to back on one machine - the workload's three activity-model cases are the
 drift control. See `benchmarks/README.md` and ADR-0023. A wall time is never
 portable between machines; a result hash is.
+
+## The robustness map (ADR-0027)
+
+Sweep every model family over the fixed coverage grids and write a classified
+record:
+
+```bash
+python -m chemthermo.bench robustness --out benchmarks/robustness_<sha>.json \
+                                      --summary-out benchmarks/robustness_<sha>.md
+```
+
+2110 states, about 15 minutes. `--family NAME` runs one family (the sweep
+partitions and resumes), `--quick` runs the 171-state subset the test suite
+uses (~9 s), `--list` prints the grid. Each state ends in one bucket: a phase
+verdict, `converged-invariant-violated`, or one of eight refusal classes.
+
+This measures **coverage, not correctness**: nothing in it is compared against
+a published number or another implementation. Use it to rank what to fix, not
+to claim something is right. See `benchmarks/README.md`, ADR-0027 and ledger
+Case R-MAP-1.
 
 ## Slice evidence
 

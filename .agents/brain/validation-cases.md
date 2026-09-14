@@ -33,6 +33,7 @@ case's own entry.
 | **V** | V-1..V-5 | Three-phase (VLLE) discovery: the ternary tie-triangle, stability misses fixed by fixed candidate surfaces, the binary refusal window, multiphase Rachford-Rice against Okuno et al. (2010), the ternary verdict map | `flash-vlle-phase-addition` (ADR-0011), `stability-candidate-surfaces` (ADR-0012) |
 | **P** | P-0..P-16 | PC-SAFT: residual Helmholtz/derivatives against teqp, density roots, flash/stability integration, split robustness re-measured on the PC-SAFT grid, phase identity, association against FeOs, per-phase density roots (LLE), EOS phase addition/removal (VLLE), fixed EOS stability surfaces, polymer components, the polymer liquid-liquid split, the polymer vapour-liquid split in log mole numbers, the log-space stability normalization, the curvature safeguard and the Rachford-Rice denominator that close the 0.3-3.6 MPa sweep | `pcsaft-residual-helmholtz` (ADR-0014), `pcsaft-density-roots-flash` (ADR-0015), `pcsaft-association` (ADR-0018), `flash-eos-per-phase-roots` (ADR-0019), `flash-phase-addition-eos` (ADR-0020), `stability-eos-root-surfaces` (ADR-0021), `pcsaft-polymer-solvent` (ADR-0022), `pcsaft-polymer-vle` (ADR-0024), `stability-log-space-sums` (ADR-0025), `flash-polymer-edge-cases` (ADR-0026) |
 | **B** | B-1 | The `chemthermo.bench` measurement harness and its acceptance rule (baseline + after + identical result hashes + measured ratio) | `perf-baseline-and-root-reuse` (ADR-0023) |
+| **R-MAP** | R-MAP-1 | The `chemthermo.bench robustness` coverage map: 2110 states over all six model families, classified into a phase verdict, an invariant violation or one of eight refusal classes, with the ranked classes and their diagnoses | `robustness-map` (ADR-0027) |
 
 ---
 
@@ -4550,3 +4551,201 @@ doubles as before the slice.
   their independent solves, and the whole 68-state sweep; about 1 min 40 s in
   total) and `python examples/validation/21_pcsaft_polymer_vle.py --full` (the
   two 0.3-12 MPa verdict scans, about 1 min 15 s).
+
+---
+
+## Case R-MAP-1: The robustness map - what every family refuses, and where
+
+- **Source:** none, and like Case B-1 that is the point. This is not a
+  thermodynamics case: it is the *coverage* case. Nothing here is checked
+  against a published number or an independent implementation; what is measured
+  is where `flash_tp` refuses, how it refuses, and whether anything it returns
+  breaks its own invariants. The thermodynamic content of the grids is pinned
+  elsewhere in this ledger (F-1, F-4, L-1, L-2, P-7..P-9, P-13..P-16, R-1..R-4,
+  V-1..V-5); this case is the map drawn over them plus the states none of them
+  reaches.
+- **Where:** ADR-0027; harness `src/chemthermo/bench/robustness.py`; record
+  `benchmarks/robustness_87f0820.json`; summary
+  `benchmarks/robustness_87f0820.md`; `benchmarks/README.md`.
+- **Assumptions:** every state is `flash_tp` at default `FlashSettings`
+  (`max_phases=3`, `phase_detection="tangent-plane"`, `post_split_stability=True`).
+  Wall times are a property of one machine at one moment - Apple M2 Max
+  (12 cores, macOS 26.6.2, arm64), CPython 3.11.6, numpy 2.4.2 - and the tree
+  was dirty at measurement because the harness module itself was uncommitted;
+  every solver, model and parameter file was at `87f0820`.
+- **Components and units:** 2110 states over six families; the grids are fixed
+  in the module and each is documented at its definition. SI throughout.
+- **Two grids carry values that are not cited, and are labelled so in the
+  record:** the two nonzero PC-SAFT `kij` binaries use **illustrative**
+  values (0.12 for CO2 / n-decane, 0.045 for methane / n-decane) because
+  chemthermo packages no `kij` dataset (ADR-0014), and 7 of the 16 Tessier
+  feeds are midpoints this module added for composition coverage. Neither is
+  compared against anything. The Peng-Robinson grid is a **reconstruction** of
+  the Case F-1 wide scan: Case F-1 names its shape (8 databank mixtures, 11 T,
+  13 geometric P) but no file in this repository lists all eight mixtures, so
+  the eighth here (Nitrogen / Methane) is this module's choice.
+
+### (i) The map at `87f0820`
+
+| family | states | verdicts | refusal classes | invariant violations | worst mass balance | worst equilibrium residual | worst dG_split/RT | time / s |
+| --- | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: |
+| `pr-phi-phi` | 1270 | VLE 319, single-liquid 406, single-vapor 545 | - | 0 | 2.12e-13 | 7.79e-08 | -1.20e-05 | 5.6 |
+| `pcsaft` | 204 | VLE 132, single-liquid 72 | - | 0 | 1.86e-13 | 3.58e-08 | -3.95e-04 | 72.7 |
+| `pcsaft-associating` | 260 | LLE 145, VLE 5, single-liquid 89, single-vapor 21 | - | 0 | 5.07e-13 | 2.83e-09 | -5.34e-07 | 470.9 |
+| `modified-raoult` | 108 | LLE 48, VLE 28, VLLE 4, single-liquid 13, single-vapor 15 | - | 0 | 1.11e-16 | 9.23e-13 | -1.07e-06 | 3.8 |
+| `gamma-gamma` | 16 | LLE 15, single-liquid 1 | - | 0 | 2.22e-16 | 1.43e-13 | -1.07e-06 | 0.7 |
+| `polymer` | 252 | LLE 113, VLE 43, single-liquid 60 | split-non-convergence 34, stability-inconclusive 2 | 0 | 2.22e-16 | 2.09e-07 | -4.12e-07 | 311.9 |
+
+**2074 of 2110 converge, 36 refuse, 0 converge and violate an invariant**, in
+865.6 s (14:26) total. The map was run **twice**, about twenty minutes apart on
+the one machine: every state count, every verdict, every refusal class and
+every worst residual in this table is identical between the two, and only the
+clock moved (865.6 s against 918.9 s). That is the reproducibility claim - a
+wall time here is not portable, a bucket is. The headline is the shape rather
+than the totals:
+**every refusal in the whole map is polyethylene / n-pentane.** The 1858 states
+of the other five families - the 1270-state Peng-Robinson scan, the 188-state
+Case F-4 grid and its two `kij` binaries, 260 associating PC-SAFT states, the
+Tessier ternary and quaternary and the water / 1-butanol binary - refuse
+nothing.
+
+### (ii) The refusal classes, ranked by count
+
+All 36 are `polymer`; the counts are (class, stage, system):
+
+| # | class | stage | count | system | where |
+| --- | --- | --- | ---: | --- | --- |
+| 1 | `split-non-convergence` | `phi-phi` | **27** | pe53000 (26) + pe16400 (1) | 1 wt%: 3.6-5.4 and 7.5-8.7 MPa; 15 wt%: 3.9-7.5 and 8.1 MPa; pe16400 5 wt%: 7.5 MPa |
+| 2 | `split-non-convergence` | `beta-outside-window` | **4** | pe16400 | 1 wt%, 0.3 / 0.6 / 0.9 / 1.2 MPa |
+| 3 | `split-non-convergence` | `log-space` | **3** | pe53000 | 1 wt%, 0.3 / 0.6 / 0.9 MPa |
+| 4 | `stability-inconclusive` | `feed` | **2** | pe53000 | 15 wt%, 10.5 and 10.8 MPa |
+
+Six of the eight declared refusal classes are **empty** over 2110 states:
+`rr-no-bracket`, `density-root-failure`, `post-split-third-phase`,
+`multiphase-solver-failure`, `model-error` and `other-refusal`. That
+`other-refusal` is empty is the claim that the classification rules cover what
+actually occurs; that `rr-no-bracket` is empty is ADR-0016 and ADR-0026 holding
+across a grid neither was measured on.
+
+**Class 1 - the ADR-0026 "What remains" band is 27 states, not three.**
+Every message is the `_phi_phi_second_order` one, e.g. `equal-fugacity
+residual=3.897e-05 after 100 successive-substitution (max_delta_k=1.539e+89)
+and 101 second-order iterations`, which is the entry point roadmap item 1 and
+ADR-0026's "What remains" name. What the map adds is its *extent*: measured at
+5 wt% the band is the three states near 5.2 MPa that Case P-16 records, and at
+**1 wt% and 15 wt% the same defect spans 3.6-8.7 MPa**. This repository's whole
+polymer history has swept one weight fraction. **Diagnosis: none attempted
+here** - ADR-0026 already recorded that the symmetric curvature retry was
+implemented at this entry point and measured *not* to repair it, so the open
+question is unchanged and only its size moved.
+
+**Class 2 - `beta = 0` where the lever rule says 4.1e-04.** PE 16400, 1 wt%
+polymer (`z_polymer = 4.443385e-05`), 453 K, 0.3-1.2 MPa. `stability_tp` is
+emphatic: `tpd_min = -4.550344e+02`, minimizing trial `wilson-liquid` in 3
+substitutions, stationary point `w = (1.000000, 1.7297e-197)` - an essentially
+pure polyethylene melt. The split then converges to `beta = 0.000000e+00` and
+`_detect` refuses it because a single phase contradicts the verdict.
+**Evidence that a two-phase answer exists:** the same system at 5 wt%, 453 K,
+0.3 MPa converges to melt `x = (0.1090625, 0.8909375)` against vapour
+`y = (4.2885e-206, 1.0)` at `beta_melt = 2.122456e-03`. A binary tie line at
+fixed `(T, P)` does not depend on the feed, so the lever rule on that tie line
+gives `beta_melt = 2.122457e-03` at the 5 wt% feed (reproducing the solver's
+own number to 7 digits, which is the check that the lever rule is being applied
+correctly) and **`4.074164e-04` at the 1 wt% feed** - strictly inside `(0, 1)`.
+**Suspected cause, from that evidence:** the stability seed has the *same
+shape* at both feeds (pure melt; `K_solvent` 6.66e-198 at 5 wt%, 1.73e-197 at
+1 wt%), so what differs between the converging state and the refusing one is
+the size of the incipient phase fraction - 2.1e-03 against 4.1e-04. Stated as
+a hypothesis consistent with the measurement, not as a proof: no instrumented
+trace of the split iteration was taken.
+
+**Class 3 - three log-space refusals at the dilute end.** PE 53000, 1 wt%,
+0.3 / 0.6 / 0.9 MPa, all through `_phi_phi_log_space` from the stability seed,
+with residuals `8.009e-02` after 3 iterations, `3.277e-08` after 100 and
+`1.657e-06` after 46. The middle one is 3.3e-08 against a `1e-08` acceptance -
+close enough that it is worth saying plainly that no tolerance was touched
+here. Same 1 wt% feed as class 2 on the other molar mass, which is the reason
+to suspect the two share a cause. **Not diagnosed further.**
+
+**Class 4 - a two-state window where no stability trial converges.** PE 53000,
+15 wt% (`z_polymer = 2.402e-04`), 10.5 and 10.8 MPa. All four trials end
+`second_order_no_progress` after 62-67 iterations (`max_iter = 300`), `tpd` is
+`nan` *because* they did not converge, with stationarity residuals **0.685**
+and **1.746**. The neighbours settle it: 10.2 MPa converges to `tpd_min =
++2.289939e-04` at a near-trivial minimizer (`K = (1.765e-02, 1.000236)`), and
+11.1 MPa to `tpd = 1.4e-15`, the trivial solution. **Two causes are ruled out
+by measurement.** It is *not* the ADR-0025 exponential-range problem: the
+largest `|ln W|` at the stopping point is **11.09**, nowhere near the 700 that
+clamp sat at, and `sum_W` is within 3.9e-04 of exactly 1. It is not a density
+root failure either - no root message is raised anywhere in the family.
+**Suspected cause:** the second-order stability stage making no progress at a
+marginal, near-trivial stationary point, in a window where the verdict is about
+to cross from "stable with a small positive tpd" to "trivial". Consistent with
+brain.md section 10's standing caveat that a phase count is never better than
+the stability test that produced it.
+
+### (iii) The invariants: nothing returned violates one
+
+Checked on every one of the 2074 converged answers: mass balance recomputed
+from the returned phase fractions and compositions (`< 1e-10`); each phase's
+composition summing to one (`< 1e-10`); phase fractions strictly in `(0, 1)`
+and summing to one; the solver's reported equilibrium residual (`< 1e-06`);
+`dG_split/RT < 0` on every multiphase answer; the post-split stability verdict
+`"stable"` wherever it ran.
+
+- **0 violations.** Worst mass balance anywhere **5.07e-13** (associating
+  PC-SAFT), worst equilibrium residual **2.09e-07** (the polymer ternary,
+  against 1e-06), worst - i.e. least negative - `dG_split/RT` **-3.95e-04**
+  (PC-SAFT).
+- **The honest limit:** mass balance and the composition sums are recomputed
+  here; the equilibrium residual, `dG_split` and the post-split verdict are
+  read from the solver's own `diagnostics`. A defect that made the solver
+  mis-report its own residual would pass this check. ADR-0027 records why the
+  duplicate verifier was not written.
+
+### (iv) One thing the map surfaced and does not adjudicate
+
+PC-SAFT 2B water / ethanol at `kij = 0` returns **LLE at 19 of its 60 states**
+(all of `z_water = 0.8`, and `z_water = 0.5` at 290 K). Example: `z = (0.5,
+0.5)`, 290 K, 0.1 MPa gives `beta = (0.039887, 0.960113)` with
+`dG_split/RT = -2.442940e-04`, mass balance 7.9e-15, equilibrium residual
+6.7e-10 and both phases post-split stable - so the *solver* returned a verified
+lowest-Gibbs answer for the model it was given. Water and ethanol are fully
+miscible in reality, so this is a statement about a **parameterization** (a
+water / alcohol cross pair at `kij = 0`), not about `flash_tp`. Recorded here
+because a coverage map is the place a result like that becomes visible;
+adjudicating it needs a reference and a `kij`, and is not this case.
+
+### (v) What this case does not establish
+
+- Not correctness: no comparison against a published number or another
+  implementation anywhere in it.
+- Not a bit-identity baseline: phase compositions are deliberately absent from
+  the record (ADR-0027).
+- Not portable wall times.
+- Not a global stability proof: a `single-*` verdict is only as good as the
+  deterministic trial set that produced it.
+- Not representative sampling in `--quick`: the 171-state subset is
+  cost-bounded so the default suite stays inside its budget, and its offsets
+  and strides were chosen from the full run's per-state times.
+
+- **Suite time:** `pytest -q` **257.33 s (4:17) for 852 tests -> 267.75 s
+  (4:27) for 891**, measured back to back on the one machine (the pre-slice
+  number is this machine *today*; the previous slice recorded 251.77 s for the
+  same 852, which is the drift). 39 tests added, none removed or marked `slow`
+  except one - the full 2110-state sweep, ~15 min. `--durations` puts the whole
+  cost of this slice at **9.12 s**, the module-scoped `--quick` sweep, almost
+  all of it PC-SAFT states. 4:27 is over the ~4:20 target and is stated rather
+  than trimmed further, as at the previous two slices; a third run of the same
+  suite in the same session measured 285.13 s, so read +-7 % into any of these.
+  `pytest -q -m slow tests/test_robustness_map.py` passes (the full sweep
+  reproduces the committed totals).
+- **Independent route:** none, by design - see the source note. The one
+  independent argument in the case is the lever rule of class 2, which shares
+  no code with the split it contradicts.
+- **Test path:** `tests/test_robustness_map.py` (the classifier against the
+  raised message strings, the quick subset against its committed counts, the
+  three pinned refusals, and the full sweep behind `slow`).
+- **Script:** `python -m chemthermo.bench robustness --quick` (~9 s) and
+  `python -m chemthermo.bench robustness --out record.json --summary-out record.md`
+  (~15 min); `--family NAME` runs one family; `--list` prints the grid.
