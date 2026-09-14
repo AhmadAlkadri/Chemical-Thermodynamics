@@ -484,20 +484,6 @@ class _PhaseRoot:
         self.selected = best_label
         return best
 
-    def fugacity_coefficients(self, composition: np.ndarray) -> np.ndarray:
-        """``phi(w)`` on this phase's root, as the model returned it.
-
-        Raises ``ModelError`` where ``phi`` is not representable; callers that
-        can work in log space should use :meth:`branch_terms` instead.
-        """
-        terms = self.branch_terms(composition)
-        if terms.phi is None:
-            raise ModelError(
-                "Fugacity coefficients are not representable on this phase's root "
-                "(|ln phi| is too large to exponentiate); use branch_terms()."
-            )
-        return terms.phi
-
     def ln_fugacity_terms(self, composition: np.ndarray) -> np.ndarray:
         """``ln phi(w)`` on this phase's root, normalizing ``w`` first.
 
