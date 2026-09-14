@@ -202,6 +202,9 @@ _ROOT_RTOL = 1e-14
 #: Maximum safeguarded-Newton iterations per bracket. Bisection alone would
 #: need ~60 to reach machine width, so this never binds in practice.
 _MAX_REFINE_ITERATIONS = 200
+#: ``np.finfo(float).eps``, read once. It used to be read inside the refinement
+#: loop, where it is a constant.
+_EPS = float(np.finfo(float).eps)
 
 
 def _eta_grid() -> np.ndarray:
@@ -216,6 +219,11 @@ def _eta_grid() -> np.ndarray:
 _ETA_GRID = _eta_grid()
 
 _POWERS = np.arange(7)
+
+#: What ``PCSAFTIsotherm.derivatives(..., value=False)`` returns in the ``a``
+#: slot. A one-element ``nan`` rather than a zero array: a caller that reads it
+#: by mistake gets ``nan`` or a shape error, not a plausible-looking zero.
+_UNREQUESTED = np.array([math.nan])
 
 
 class _EtaDerivatives(NamedTuple):
@@ -304,14 +312,25 @@ class PCSAFTIsotherm:
 
     # -- the model in one variable -----------------------------------------
 
-    def derivatives(self, eta: np.ndarray, *, second: bool) -> _EtaDerivatives:
-        """Return ``(a, a', a'')`` at every ``eta``; ``a''`` is zero if not asked."""
+    def derivatives(self, eta: np.ndarray, *, second: bool, value: bool = True) -> _EtaDerivatives:
+        """Return ``(a, a', a'')`` at every ``eta``; ``a''`` is zero if not asked.
+
+        ``value=False`` says the caller wants only the derivatives, and then
+        ``a`` is not computed at all and comes back as ``nan``. That is not a
+        micro-optimization for its own sake: the root solver never looks at
+        ``a`` - :meth:`pressure` needs ``a'`` and :meth:`pressure_and_slope`
+        needs ``a'`` and ``a''`` - and ``a`` is the only part of this function
+        that takes a logarithm, one over the whole ``eta`` grid and one over
+        the ``(eta, component)`` contact values, plus the chain-term sum over
+        components. Skipping it leaves every remaining expression character for
+        character what it was, so ``a'`` and ``a''`` are the same doubles
+        (ADR-0023).
+        """
         eta = np.asarray(eta, dtype=float)
         u = 1.0 - eta
         column = eta[..., None]
         u_column = u[..., None]
 
-        a_hs = self._a1_const * eta / u + self._a2_const * eta / u**2 + self._a3_const * np.log(u)
         a_hs1 = self._a1_const / u**2 + self._a2_const * (1.0 + eta) / u**3 - self._a3_const / u
 
         g = 1.0 / u_column + self._b_i * column / u_column**2 + self._c_i * column**2 / u_column**3
@@ -322,7 +341,6 @@ class PCSAFTIsotherm:
         )
         g_ratio = g1 / g
 
-        a_hc = self._mbar * a_hs - (self._chain_weight * np.log(g)).sum(axis=-1)
         a_hc1 = self._mbar * a_hs1 - (self._chain_weight * g_ratio).sum(axis=-1)
 
         powers = column**_POWERS
@@ -354,13 +372,21 @@ class PCSAFTIsotherm:
             - math.pi * mbar * (c1_1 * i2 + c1 * i2_1) * self._m2e2s3
         )
 
-        a = a_hc + eta * f / self._m3
+        if value:
+            a_hs = (
+                self._a1_const * eta / u + self._a2_const * eta / u**2 + self._a3_const * np.log(u)
+            )
+            a_hc = self._mbar * a_hs - (self._chain_weight * np.log(g)).sum(axis=-1)
+            a = a_hc + eta * f / self._m3
+        else:
+            a = _UNREQUESTED
         a1 = a_hc1 + (f + eta * f1) / self._m3
 
         if not second:
             if self.association is not None:
-                a_assoc, a1_assoc, _ = self.association.derivatives(eta, second=False)
-                a = a + a_assoc
+                a_assoc, a1_assoc, _ = self.association.derivatives(eta, second=False, value=value)
+                if value:
+                    a = a + a_assoc
                 a1 = a1 + a1_assoc
             return _EtaDerivatives(a=a, a1=a1, a2=np.zeros_like(a1))
 
@@ -396,15 +422,18 @@ class PCSAFTIsotherm:
         )
         a2 = a_hc2 + (2.0 * f1 + eta * f2) / self._m3
         if self.association is not None:
-            a_assoc, a1_assoc, a2_assoc = self.association.derivatives(eta, second=True)
-            a = a + a_assoc
+            a_assoc, a1_assoc, a2_assoc = self.association.derivatives(
+                eta, second=True, value=value
+            )
+            if value:
+                a = a + a_assoc
             a1 = a1 + a1_assoc
             a2 = a2 + a2_assoc
         return _EtaDerivatives(a=a, a1=a1, a2=a2)
 
     def pressure(self, eta: np.ndarray) -> np.ndarray:
         """Return ``P = Z rho R T`` in Pa at every ``eta``."""
-        derivatives = self.derivatives(eta, second=False)
+        derivatives = self.derivatives(eta, second=False, value=False)
         z_factor = 1.0 + eta * derivatives.a1
         return z_factor * (self.density_per_eta * eta) * R_J_PER_MOL_K * self.temperature
 
@@ -416,7 +445,7 @@ class PCSAFTIsotherm:
         :attr:`density_per_eta`.
         """
         point = np.array([eta], dtype=float)
-        derivatives = self.derivatives(point, second=True)
+        derivatives = self.derivatives(point, second=True, value=False)
         a1 = float(derivatives.a1[0])
         a2 = float(derivatives.a2[0])
         z_factor = 1.0 + eta * a1
@@ -470,7 +499,7 @@ def solve_density_roots(
     residual = isotherm.pressure(grid) - target
 
     finite = np.isfinite(residual)
-    brackets: list[tuple[float, float]] = []
+    brackets: list[tuple[float, float, float]] = []
     exact: list[float] = []
     for index in range(grid.size - 1):
         if not (finite[index] and finite[index + 1]):
@@ -483,7 +512,10 @@ def solve_density_roots(
         if right == 0.0:
             continue
         if left < 0.0 < right or right < 0.0 < left:
-            brackets.append((float(grid[index]), float(grid[index + 1])))
+            # `left` is carried into the refinement: it is exactly the residual
+            # that used to be recomputed there, one whole isotherm evaluation
+            # per bracket (ADR-0023).
+            brackets.append((float(grid[index]), float(grid[index + 1]), left))
     if finite[-1] and float(residual[-1]) == 0.0:
         exact.append(float(grid[-1]))
 
@@ -495,13 +527,18 @@ def solve_density_roots(
             f"{state_description}."
         )
 
-    candidates = [_refine(isotherm, low, high, target) for low, high in brackets]
-    candidates.extend(exact)
+    # The refinement already evaluated `(P, dP/drho)` at the root it returns,
+    # so the mechanical-stability filter below reads them off rather than
+    # asking the isotherm again - one further whole evaluation per bracket
+    # (ADR-0023). A grid point that hit the target exactly never went through
+    # the refinement and is still evaluated here.
+    candidates = [_refine(isotherm, low, high, target, f_lo) for low, high, f_lo in brackets]
+    candidates.extend(_RefinedRoot(eta, *isotherm.pressure_and_slope(eta)) for eta in exact)
 
     densities: list[float] = []
     worst_residual = 0.0
-    for eta in sorted(candidates):
-        pressure, slope = isotherm.pressure_and_slope(eta)
+    for candidate in sorted(candidates, key=lambda root: root.eta):
+        eta, pressure, slope = candidate
         if not math.isfinite(slope) or slope <= 0.0:
             continue
         densities.append(isotherm.density_per_eta * eta)
@@ -520,7 +557,24 @@ def solve_density_roots(
     )
 
 
-def _refine(isotherm: PCSAFTIsotherm, low: float, high: float, target: float) -> float:
+class _RefinedRoot(NamedTuple):
+    """One refined root, with the isotherm values the refinement already has.
+
+    Attributes:
+        eta: The packing fraction the refinement stopped at.
+        pressure: ``P_model(eta)`` there.
+        slope: ``(dP/drho)(eta)`` there, which is what decides mechanical
+            stability.
+    """
+
+    eta: float
+    pressure: float
+    slope: float
+
+
+def _refine(
+    isotherm: PCSAFTIsotherm, low: float, high: float, target: float, f_lo: float
+) -> _RefinedRoot:
     """Safeguarded Newton on ``P_model(eta) - P`` inside a sign-changing bracket.
 
     Newton is taken when the step stays strictly inside the current bracket;
@@ -528,32 +582,40 @@ def _refine(isotherm: PCSAFTIsotherm, low: float, high: float, target: float) ->
     the iteration cannot leave the root, which plain Newton can do on the steep
     liquid branch.
 
+    ``f_lo`` is the residual at ``low``, which the scan that produced this
+    bracket already evaluated; it used to be recomputed here, and a
+    single-point evaluation of the isotherm returns the same double the grid
+    evaluation put in that slot (checked over three systems and the whole grid
+    in ``tests/test_pcsaft_density.py``), so passing it in changes the cost and
+    not the iteration.
+
     The iterate with the smallest ``|residual|`` is what is returned, not the
-    last one. On the steep liquid branch one ``ulp`` of ``eta`` is already
+    last one - together with the isotherm's pressure and slope there, which
+    this iteration has already computed and which the caller's
+    mechanical-stability filter would otherwise recompute. On the steep liquid branch one ``ulp`` of ``eta`` is already
     worth a few times ``1e-12 P`` at a low target pressure, so the last two
     iterates straddle the root with different residuals and there is no reason
     to keep the worse one.
     """
     lo, hi = low, high
-    f_lo = float(isotherm.pressure(np.array([lo]))[0]) - target
     eta = 0.5 * (lo + hi)
-    best_eta = eta
+    best = _RefinedRoot(eta, math.nan, math.nan)
     best_residual = math.inf
     for _ in range(_MAX_REFINE_ITERATIONS):
         value, slope = isotherm.pressure_and_slope(eta)
         residual = value - target
         if abs(residual) < best_residual:
-            best_eta, best_residual = eta, abs(residual)
+            best, best_residual = _RefinedRoot(eta, value, slope), abs(residual)
         if residual == 0.0:
-            return eta
+            return _RefinedRoot(eta, value, slope)
         if (f_lo < 0.0) == (residual < 0.0):
             lo, f_lo = eta, residual
         else:
             hi = eta
         if abs(residual) <= _ROOT_RTOL * target:
-            return eta
+            return _RefinedRoot(eta, value, slope)
         width = hi - lo
-        if width <= 2.0 * np.finfo(float).eps * max(abs(eta), 1e-300):
+        if width <= 2.0 * _EPS * max(abs(eta), 1e-300):
             break
         derivative = slope * isotherm.density_per_eta
         step = eta - residual / derivative if derivative != 0.0 else math.nan
@@ -561,7 +623,7 @@ def _refine(isotherm: PCSAFTIsotherm, low: float, high: float, target: float) ->
             eta = step
         else:
             eta = 0.5 * (lo + hi)
-    return best_eta
+    return best
 
 
 def build_isotherm(

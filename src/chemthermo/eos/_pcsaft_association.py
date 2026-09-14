@@ -182,6 +182,12 @@ SITE_FRACTION_TOL = 1e-14
 _X_FLOOR = 1e-300
 
 
+#: What :meth:`AssociationIsotherm.derivatives` returns in the ``a`` slot when
+#: the caller asked for the derivatives only (``value=False``). See the
+#: matching constant in :mod:`chemthermo.eos._pcsaft_density`.
+_UNREQUESTED = np.array([float("nan")])
+
+
 class AssociationParameterError(ModelError):
     """Raised when a set of association parameters cannot be used."""
 
@@ -515,7 +521,7 @@ class AssociationIsotherm:
         )
         constant = self._setup.pair_constant
         if not second:
-            return constant * g, constant * g1, np.zeros_like(g)
+            return constant * g, constant * g1, _UNREQUESTED
         g2 = (
             2.0 / u**3
             + self._b * (4.0 + 2.0 * column) / u**4
@@ -524,12 +530,18 @@ class AssociationIsotherm:
         return constant * g, constant * g1, constant * g2
 
     def derivatives(
-        self, eta: np.ndarray, *, second: bool
+        self, eta: np.ndarray, *, second: bool, value: bool = True
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """Return ``(a, a', a'')`` in ``eta``; ``a''`` is zero when not asked.
 
         ``a'`` is Eq. (6); ``a''`` is Eq. (7), the one derivative that needs the
         site-fraction sensitivity and therefore a linear solve.
+
+        ``value=False`` skips Eq. (1) itself - the caller wants only the
+        derivatives - and ``a`` comes back as ``nan``. Nothing else changes:
+        Eq. (1) is a function of the converged site fractions alone and feeds
+        nothing below it, so ``a'`` and ``a''`` are the same doubles either way
+        (ADR-0023).
         """
         eta = np.asarray(eta, dtype=float)
         rho = eta / self._m3
@@ -542,7 +554,7 @@ class AssociationIsotherm:
         pair_sum = _quadratic(weighted_sites, delta)
         pair_sum_1 = _quadratic(weighted_sites, delta_1)
 
-        a = helmholtz(weights, x_sites)
+        a = helmholtz(weights, x_sites) if value else _UNREQUESTED
         a1 = -half * (pair_sum + eta * pair_sum_1)
         if not second:
             return a, a1, np.zeros_like(a1)
