@@ -264,7 +264,14 @@ def test_the_independent_tie_triangle_is_a_genuine_three_phase_state(
 
 
 @pytest.mark.parametrize("temperature_K", sorted(TRIANGLE_SEEDS))
-@pytest.mark.parametrize("weights", INSIDE_WEIGHTS)
+@pytest.mark.parametrize(
+    "weights",
+    # ADR-0028 runtime trim: a second feed inside the same tie triangle says
+    # the same thing about the same state - the compositions are the triangle's
+    # and only the amounts move, which is what
+    # `test_every_three_phase_answer_is_the_same_tie_triangle` asserts.
+    [INSIDE_WEIGHTS[0], *(pytest.param(w, marks=pytest.mark.slow) for w in INSIDE_WEIGHTS[1:])],
+)
 def test_a_feed_inside_the_tie_triangle_returns_three_verified_phases(
     system, temperature_K: float, weights
 ) -> None:
@@ -322,7 +329,11 @@ def test_a_feed_inside_the_tie_triangle_returns_three_verified_phases(
 
 
 @pytest.mark.parametrize("temperature_K", sorted(TRIANGLE_SEEDS))
-@pytest.mark.parametrize("weights", INSIDE_WEIGHTS)
+@pytest.mark.parametrize(
+    "weights",
+    # ADR-0028 runtime trim, as just above.
+    [INSIDE_WEIGHTS[0], *(pytest.param(w, marks=pytest.mark.slow) for w in INSIDE_WEIGHTS[1:])],
+)
 def test_the_three_phase_state_has_the_lowest_gibbs_energy(
     system, temperature_K: float, weights
 ) -> None:

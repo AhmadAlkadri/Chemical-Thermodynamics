@@ -170,7 +170,14 @@ _FEEDS = [(0.10, 1.0e6), (0.30, 3.0e6), (0.50, 5.0e6), (0.70, 7.0e6)]
 
 
 @pytest.mark.parametrize(
-    ("z1", "pressure"), _FEEDS, ids=[f"z1={row[0]}, P={row[1]:.3g} Pa" for row in _FEEDS]
+    ("z1", "pressure"),
+    # ADR-0028 runtime trim: four feeds on one isotherm, two of them further
+    # points on the same curve.
+    [
+        row if index % 2 == 0 else pytest.param(*row, marks=pytest.mark.slow)
+        for index, row in enumerate(_FEEDS)
+    ],
+    ids=[f"z1={row[0]}, P={row[1]:.3g} Pa" for row in _FEEDS],
 )
 def test_two_phase_flash_is_verified_not_merely_converged(z1: float, pressure: float) -> None:
     """Every split carries mass balance, equal fugacity and a Gibbs-energy drop."""

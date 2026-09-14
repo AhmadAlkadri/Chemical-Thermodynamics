@@ -221,7 +221,12 @@ def test_vapor_liquid_flash_matches_thermo() -> None:
 
 @pytest.mark.parametrize(
     "z1, bubble_low, bubble_high, dew_low, dew_high",
-    [(0.3, 350.0, 361.0, 364.0, 365.0), (0.5, 350.0, 361.0, 361.5, 362.0)],
+    # ADR-0028 runtime trim: the same four boundaries on the same binary at
+    # another feed composition. `z1 = 0.5` runs by default.
+    [
+        pytest.param(0.3, 350.0, 361.0, 364.0, 365.0, marks=pytest.mark.slow),
+        (0.5, 350.0, 361.0, 361.5, 362.0),
+    ],
 )
 def test_bubble_and_dew_temperatures_match_thermo(
     z1: float, bubble_low: float, bubble_high: float, dew_low: float, dew_high: float
