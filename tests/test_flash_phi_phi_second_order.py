@@ -128,7 +128,17 @@ def _reduced_g(fractions: np.ndarray, ln_f: np.ndarray) -> float:
 # --------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize(("temperature_K", "pressure_Pa"), FAILING_STATES)
+@pytest.mark.parametrize(
+    ("temperature_K", "pressure_Pa"),
+    # ADR-0028 runtime trim: three states of one defect on one methane/ethane
+    # map. The reference state runs by default and is also the one the
+    # independent-Newton comparison below uses, so the route is covered end to
+    # end; the other two are the same statement at another temperature.
+    [
+        FAILING_STATES[0],
+        *(pytest.param(*state, marks=pytest.mark.slow) for state in FAILING_STATES[1:]),
+    ],
+)
 def test_the_previously_failing_states_return_a_verified_two_phase_result(
     temperature_K: float, pressure_Pa: float
 ) -> None:

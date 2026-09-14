@@ -214,7 +214,17 @@ def test_the_reference_is_not_vacuous() -> None:
 _PRESSURES = [5.0e5, 1.0e6, 2.0e6, 3.0e6, 5.0e6, 7.0e6, 8.5e6]
 
 
-@pytest.mark.parametrize("pressure", _PRESSURES, ids=[f"{p:.3g} Pa" for p in _PRESSURES])
+# ADR-0028 runtime trim: seven pressures on one isotherm against one teqp
+# curve. Three - the two ends and one in the middle - run by default and keep
+# the comparison; the other four are further points on the same line.
+_DEFAULT_PRESSURES = frozenset({5.0e5, 3.0e6, 8.5e6})
+
+
+@pytest.mark.parametrize(
+    "pressure",
+    [p if p in _DEFAULT_PRESSURES else pytest.param(p, marks=pytest.mark.slow) for p in _PRESSURES],
+    ids=[f"{p:.3g} Pa" for p in _PRESSURES],
+)
 def test_flash_tie_line_matches_teqp_at_300_K(reference, pressure: float) -> None:
     model = reference[0]
     rho_liquid_ref, rho_vapor_ref = _teqp_tie_line(reference, pressure)

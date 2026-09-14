@@ -144,14 +144,21 @@ ADR-0027 before using it to justify anything.
 
 | file | what it is |
 | --- | --- |
-| `robustness_87f0820.json` | the full 2110-state sweep at `87f0820` |
-| `robustness_87f0820.md` | its summary table |
+| `robustness_9adf390.json` | the full 2110-state sweep at `9adf390` |
+| `robustness_9adf390.md` | its summary table |
+| `robustness_87f0820.md` | the summary of the superseded `87f0820` sweep |
 
-At `87f0820`: **2074 of 2110 states converge, 36 refuse, 0 converge and
-violate an invariant.** Every refusal is in the `polymer` family; the whole
-Peng-Robinson, PC-SAFT, associating-PC-SAFT, modified-Raoult and
-`gamma-gamma` sweep (1858 states) refuses nothing. See ledger Case R-MAP-1 for
-the ranked classes and the diagnoses.
+At `9adf390`: **2110 of 2110 states converge, 0 refuse, 0 converge and violate
+an invariant**, in 893.1 s. At `87f0820` it was 2074 converging and **36
+refusing**, all of them polyethylene / n-pentane; ADR-0028 retired all 36 and
+the two records were compared state by state - every one of the 2074 that
+converged before is **identical on every field this record carries**, wall time
+excepted. See ledger Cases R-MAP-1 (the map, and the diagnoses it ranked) and
+P-17 (the repairs, each against an independent solve).
+
+`robustness_87f0820.json` was pruned when `9adf390` superseded it, per the
+policy in the paragraph above; its `.md` summary is kept, because the counts in
+it are what ADR-0027 and Case R-MAP-1 quote.
 
 Adding a system or a state to `chemthermo/bench/robustness.py` is a normal
 change - unlike the timing workload above, this grid is *meant* to grow -

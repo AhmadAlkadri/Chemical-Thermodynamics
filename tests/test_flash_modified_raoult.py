@@ -311,7 +311,8 @@ def test_both_liquid_phases_are_stable_against_the_vapor_candidate(butanol_water
 # --------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("x1", [0.3, 0.5])
+# ADR-0028 runtime trim: a second feed on the same bubble curve.
+@pytest.mark.parametrize("x1", [pytest.param(0.3, marks=pytest.mark.slow), 0.5])
 def test_bubble_temperature_from_flash_verdicts_satisfies_the_scalar_equation(
     propanol_water, x1: float
 ) -> None:
@@ -334,7 +335,11 @@ def test_bubble_temperature_from_flash_verdicts_satisfies_the_scalar_equation(
     assert abs(temperature - independent) < 1e-6
 
 
-@pytest.mark.parametrize("y1, low_K, high_K", [(0.3, 364.0, 365.0), (0.5, 361.5, 362.0)])
+# ADR-0028 runtime trim: a second vapour composition on the same dew curve.
+@pytest.mark.parametrize(
+    "y1, low_K, high_K",
+    [pytest.param(0.3, 364.0, 365.0, marks=pytest.mark.slow), (0.5, 361.5, 362.0)],
+)
 def test_dew_temperature_from_flash_verdicts_satisfies_the_scalar_equation(
     propanol_water, y1: float, low_K: float, high_K: float
 ) -> None:

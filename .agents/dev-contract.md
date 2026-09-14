@@ -52,7 +52,9 @@ running them. What is marked:
   scans across the water / n-hexane three-phase temperature, the PC-SAFT
   ternary tie triangle, the verdict-boundary bisection;
 - a handful of *repetitions*: a further feed on a tie line the default run
-  already checks, a further pressure or temperature on the same map;
+  already checks, a further pressure or temperature on the same map. ADR-0028
+  added 31 of these in one pass to hold the runtime budget - the table naming
+  each one and what still covers it by default is in ledger Case P-17;
 - the full 2110-state robustness sweep of ADR-0027, whose 171-state `--quick`
   subset runs the same code over all six families by default.
 
@@ -149,6 +151,12 @@ This measures **coverage, not correctness**: nothing in it is compared against
 a published number or another implementation. Use it to rank what to fix, not
 to claim something is right. See `benchmarks/README.md`, ADR-0027 and ledger
 Case R-MAP-1.
+
+At `9adf390` it refuses **nothing** (2110 of 2110 converge; 36 refused at
+`87f0820`, all of them polyethylene / n-pentane, and ADR-0028 retired them).
+Read that as "nothing in *this* grid refuses", not as a coverage claim - and
+note that regenerating the record at a new commit means a new file, so the
+superseded JSON is pruned and its `.md` summary kept.
 
 ## Slice evidence
 

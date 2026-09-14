@@ -954,3 +954,374 @@ def test_a_record_without_a_molar_mass_cannot_use_the_mass_based_parameter() -> 
 
     with pytest.raises(PCSAFTParameterError, match="MW_g_mol"):
         PCSAFTRecord(name="Polyethylene", segments_per_g=0.0263, sigma_A=4.0217, epsilon_k_K=247.5)
+
+
+# ---------------------------------------------------------------------------
+# What the robustness map left, and ADR-0028 retires (validation Case P-17)
+#
+# The 2110-state map at `87f0820` refused 36 states and every one of them was
+# this system (ledger Case R-MAP-1). Three causes, all of them about where a
+# stage *starts* rather than how it steps:
+#
+#   1 wt%, 0.3-1.2 MPa    the log-space stage converged on the **trivial**
+#   (both molar masses)   solution - equal compositions, residual 8e-13, phase
+#                         fraction collapsing to 0 - because its seed puts the
+#                         two phases half and half while the melt here holds
+#                         4e-04 of the feed. Repaired by the third ladder
+#                         entry, whose phase fraction is the lever rule's.
+#   3.6-8.7 MPa           the linear second-order stage and its log-space
+#   (1, 5 and 15 wt%)     retry both continue from the K-loop's last iterate,
+#                         and the K-loop had diverged (`max_delta_k` to
+#                         1e+128). Repaired by running the log-space stage from
+#                         the stationary point instead - ladder entries 1 and 2.
+#   15 wt%, 10.5/10.8 MPa every stability trial stalled in the Newton stage.
+#                         Repaired by the ADR-0028 substitution-budget retry;
+#                         the verdict is `stable`, which is what the pressures
+#                         on both sides of it say too.
+#
+# Every tie line below is reproduced by a solver that shares no code with
+# `flash_tp` (the two-equation Newton above, the one-dimensional solve of Case
+# P-14), and the three that are checked against FeOs are in
+# `tests/validation/test_pcsaft_polymer_vs_feos.py`.
+# ---------------------------------------------------------------------------
+
+
+#: ``pressure -> (melt composition, melt phase fraction, ln y_polymer)`` at
+#: 1 wt% polymer, ``Mw = 16400``. The melt fraction at 0.3 MPa, 4.0742e-04, is
+#: the lever rule's on the tie line the 5 wt% feed converges on - which is how
+#: the map's diagnosis knew what these states were refusing to find.
+P17_DILUTE_VLE = {
+    3.0e5: ((0.10906250886173996, 0.89093749113826), 0.00040741633069130145, -472.87659070916015),
+    6.0e5: ((0.053053918285085024, 0.946946081714915), 0.0008375224415597682, -463.8731421615793),
+    9.0e5: ((0.032720262948131754, 0.9672797370518682), 0.001357991751070986, -454.00264952079226),
+    1.2e6: ((0.022154085500088714, 0.9778459144999112), 0.00200567282166797, -443.2920259578849),
+}
+
+
+@pytest.mark.parametrize(
+    "pressure_Pa",
+    [
+        3.0e5,
+        # `slow`: the same statement at three further pressures on the same
+        # 1 wt% isopleth, all through the same ladder entry.
+        pytest.param(6.0e5, marks=pytest.mark.slow),
+        pytest.param(9.0e5, marks=pytest.mark.slow),
+        pytest.param(1.2e6, marks=pytest.mark.slow),
+    ],
+)
+def test_the_dilute_feed_converges_on_the_lever_rule_seed(pressure_Pa: float) -> None:
+    """Case P-17 (i): the four ``beta``-outside-window refusals of the map.
+
+    Before ADR-0028 the log-space stage reached a residual of 8e-13 here and
+    `flash_tp` still raised, because what it had converged on was the trivial
+    solution: both phases at the feed composition, where every equal-fugacity
+    residual is zero by construction and the phase fraction is an exact ``0``.
+    The seed's phase fraction, not the stage, is what put it there.
+    """
+    mixture = _mixture(0.01)
+    eos = _eos()
+    result = ct.flash_tp(mixture, temperature_K=TEMPERATURE_K, pressure_Pa=pressure_Pa, eos=eos)
+    diagnostics = result.diagnostics
+    melt, melt_fraction, ln_y_polymer = P17_DILUTE_VLE[pressure_Pa]
+
+    assert sorted(result.phases) == ["liquid", "vapor"]
+    assert diagnostics["phase_regime"] == "VLE"
+    assert diagnostics["k_seed"] == "stability-log"
+    assert diagnostics["converged_stage"] == "second-order-log"
+    assert diagnostics["log_space_seed"] == "stability-w-lever-rule"
+    assert diagnostics["log_space_curvature_safeguard"] is True
+
+    assert result.phases["liquid"].composition.fractions == pytest.approx(melt, rel=1e-11)
+    assert result.phase_fractions["liquid"] == pytest.approx(melt_fraction, rel=1e-11)
+    assert math.log(result.phases["vapor"].composition.fractions[0]) == pytest.approx(
+        ln_y_polymer, rel=1e-9
+    )
+    assert result.vapor_fraction == pytest.approx(1.0 - melt_fraction, rel=1e-11)
+
+    # The lever rule on the converged tie line, which is the number the map's
+    # diagnosis predicted before any of this converged.
+    z = np.asarray(mixture.fractions, dtype=float)
+    lean = result.phases["vapor"].composition.fractions[0]
+    assert result.phase_fractions["liquid"] == pytest.approx(
+        (z[0] - lean) / (melt[0] - lean), rel=1e-12
+    )
+
+    assert float(diagnostics["mass_balance_residual"]) < 1e-12
+    assert float(diagnostics["fugacity_residual"]) < 1e-8
+    assert float(diagnostics["log_space_residual"]) < 1e-8
+    assert float(diagnostics["delta_g_split_rt"]) < 0.0
+    assert diagnostics["post_split_status"] == "stable"
+
+
+def test_the_53000_dilute_state_lands_on_the_tie_line_case_p_16_already_pinned() -> None:
+    """Case P-17 (ii): the three ``log-space`` refusals, checked against a fixed point.
+
+    The ``Mw = 53 000`` chain at 1 wt% and 0.3 MPa refused with a residual of
+    8.0e-02 before ADR-0028. The answer it now returns is not checked against a
+    number invented for it: 0.3 MPa at **5 wt%** is a state ADR-0026 already
+    pinned, verified there against a one-dimensional equal-fugacity solve, and
+    a tie line is a property of the state and not of the feed. The two melts
+    agree to 1.1e-12 relative, from two different ladder entries.
+    """
+    eos = _eos(KIJ, 53000.0)
+    dilute = ct.flash_tp(
+        _mixture(0.01, 53000.0), temperature_K=TEMPERATURE_K, pressure_Pa=3.0e5, eos=eos
+    )
+    diagnostics = dilute.diagnostics
+
+    assert sorted(dilute.phases) == ["liquid", "vapor"]
+    assert diagnostics["log_space_seed"] == "stability-w-lever-rule"
+    assert dilute.phases["liquid"].composition.fractions == pytest.approx(
+        (0.036808345719631735, 0.9631916542803682), rel=1e-11
+    )
+    # The 5 wt% melt of Case P-16, from the block above, on the same tie line.
+    assert dilute.phases["liquid"].composition.fractions[0] == pytest.approx(
+        0.036808345719672377, rel=1e-11
+    )
+    assert dilute.phase_fractions["liquid"] == pytest.approx(0.00037355015625717414, rel=1e-11)
+    assert dilute.phases["vapor"].composition.fractions[0] == 0.0
+    assert float(diagnostics["log_space_ln_x_min"]) == pytest.approx(-1528.39130415, rel=1e-9)
+
+    assert float(diagnostics["mass_balance_residual"]) < 1e-12
+    assert float(diagnostics["log_space_residual"]) < 1e-8
+    assert float(diagnostics["delta_g_split_rt"]) < 0.0
+    assert diagnostics["post_split_status"] == "stable"
+
+
+#: ``(Mw, weight fraction, pressure) -> (polymer-rich composition, polymer-lean
+#: ln x_polymer, polymer-rich phase fraction, curvature safeguard)`` for the
+#: band the K-loop used to hand over in ruins.
+P17_LADDER_LLE = {
+    (53000.0, 0.15, 8.1e6): (
+        (0.0003647955115724242, 0.9996352044884275),
+        -20.715500022759343,
+        0.6583461479606705,
+        False,
+    ),
+    (16400.0, 0.05, 7.5e6): (
+        (0.001129717115748221, 0.9988702828842517),
+        -12.185046049951254,
+        0.20129111537244893,
+        True,
+    ),
+    (53000.0, 0.01, 3.6e6): (
+        (0.0008131909284340129, 0.999186809071566),
+        -70.220361234825,
+        0.016908407133382708,
+        True,
+    ),
+    (53000.0, 0.01, 8.1e6): (
+        (0.0003647955115718861, 0.9996352044884281),
+        -20.715500022776144,
+        0.03768904234241921,
+        True,
+    ),
+}
+
+
+@pytest.mark.parametrize(
+    ("mw_g_mol", "weight_fraction", "pressure_Pa"),
+    [
+        # One state per ladder entry runs by default: the 15 wt% state needs
+        # only the stationary-point seed, the 16400 state needs the curvature
+        # safeguard with it.
+        (53000.0, 0.15, 8.1e6),
+        (16400.0, 0.05, 7.5e6),
+        # `slow`: two further pressures of the same 26-state band on the same
+        # chain, both through the entry the 16400 state above already covers.
+        pytest.param(53000.0, 0.01, 3.6e6, marks=pytest.mark.slow),
+        pytest.param(53000.0, 0.01, 8.1e6, marks=pytest.mark.slow),
+    ],
+)
+def test_the_band_the_diverged_k_loop_used_to_end(
+    mw_g_mol: float, weight_fraction: float, pressure_Pa: float
+) -> None:
+    """Case P-17 (iii): the 27 ``phi-phi`` refusals, the map's largest class.
+
+    Successive substitution runs away here - ``max_delta_k`` reaches 1e+89 to
+    1e+128 - and both stages that follow it were started from what it left.
+    They are now started from the tangent-plane stationary point instead, which
+    is a phase the stability test actually measured.
+    """
+    mixture = _mixture(weight_fraction, mw_g_mol)
+    eos = _eos(KIJ, mw_g_mol)
+    result = ct.flash_tp(mixture, temperature_K=TEMPERATURE_K, pressure_Pa=pressure_Pa, eos=eos)
+    diagnostics = result.diagnostics
+    rich_x, lean_ln_x, rich_fraction, safeguard = P17_LADDER_LLE[
+        (mw_g_mol, weight_fraction, pressure_Pa)
+    ]
+
+    assert sorted(result.phases) == ["liquid1", "liquid2"]
+    assert diagnostics["phase_regime"] == "LLE"
+    assert result.vapor_fraction is None
+    # The seed is the stationary point's, and the successive-substitution loop
+    # is what failed - so `k_seed` is still `"stability"`, not `"stability-log"`.
+    assert diagnostics["k_seed"] == "stability"
+    assert diagnostics["converged_stage"] == "second-order-log"
+    assert diagnostics["log_space_seed"] == "stability-w"
+    assert diagnostics["log_space_curvature_safeguard"] is safeguard
+
+    polymer_rich, solvent_rich = _phase_by_polymer(result)
+    assert result.phases[polymer_rich].composition.fractions == pytest.approx(rich_x, rel=1e-11)
+    assert result.phase_fractions[polymer_rich] == pytest.approx(rich_fraction, rel=1e-11)
+    assert math.log(result.phases[solvent_rich].composition.fractions[0]) == pytest.approx(
+        lean_ln_x, rel=1e-9
+    )
+
+    assert float(diagnostics["mass_balance_residual"]) < 1e-12
+    assert float(diagnostics["fugacity_residual"]) < 1e-8
+    assert float(diagnostics["delta_g_split_rt"]) < 0.0
+    assert diagnostics["post_split_status"] == "stable"
+
+
+@pytest.mark.slow  # another feed on a tie line the default run already solves
+def test_the_recovered_tie_line_is_the_same_from_a_1_and_a_15_wt_percent_feed() -> None:
+    """Case P-17 (iv): two feeds, two ladder entries, one tie line.
+
+    8.1 MPa is the pressure the quick subset of the robustness map pins, and
+    the map refuses it at both 1 wt% and 15 wt%. They converge through
+    different ladder entries - the 15 wt% feed needs no curvature safeguard and
+    the 1 wt% feed does - so agreeing to 1.5e-12 is a statement about the tie
+    line rather than about a shared code path.
+    """
+    eos = _eos(KIJ, 53000.0)
+    lines = []
+    for weight_fraction in (0.01, 0.15):
+        result = ct.flash_tp(
+            _mixture(weight_fraction, 53000.0),
+            temperature_K=TEMPERATURE_K,
+            pressure_Pa=8.1e6,
+            eos=eos,
+        )
+        polymer_rich, solvent_rich = _phase_by_polymer(result)
+        lines.append(
+            (
+                result.phases[polymer_rich].composition.fractions[0],
+                result.phases[solvent_rich].composition.fractions[0],
+                result.diagnostics["log_space_curvature_safeguard"],
+            )
+        )
+    assert lines[0][2] is not lines[1][2]
+    assert lines[0][0] == pytest.approx(lines[1][0], rel=1e-11)
+    assert lines[0][1] == pytest.approx(lines[1][1], rel=1e-8)
+
+
+@pytest.mark.parametrize(
+    "pressure_Pa",
+    [1.05e7, pytest.param(1.08e7, marks=pytest.mark.slow)],  # the second is the same statement
+)
+def test_the_stalled_stability_pair_is_resolved_as_stable(pressure_Pa: float) -> None:
+    """Case P-17 (v): the two ``stability-inconclusive`` refusals of the map.
+
+    All four trials ended ``second_order_no_progress`` at a residual of 0.685
+    and 1.746 - the Newton line search finding no admissible step at all - from
+    a 50-substitution iterate that was still travelling. With the substitutions
+    given their full ``max_iter`` budget the same unchanged Newton stage
+    converges, on the trivial solution, and the verdict is ``stable``.
+
+    That verdict is not taken on the solver's word here: 9.9 and 10.2 MPa
+    below it are ``stable`` with a positive tangent-plane minimum, 11.1 and
+    11.4 MPa above it are ``stable`` on the trivial solution, and the scan in
+    ``test_no_trial_free_scan_finds_a_negative_tangent_plane_distance`` finds
+    no negative distance anywhere.
+
+    ``flash_tp``'s end of it - a single liquid returned rather than a refusal -
+    is the test just below; it runs the analysis a second time, so it is
+    ``slow`` and this one is what runs by default.
+    """
+    stability = ct.stability_tp(
+        _mixture(0.15, 53000.0),
+        temperature_K=TEMPERATURE_K,
+        pressure_Pa=pressure_Pa,
+        eos=_eos(KIJ, 53000.0),
+    )
+    assert stability.status == "stable"
+    assert stability.diagnostics["substitution_budget_retry"] is True
+    assert stability.diagnostics["substitution_budget_retry_from"] == 50
+    assert stability.diagnostics["ssi_iterations_budget"] == 300
+    converged = [trial for trial in stability.trials if trial.converged]
+    assert converged, "the retry is only kept when it produced a verdict"
+    assert all(trial.trivial for trial in converged)
+
+
+@pytest.mark.slow  # the same two states through `flash_tp`, which re-runs the analysis
+@pytest.mark.parametrize("pressure_Pa", [1.05e7, 1.08e7])
+def test_the_resolved_pair_returns_a_single_liquid_rather_than_a_refusal(
+    pressure_Pa: float,
+) -> None:
+    """Case P-17 (v), end to end: what the user gets where the map recorded a refusal."""
+    result = ct.flash_tp(
+        _mixture(0.15, 53000.0),
+        temperature_K=TEMPERATURE_K,
+        pressure_Pa=pressure_Pa,
+        eos=_eos(KIJ, 53000.0),
+    )
+    assert list(result.phases) == ["liquid"]
+    assert result.diagnostics["termination_reason"] == "feed_stable_tangent_plane"
+    assert result.diagnostics["phase_regime"] == "single-phase"
+    assert result.diagnostics["stability_status"] == "stable"
+
+
+@pytest.mark.parametrize("pressure_Pa", [9.9e6, 1.11e7])
+def test_the_substitution_budget_retry_is_dormant_on_the_pressures_either_side(
+    pressure_Pa: float,
+) -> None:
+    """Both neighbours reach a verdict on the first pass, so the retry never runs.
+
+    9.9 MPa converges to a non-trivial stationary point with ``tpd > 0`` and
+    11.1 MPa to the trivial one; the key's *absence* is the assertion that
+    nothing about either was re-run.
+    """
+    stability = ct.stability_tp(
+        _mixture(0.15, 53000.0),
+        temperature_K=TEMPERATURE_K,
+        pressure_Pa=pressure_Pa,
+        eos=_eos(KIJ, 53000.0),
+    )
+    assert stability.status == "stable"
+    assert "substitution_budget_retry" not in stability.diagnostics
+
+
+@pytest.mark.slow  # a 220-point scan of the same verdict the default run asserts
+def test_no_trial_free_scan_finds_a_negative_tangent_plane_distance() -> None:
+    """Case P-17 (v), independently: ``tpd(w) >= 0`` on a grid, with no solver at all.
+
+    Michelsen's test is a local stationary-point search, so "stable" is only
+    ever "no negative distance was found from this trial set". This walks
+    equation (2) directly over a grid of trial compositions spanning twelve
+    decades of polymer content, using nothing but ``density_roots`` and
+    ``ln_fugacity_coefficients``. Measured minimum: +8.0e-09 at 10.5 MPa and
+    +8.8e-09 at 10.8 MPa, both at the feed composition itself.
+    """
+    bound = PCSAFTEOS(
+        components=("Polyethylene", "n-Pentane"), parameters=_parameters(53000.0), kij=KIJ
+    )
+
+    def min_gibbs_ln_phi(pressure_Pa: float, x: list[float]) -> np.ndarray:
+        best: tuple[float, np.ndarray] | None = None
+        for density in bound.density_roots(
+            temperature_K=TEMPERATURE_K, pressure_Pa=pressure_Pa, composition=x
+        ):
+            terms = np.asarray(
+                bound.ln_fugacity_coefficients(
+                    temperature_K=TEMPERATURE_K, density_mol_m3=density, composition=x
+                )
+            )
+            energy = float(np.dot(x, terms))
+            if best is None or energy < best[0]:
+                best = (energy, terms)
+        assert best is not None
+        return best[1]
+
+    z = np.asarray(_mixture(0.15, 53000.0).fractions, dtype=float)
+    grid = np.concatenate(
+        [np.logspace(-12.0, math.log10(200.0 * z[0]), 200), np.linspace(0.5, 1.0 - 1e-9, 20)]
+    )
+    for pressure_Pa in (1.05e7, 1.08e7):
+        plane = np.log(z) + min_gibbs_ln_phi(pressure_Pa, z.tolist())
+        worst = math.inf
+        for polymer in grid:
+            w = np.array([polymer, 1.0 - polymer])
+            terms = min_gibbs_ln_phi(pressure_Pa, w.tolist())
+            worst = min(worst, float(np.sum(w * (np.log(w) + terms - plane))))
+        assert worst >= 0.0, (pressure_Pa, worst)

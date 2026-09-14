@@ -476,3 +476,71 @@ def test_feos_refuses_this_flash_where_chemthermo_returns_a_verified_split() -> 
 
     assert raised == 2
     assert degenerate == 1
+
+
+# ---------------------------------------------------------------------------
+# Case P-17: the states ADR-0028 moves from refusal to answer
+# ---------------------------------------------------------------------------
+
+#: ``(Mw, weight fraction, P/Pa)``, all of them states the robustness map at
+#: ``87f0820`` refused and the ADR-0028 seed ladder now converges. The three
+#: cover both of the ladder entries that produce an answer here: the 16400
+#: state at 0.3 MPa goes through the lever-rule seed, the other two through the
+#: stationary-point seed with the curvature safeguard.
+P17_STATES: tuple[tuple[float, float, float], ...] = (
+    (16400.0, 0.01, 3.0e5),
+    (53000.0, 0.01, 3.6e6),
+    (53000.0, 0.15, 6.0e6),
+)
+
+
+@pytest.mark.parametrize(
+    ("mw_g_mol", "weight_fraction", "pressure_Pa"),
+    [
+        # One per ladder entry runs by default: the 16400 state at 0.3 MPa
+        # comes through the lever-rule seed and the 15 wt% state at 6 MPa
+        # through the stationary-point seed with the curvature safeguard.
+        (16400.0, 0.01, 3.0e5),
+        (53000.0, 0.15, 6.0e6),
+        # `slow`: a further pressure on the same chain through the same entry
+        # as the 15 wt% state above.
+        pytest.param(53000.0, 0.01, 3.6e6, marks=pytest.mark.slow),
+    ],
+)
+@pytest.mark.usefixtures("matched_constants")
+def test_feos_potentials_are_equal_at_the_phases_adr_0028_recovers(
+    mw_g_mol: float, weight_fraction: float, pressure_Pa: float
+) -> None:
+    """Case P-17: the Case P-8 route, on states that had no answer to check.
+
+    Only the two compositions and the two densities are chemthermo's; FeOs
+    supplies the chemical potentials, and equal potentials across the pair is
+    the equilibrium condition evaluated by the other implementation. Run at
+    ``k_ij = 0``, which is the only ``k_ij`` FeOs takes here (see the module
+    docstring), so these are the same *states* rather than the same numbers as
+    ``tests/test_pcsaft_polymer.py``'s - and all three still come out of the
+    ADR-0028 ladder at ``k_ij = 0``.
+
+    Achieved: worst 4.3e-12 over the three, against an asserted 1e-07.
+    """
+    assert (mw_g_mol, weight_fraction, pressure_Pa) in P17_STATES
+    mixture = _mixture(weight_fraction, mw_g_mol)
+    eos = PCSAFTEOS(parameters=_our_parameters(mw_g_mol), kij=0.0)
+    result = ct.flash_tp(mixture, temperature_K=TEMPERATURE_K, pressure_Pa=pressure_Pa, eos=eos)
+    assert len(result.phases) == 2
+    assert result.diagnostics["converged_stage"] == "second-order-log"
+    assert str(result.diagnostics["log_space_seed"]).startswith("stability-w")
+
+    potentials = []
+    for phase in result.phases.values():
+        composition = np.asarray(phase.composition.fractions, dtype=float)
+        assert np.all(composition > 0.0), "an exact zero has no chemical potential"
+        density = eos.density_roots(
+            mixture=mixture,
+            temperature_K=TEMPERATURE_K,
+            pressure_Pa=pressure_Pa,
+            composition=composition.tolist(),
+        )[-1]
+        potentials.append(_feos_reduced_potentials(mw_g_mol, density, composition))
+    difference = float(np.max(np.abs(potentials[0] - potentials[1])))
+    assert difference < POTENTIAL_TOL, (mw_g_mol, weight_fraction, pressure_Pa, difference)

@@ -343,6 +343,8 @@ def test_pure_hexane_saturation_matches_teqp_pure_vle(temperature: float) -> Non
     ) == pytest.approx(p_sat, rel=1e-9)
 
 
+@pytest.mark.slow  # the coarser half of the check `..._matches_teqp_pure_vle[300.0]`
+# makes by default, on the same saturation state
 def test_hexane_saturation_pressure_is_in_the_right_range_at_300_K() -> None:
     """Model-versus-experiment sanity remark, not a validation of the model.
 

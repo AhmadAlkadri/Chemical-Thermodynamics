@@ -10,7 +10,7 @@ first if a message were reworded.
 **The map.** The ``--quick`` subset - 171 states, a cost-bounded sample of
 every family (see ``QUICK_SAMPLING`` in the module under test) - is run once per
 module and its per-family bucket counts are compared against the committed
-expectation below. Those counts were measured at `87f0820`; a change to any of
+expectation below. Those counts were measured at `9adf390`; a change to any of
 them is a change in what chemthermo can answer, which is exactly what this file
 exists to notice.
 
@@ -18,6 +18,11 @@ exists to notice.
 state and class, with a test that **expects the failure**. If a later slice
 fixes one of them, this file fails - deliberately. The fix is to move the state
 out of :data:`PINNED_REFUSALS` and into the record, not to loosen the test.
+Since ADR-0028 that list is **empty** - the full sweep refuses nothing - so the
+parametrized test over it skips with "empty parameter set" and the assertion
+that carries the claim is
+``test_the_quick_subset_contains_exactly_the_pinned_refusals``, which compares
+the refusals found against the empty set.
 
 The full 2110-state sweep is marked ``slow``: the quick subset runs the same
 code over every family by default, so this is the "full grid whose
@@ -45,8 +50,13 @@ from chemthermo.bench.robustness import (
 )
 
 # ---------------------------------------------------------------------------
-# The committed expectation for the quick subset (measured at 87f0820).
+# The committed expectation for the quick subset (measured at 9adf390).
 # ---------------------------------------------------------------------------
+
+#: The committed full sweep this module checks the code against. Regenerating
+#: it at a new commit means a new file (``benchmarks/README.md``), so the name
+#: lives in one place.
+COMMITTED_RECORD = Path(__file__).resolve().parents[1] / "benchmarks" / "robustness_9adf390.json"
 
 #: Total states in the ``--quick`` subset.
 EXPECTED_QUICK_STATES = 171
@@ -58,19 +68,20 @@ EXPECTED_QUICK_FAMILIES: dict[str, tuple[int, int, int, int]] = {
     "pcsaft-associating": (7, 7, 0, 0),
     "modified-raoult": (20, 20, 0, 0),
     "gamma-gamma": (8, 8, 0, 0),
-    "polymer": (9, 6, 3, 0),
+    "polymer": (9, 9, 0, 0),
 }
 
 #: Every refusal the quick subset contains, pinned. Each entry is
-#: ``(system, T / K, P / Pa, refusal class, refusal stage)``. All three are
-#: polyethylene / n-pentane at 453 K and one of them - the ``phi-phi`` stage at
-#: 8.1 MPa - stands for the 30-state band that is the largest refusal class in
-#: the whole map (ledger Case R-MAP-1).
-PINNED_REFUSALS: tuple[tuple[str, float, float, str, str], ...] = (
-    ("polymer-pe16400-pentane", 453.0, 300000.0, "split-non-convergence", "beta-outside-window"),
-    ("polymer-pe53000-pentane", 453.0, 300000.0, "split-non-convergence", "log-space"),
-    ("polymer-pe53000-pentane", 453.0, 8100000.0, "split-non-convergence", "phi-phi"),
-)
+#: ``(system, T / K, P / Pa, refusal class, refusal stage)``.
+#:
+#: **Empty since ADR-0028**, and that emptiness is the claim: the three
+#: polyethylene / n-pentane states pinned here at ``87f0820`` - the
+#: ``beta``-outside-window state at 0.3 MPa, the ``log-space`` state at
+#: 0.3 MPa, and the ``phi-phi`` state at 8.1 MPa standing for the map's
+#: largest refusal class - now converge to verified two-phase results, and the
+#: full sweep refuses nothing at all (ledger Cases R-MAP-1 and P-17). A new
+#: entry here is a regression to argue for, not a line to add.
+PINNED_REFUSALS: tuple[tuple[str, float, float, str, str], ...] = ()
 
 #: States that converge but violate an invariant. Empty is the claim - the full
 #: 2110-state map found none - and a new entry here has to be argued for, not
@@ -433,7 +444,7 @@ def test_the_timing_cli_still_means_what_it_meant(tmp_path: Path) -> None:
 
 def test_the_committed_record_matches_the_grid_this_module_defines() -> None:
     """The committed full record describes the same 2110-state map as the code."""
-    path = Path(__file__).resolve().parents[1] / "benchmarks" / "robustness_87f0820.json"
+    path = COMMITTED_RECORD
     if not path.is_file():  # pragma: no cover - a wheel has no benchmarks/ directory
         pytest.skip("the committed record lives in a source checkout only")
     with path.open("r", encoding="utf-8") as handle:
@@ -452,8 +463,7 @@ def test_the_committed_record_matches_the_grid_this_module_defines() -> None:
 @pytest.mark.slow  # minutes; the quick subset above runs the same code over every family
 def test_the_full_sweep_reproduces_the_committed_totals() -> None:
     """The whole 2110-state map, against the committed record's counts."""
-    path = Path(__file__).resolve().parents[1] / "benchmarks" / "robustness_87f0820.json"
-    with path.open("r", encoding="utf-8") as handle:
+    with COMMITTED_RECORD.open("r", encoding="utf-8") as handle:
         committed = json.load(handle)
 
     record = run_sweep()

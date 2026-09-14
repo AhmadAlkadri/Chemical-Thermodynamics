@@ -232,7 +232,12 @@ def _kappa(pressure_Pa: float, composition: Sequence[float] | np.ndarray) -> flo
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.parametrize("pressure_Pa", [ATMOSPHERE_PA, HIGH_PRESSURE_PA])
+@pytest.mark.parametrize(
+    "pressure_Pa",
+    # ADR-0028 runtime trim: another pressure on the same binary against the
+    # same reference implementation; the high-pressure state runs by default.
+    [pytest.param(ATMOSPHERE_PA, marks=pytest.mark.slow), HIGH_PRESSURE_PA],
+)
 def test_the_tie_line_matches_the_feos_tp_flash(pressure_Pa: float) -> None:
     """Compositions, densities and phase amounts, against FeOs's own flash.
 
@@ -269,7 +274,11 @@ def test_the_tie_line_matches_the_feos_tp_flash(pressure_Pa: float) -> None:
         assert 0.0 < _kappa(pressure_Pa, composition) < KAPPA_LIQUID_THRESHOLD
 
 
-@pytest.mark.parametrize("pressure_Pa", [ATMOSPHERE_PA, HIGH_PRESSURE_PA])
+@pytest.mark.parametrize(
+    "pressure_Pa",
+    # ADR-0028 runtime trim, as just above.
+    [pytest.param(ATMOSPHERE_PA, marks=pytest.mark.slow), HIGH_PRESSURE_PA],
+)
 @pytest.mark.usefixtures("matched_constants")
 def test_feos_chemical_potentials_are_equal_at_chemthermos_phases(
     pressure_Pa: float,
