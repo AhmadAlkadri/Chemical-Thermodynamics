@@ -38,7 +38,7 @@ import pytest
 import chemthermo as ct
 from chemthermo.core import Composition
 from chemthermo.eos import PCSAFTEOS
-from chemthermo.exceptions import ConvergenceError, ModelError
+from chemthermo.exceptions import ModelError
 from chemthermo.flash import _detect
 from chemthermo.flash._common import wilson_k
 from chemthermo.flash._log_space import (
@@ -466,16 +466,20 @@ def test_a_composition_accepts_an_exact_zero() -> None:
 
 
 @pytest.mark.parametrize("pressure_Pa", [5.0e5, pytest.param(1.0e6, marks=pytest.mark.slow)])
-def test_the_longest_chain_below_1_mpa_is_still_out_of_reach(pressure_Pa: float) -> None:
-    """A narrower limitation than Case P-13 (vi), pinned rather than worked around.
+def test_the_longest_chain_below_1_mpa_is_now_in_reach(pressure_Pa: float) -> None:
+    """The former limitation, pinned the other way round (ADR-0025, Case P-15).
 
-    For ``Mw = 53 000`` at 0.5 and 1 MPa the tangent-plane test does not find
-    the melt at all: its deepest stationary point is a shallow vapour-side one
-    (``tpd`` of order 1e-04), so the log-space stage is seeded 1300 orders of
-    magnitude away from the answer and spends its budget without reaching it.
-    That is a property of the **stability trial set** for a chain of
-    ``m = 1393.9``, not of the split, and it is left for a later slice. At
-    2 MPa the same system converges (the test above).
+    Until ADR-0025 this test asserted the opposite: for ``Mw = 53 000`` at 0.5
+    and 1 MPa the tangent-plane test did not find the melt at all - its deepest
+    stationary point was a shallow vapour-side one (``tpd`` of order 1e-04) -
+    so this stage was seeded 1300 orders of magnitude from the answer and spent
+    its budget. It was a property of the **stability** iteration, not of the
+    split: the melt's stationary point sits at ``ln W_polymer ~ 1450`` and the
+    iteration clamped ``ln W`` at ``700``. With the clamp gone the melt is the
+    minimizer, and this stage - unchanged - converges from it.
+
+    What this module owns is the *stage*; the stability side of the same
+    reversal is in `tests/test_stability_log_space.py`.
     """
     mixture = _mixture(0.05, 53000.0)
     eos = _eos(KIJ, 53000.0)
@@ -483,9 +487,17 @@ def test_the_longest_chain_below_1_mpa_is_still_out_of_reach(pressure_Pa: float)
         mixture, temperature_K=TEMPERATURE_K, pressure_Pa=pressure_Pa, eos=eos
     )
     assert stability.status == "unstable"
-    assert stability.tpd_min > -1.0  # the deep melt stationary point is not found
-    with pytest.raises(ConvergenceError, match="log mole numbers"):
-        ct.flash_tp(mixture, temperature_K=TEMPERATURE_K, pressure_Pa=pressure_Pa, eos=eos)
+    assert stability.tpd_min < -1000.0  # the melt, not the shallow vapour-side point
+    assert stability.phase_branch == "liquid"
+
+    result = ct.flash_tp(mixture, temperature_K=TEMPERATURE_K, pressure_Pa=pressure_Pa, eos=eos)
+    assert sorted(result.phases) == ["liquid", "vapor"]
+    assert result.diagnostics["k_seed"] == "stability-log"
+    assert result.diagnostics["converged_stage"] == "second-order-log"
+    assert float(result.diagnostics["fugacity_residual"]) < 1e-8
+    assert float(result.diagnostics["mass_balance_residual"]) < 1e-12
+    assert float(result.diagnostics["delta_g_split_rt"]) < 0.0
+    assert result.diagnostics["post_split_status"] == "stable"
 
 
 # ---------------------------------------------------------------------------
