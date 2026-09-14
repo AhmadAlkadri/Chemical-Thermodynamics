@@ -114,8 +114,10 @@ machine, as the rule requires, and **the machine was not quiet**: an unrelated
 process held about eight of its twelve cores for the whole session. Read the
 three activity-model controls first, because they are what that looks like -
 they touch none of the code this slice changes and they still scatter across
-1.02x, 0.96x and 1.03x at nine timed repeats, against the 1.00x / 1.04x / 1.02x the same three read for
-ADR-0023 on a quiet machine.
+1.02x, 0.96x and 1.03x at nine timed repeats, against the
+1.00x / 1.04x / 1.02x the same three read for ADR-0023 on a quiet machine. A
+first attempt at five repeats gave controls of 0.77x / 1.25x / 0.92x and was
+discarded as unreadable.
 
 ```
 case                           before / s    after / s   speedup  result

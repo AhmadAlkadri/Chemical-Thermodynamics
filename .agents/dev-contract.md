@@ -153,15 +153,18 @@ a published number or another implementation. Use it to rank what to fix, not
 to claim something is right. See `benchmarks/README.md`, ADR-0027 and ledger
 Cases R-MAP-1 and R-MAP-2.
 
-At `64831bd` it refuses **5** of 2505 states, all of them the deprecated
+At `f852726` it refuses **5** of 2505 states, all of them the deprecated
 `gamma-phi-legacy` path's `rr-no-bracket` behaviour, which is by design
 (ADR-0016 decision 8). The nine `multiphase-solver-failure` states the map
 found at `74820b8` in `eos-three-phase` were repaired by ADR-0029; the
 original 2110-state grid still refuses nothing, unchanged field for field from
-`9adf390`. Read every count here as "nothing in *this* grid refuses" (or "this
-is what *this* grid refuses"), not as a coverage claim - and note that
-regenerating the record at a new commit means a new file, so the superseded
-JSON is pruned and its `.md` summary kept.
+`9adf390`. The whole 2505-state record is **identical field for field to the
+`64831bd` one**, wall time excluded - ADR-0030 is a performance change, and
+re-running the sweep and diffing it is the widest of the three bit-identity
+gates a performance slice here is held to. Read every count here as "nothing
+in *this* grid refuses" (or "this is what *this* grid refuses"), not as a
+coverage claim - and note that regenerating the record at a new commit means a
+new file, so the superseded JSON is pruned and its `.md` summary kept.
 
 ## Slice evidence
 

@@ -32,7 +32,7 @@ case's own entry.
 | **R** | R-1..R-4 | `modified-raoult` mode (activity liquid + ideal vapor): VLE/LLE from one tangent plane, the three-phase neighbourhood refusal window, cross-check against `thermo` | `flash-modified-raoult` (ADR-0010) |
 | **V** | V-1..V-5 | Three-phase (VLLE) discovery: the ternary tie-triangle, stability misses fixed by fixed candidate surfaces, the binary refusal window, multiphase Rachford-Rice against Okuno et al. (2010), the ternary verdict map | `flash-vlle-phase-addition` (ADR-0011), `stability-candidate-surfaces` (ADR-0012) |
 | **P** | P-0..P-18 | PC-SAFT: residual Helmholtz/derivatives against teqp, density roots, flash/stability integration, split robustness re-measured on the PC-SAFT grid, phase identity, association against FeOs, per-phase density roots (LLE), EOS phase addition/removal (VLLE), fixed EOS stability surfaces, polymer components, the polymer liquid-liquid split, the polymer vapour-liquid split in log mole numbers, the log-space stability normalization, the curvature safeguard and the Rachford-Rice denominator that close the 0.3-3.6 MPa sweep, the seed ladder that retires the map's polymer refusals (P-17), and the reversible removal plus multiphase log-space stage that retire its nine `eos-three-phase` refusals (P-18) | `pcsaft-residual-helmholtz` (ADR-0014), `pcsaft-density-roots-flash` (ADR-0015), `pcsaft-association` (ADR-0018), `flash-eos-per-phase-roots` (ADR-0019), `flash-phase-addition-eos` (ADR-0020), `stability-eos-root-surfaces` (ADR-0021), `pcsaft-polymer-solvent` (ADR-0022), `pcsaft-polymer-vle` (ADR-0024), `stability-log-space-sums` (ADR-0025), `flash-polymer-edge-cases` (ADR-0026), `flash-polymer-robustness` (ADR-0028), `flash-eos-multiphase-robustness` (ADR-0029) |
-| **B** | B-1 | The `chemthermo.bench` measurement harness and its acceptance rule (baseline + after + identical result hashes + measured ratio) | `perf-baseline-and-root-reuse` (ADR-0023) |
+| **B** | B-1, B-2 | The `chemthermo.bench` measurement harness and its acceptance rule (baseline + after + identical result hashes + measured ratio) (B-1), and the call-local equation-of-state solve memo plus the structured multiphase Hessian that was measured and declined (B-2) | `perf-baseline-and-root-reuse` (ADR-0023), `perf-eos-solve-cache` (ADR-0030) |
 | **R-MAP** | R-MAP-1, R-MAP-2 | The `chemthermo.bench robustness` coverage map: 2110 states over the original six model families (R-MAP-1), grown to 2505 states over ten families - EOS three-phase windows, the legacy `gamma-phi` path, near-critical Peng-Robinson states and associating ternaries (R-MAP-2) - classified into a phase verdict, an invariant violation or one of eight refusal classes, with the ranked classes and their diagnoses. Both are amended in place as later slices retire what they found: R-MAP-2 by ADR-0029 (Case P-18), which leaves 5 refusals, all of them the deprecated `gamma-phi` path's | `robustness-map` (ADR-0027), `robustness-map-coverage` (ADR-0027 amendment) |
 
 ---
@@ -4075,7 +4075,11 @@ worth keeping:
   duplicate solves the branch capability cannot see (`phase_identity`, the
   post-split re-evaluation). Rejected on design grounds, not measurement: both
   model classes are frozen dataclasses and a stale cache key would be a wrong
-  answer rather than a slow one.
+  answer rather than a slow one. *(Amended by slice `perf-eos-solve-cache`,
+  ADR-0030: those 37 solves are now removed by a memo that lives in the
+  **call** rather than on the model, which is not the construction rejected
+  here - nothing is written to either dataclass and no key outlives the call
+  that made it. See Case B-2.)*
 
 - **Tolerance:** exact. `==` on every comparison above; no tolerance is used
   anywhere in this case, which is what distinguishes a performance change from
@@ -4102,6 +4106,277 @@ worth keeping:
   `tests/test_bench_harness.py` (7), plus the whole existing suite unchanged.
 - **Script:** `python -m chemthermo.bench --out record.json` and
   `python -m chemthermo.bench --compare before.json after.json`.
+
+---
+
+## Case B-2: The call-local solve memo, and the structured Hessian that was measured and declined
+
+- **Source:** none, and as with Case B-1 that is the point. This is the
+  *measurement* case for slice `perf-eos-solve-cache`. Nothing here is checked
+  against a published number; what is checked is that a performance change
+  moved the number of solves and did not move a single result. The
+  thermodynamic content of every state used below is already pinned elsewhere
+  in this ledger (F-4, P-8, P-9, P-10, P-13).
+- **Where:** ADR-0030; `src/chemthermo/_eos_memo.py`; the two solve points in
+  `src/chemthermo/eos/pcsaft.py` (`_density_roots`) and
+  `src/chemthermo/models/peng_robinson.py` (`_compressibility_roots`); records
+  `benchmarks/baseline_d8814de.json` and `benchmarks/after_07bf0b3.json`;
+  `benchmarks/README.md`.
+- **Assumptions:** the machine was **not quiet**. An unrelated process held
+  about eight of this machine's twelve cores for the whole session, load
+  average 9-11 throughout, and every wall time below was measured under that.
+  Machine: Apple M2 Max (12 cores, macOS 26.6.2, arm64), CPython 3.11.6, numpy
+  2.4.2. The numbers that carry the claim are therefore the **solve counts**,
+  which are integers and a property of the workload; the wall times are
+  reported for completeness and are explicitly not the evidence.
+- **Components and units:** the nine-case ADR-0023 workload, the Case F-4
+  default subset, the ADR-0019 water / n-hexane states and the Case P-10
+  water / ethanol / n-hexane tie-triangle states. SI throughout.
+
+### (i) What was duplicated, and by whom
+
+At `d8814de`, counting `PCSAFTEOS._density_roots` calls whose
+`(names, T, P, x)` are equal bit for bit over one `invoke` of each case:
+
+| case | solves | distinct | repeats |
+| --- | ---: | ---: | ---: |
+| `pcsaft-vle-methane-hexane` | 137 | 102 | 35 (25.5 %) |
+| `pcsaft-lle-water-hexane` | 275 | 238 | 37 (13.5 %) |
+| `pcsaft-polymer-lle` | 601 | 512 | 89 (14.8 %) |
+
+Attributing each of the 37 repeats in the liquid-liquid case to the pair of
+call sites that made it (captured from the stack at each solve):
+
+| first call site | second call site | count |
+| --- | --- | ---: |
+| `_evaluator.ln_fugacity_terms` -> `fugacity_coefficients` | `_reported_terms` -> `identity_label` -> `phase_identity` | 12 |
+| `_evaluator.ln_fugacity_terms` -> `fugacity_coefficients` | `_evaluator.branch_terms` -> `ln_fugacity_branches` | 12 |
+| `_evaluator.ln_fugacity_terms` -> `fugacity_coefficients` | itself, at the same state | 5 |
+| `_split._branch_terms` -> `fugacity_coefficients` | `_detect._name_two_phase_result` -> `phase_identity` | 2 |
+| `_split._branch_terms` -> `fugacity_coefficients` | `_evaluator.branch_terms` -> `ln_fugacity_branches` | 2 |
+| `_split._branch_terms` -> `fugacity_coefficients` | `stability_tp` -> `identity_label` -> `phase_identity` | 2 |
+| `_evaluator.branch_terms` -> `ln_fugacity_branches` | `stability_tp` -> `identity_label` -> `phase_identity` | 1 |
+| `_evaluator.branch_terms` -> `ln_fugacity_branches` | itself, at the same state | 1 |
+
+**This is why the memo is where it is.** Six of the 37 are one entry point
+called twice; the other 31 are two *different* model methods reaching one root
+solve. A memo at the `chemthermo.flash._common` level - the obvious place, and
+the one this slice was scoped to first - would have caught the six and none of
+the rest, while touching a dozen internal signatures instead of two.
+
+### (ii) Solves removed - the number that is not a wall time
+
+Counting executed `solve_density_roots` calls and executed cubic eigenproblems
+over the same prepared payload, with the models' memo lookup returning `None`
+and with it active. Integers, and a property of the workload rather than of the
+machine:
+
+| case | PC-SAFT density solves off -> on | PR cubic solves off -> on |
+| --- | ---: | ---: |
+| `pr-flash-ternary` | - | 230 -> 187 (**-18.7 %**) |
+| `pr-stability-ternary` | - | 84 -> 73 (**-13.1 %**) |
+| `pr-flash-grid-24` | - | 2203 -> 1679 (**-23.8 %**) |
+| `nrtl-lle-tessier-p1` (control) | 0 -> 0 | 0 -> 0 |
+| `modified-raoult-vle` (control) | 0 -> 0 | 0 -> 0 |
+| `vlle-364k` (control) | 0 -> 0 | 0 -> 0 |
+| `pcsaft-vle-methane-hexane` | 137 -> 102 (**-25.5 %**) | - |
+| `pcsaft-lle-water-hexane` | 275 -> 238 (**-13.5 %**) | - |
+| `pcsaft-polymer-lle` | 601 -> 512 (**-14.8 %**) | - |
+
+`pr-flash-grid-24` saves more than the single Peng-Robinson flash does because
+it is 24 flashes and each one saves its own repeats; the memo is per call, so
+nothing is shared *between* the 24.
+
+### (iii) Bit-identity, and where it comes from
+
+Not from an arithmetic argument. A hit returns **the identical object** the
+first solve produced - a `DensityRoots` namedtuple of floats, or a tuple of
+compressibility roots - so every double downstream of it is the same double.
+What has to be argued is only that no key can name the wrong state:
+
+- the key is the solve routine's own arguments, compared for exact equality;
+- `composition_key` gives `-0.0` and `0.0` **different** keys. They compare
+  equal and hash equal in Python, so a plain tuple key would merge them. That
+  is the one pair of distinct bit patterns that could alias, and it is closed
+  by construction rather than by an argument that the models would not care;
+- `nan` never compares equal to itself, so a `nan` argument misses;
+- `id(model)` is in the PC-SAFT key, and the memo holds a strong reference to
+  the model in the same entry, so the id cannot be recycled onto another object
+  while the entry lives;
+- the 4096-entry FIFO bound can only cause a re-solve, which produces the same
+  doubles again. `test_a_memo_bound_of_one_gives_the_same_answer_as_the_default_bound`
+  runs a whole associating flash through a **one-entry** memo and compares
+  every field with `==`.
+
+Checked, all with `==` and never a tolerance:
+
+| what | states | result |
+| --- | ---: | --- |
+| Case F-4 default subset, `flash_tp`, memo on vs memo off | 16 | identical, field for field |
+| ADR-0019 water / n-hexane, `flash_tp` and `stability_tp` | 4 (x2) | identical |
+| ADR-0017 Peng-Robinson grid slice, `flash_tp` and `stability_tp` | 7 (x2) | identical |
+| ADR-0022 polymer split (where `exp(ln phi)` underflows) | 1 | identical |
+| one-entry memo against the default bound | 1 | identical |
+| two `kij` inside one deliberately shared scope | 2 | each equals what it gives alone |
+| two models flashed concurrently in two threads | 2 | each equals what it gives alone |
+| `refactor_bit_identity_v3.json` (155 states) | 155 | unchanged, not regenerated |
+| the nine benchmark `result_hash` values | 9 | identical |
+| the 2505-state robustness map, every observable field | 2505 | **0 differences** |
+
+### (iv) The structured multiphase Hessian: measured, and **not shipped**
+
+The assembly is exact as algebra: with the reference phase holding
+`N_0 = z - sum_p n_p` and `a_{j,k} = ln x_{j,k} + f_j(x_j)_k`, phase `p+1`
+depends only on `n_p`, so `H[(p,k),(q,l)] = delta_pq A^{(p+1)}[k,l] + A^{(0)}[k,l]`
+with `A^{(j)}` the per-phase Jacobian. That is `N_phases (NC x NC)` finite
+differences instead of `((N_phases - 1) NC)^2`.
+
+Built and compared entry by entry against the Hessian
+`_multiphase_second_order` actually forms, at **every** build the stage reaches
+over two sets of states: the 20 Case P-9 PC-SAFT water / n-hexane states below
+`T3` (`z_water` in `{0.05, 0.3, 0.5, 0.7, 0.95}` x `T3 - {1.0, 0.5, 0.1, 0.01}`
+K, 1 atm), which give **8 builds**, all two-phase, **0 of 8 bit-identical**,
+largest absolute difference 3.199e-04 and largest relative 7.381e-05; and six
+Case P-10 water / ethanol / n-hexane feeds at 1 atm (`(0.1,0.1,0.8)`,
+`(0.2,0.2,0.6)`, the centroid and `(0.6,0.2,0.2)` at 333 K, `(0.2,0.6,0.2)` and
+`(0.1,0.1,0.8)` at 335 K), which give the **4 builds** below, three of them
+three-phase:
+
+| phases | Hessian size | bit-identical | max abs difference | max rel difference | max `|H|` |
+| ---: | ---: | --- | ---: | ---: | ---: |
+| 2 | 3 | no | 1.557e-07 | 6.208e-08 | 4.633e+01 |
+| 3 | 6 | no | 4.079e-04 | 9.675e-05 | 7.709e+05 |
+| 3 | 6 | no | 1.018e-04 | 2.522e-05 | 4.416e+04 |
+| 3 | 6 | no | 1.047e-04 | 2.536e-04 | 1.051e+04 |
+
+**0 of 12 bit-identical over both sets**, and the reason is structural rather
+than incidental.
+For a row `(p,k)` and a column `(q,l)` with `p != q`, the shipped code forms
+`fl(fl(u - v_-) - fl(u - v_+))` where `u = a_{p+1,k}` is the *same double* in
+both gradient evaluations; the structured form computes `fl(v_+ - v_-)`. Those
+differ whenever `u` is large next to `v_+ - v_-`, which is the ordinary case
+here. Two further differences compound it: the diagonal blocks add their two
+contributions in a different order, and the shipped code's reference-phase
+perturbation is `fl(z_l - fl(sum_q n_{q,l}))` rather than an exact
+`N_{0,l} - h`. A relative difference of 1e-04 in the Hessian moves the Newton
+direction, the line search accepts on an Armijo decrease *or* a residual
+decrease, so a moved direction moves the accepted iterate. Bit-identity is the
+gate; it is not shipped.
+
+**And what it would have bought is smaller than it was**, because the memo
+already takes most of it, bit-identically. Counting the model evaluations each
+Hessian build makes (distinct `(phase, composition)` pairs is what the memo
+reduces the build to):
+
+| phases | Hessian size | evaluations, no memo | with the memo | structured |
+| ---: | ---: | ---: | ---: | ---: |
+| 2 | 3 | 12 | 12 | 12 |
+| 3 | 6 | 36 | 20 | 18 |
+| 3 | 6 | 36 | 20 | 18 |
+| 3 | 6 | 36 | 21 | 18 |
+
+15 or 16 of the 18 evaluations the structured form would remove are already
+removed. The remaining 2 or 3 per build are what a re-audit slice would be
+buying, and it would be paying a regenerated bit-identity fixture for them.
+
+### (v) The benchmark pair, and why it is not the evidence
+
+Nine timed repeats each, back to back, `benchmarks/baseline_d8814de.json`
+against `benchmarks/after_07bf0b3.json`, every `result_hash` identical:
+
+| case | before / s | after / s | ratio |
+| --- | ---: | ---: | ---: |
+| `pr-flash-ternary` | 0.016810 | 0.013450 | 1.25x |
+| `pr-stability-ternary` | 0.004402 | 0.004119 | 1.07x |
+| `pr-flash-grid-24` | 0.158998 | 0.120641 | 1.32x |
+| `nrtl-lle-tessier-p1` (control) | 0.057287 | 0.059526 | 0.96x |
+| `modified-raoult-vle` (control) | 0.024677 | 0.024191 | 1.02x |
+| `vlle-364k` (control) | 0.137144 | 0.133123 | 1.03x |
+| `pcsaft-vle-methane-hexane` | 0.216429 | 0.178299 | 1.21x |
+| `pcsaft-lle-water-hexane` | 1.595234 | 1.324830 | 1.20x |
+| `pcsaft-polymer-lle` | 0.994039 | 0.851818 | 1.17x |
+
+A first attempt at five repeats gave controls of 0.77x / 1.25x / 0.92x and was
+discarded as unreadable; nine repeats brought them to 0.96x / 1.02x / 1.03x,
+still wider than the 1.00x / 1.04x / 1.02x the same three read for Case B-1 on
+a quiet machine.
+
+Because of that, the same workload was also run **in one process with the two
+arms interleaved repeat by repeat** - memo active against memo lookup returning
+`None`, milliseconds apart, so both arms take the same contention. 11 repeats
+each, with the observed per-repeat ratio range:
+
+| case | off / ms | on / ms | ratio | spread |
+| --- | ---: | ---: | ---: | --- |
+| `pr-flash-ternary` | 13.77 | 13.41 | 1.027x | 1.01x .. 1.03x |
+| `pr-stability-ternary` | 4.17 | 4.10 | 1.018x | 1.01x .. 1.02x |
+| `pr-flash-grid-24` | 125.67 | 126.70 | 0.992x | 0.94x .. 1.14x |
+| `nrtl-lle-tessier-p1` (control) | 52.64 | 54.03 | 0.974x | 0.82x .. 1.33x |
+| `modified-raoult-vle` (control) | 22.88 | 24.95 | 0.917x | 0.74x .. 1.13x |
+| `vlle-364k` (control) | 133.49 | 132.40 | 1.008x | 0.63x .. 1.12x |
+| `pcsaft-vle-methane-hexane` | 190.01 | 146.00 | 1.301x | 1.23x .. 1.31x |
+| `pcsaft-lle-water-hexane` | 1363.89 | 1233.82 | 1.105x | 1.01x .. 1.25x |
+| `pcsaft-polymer-lle` | 924.09 | 801.81 | 1.153x | 1.05x .. 1.22x |
+
+**What is claimed:** PC-SAFT **1.10x - 1.30x** (the two measurements agree
+within their spreads). **What is not claimed:** the Peng-Robinson ratios in the
+committed pair. 1.25x / 1.07x / 1.32x there against 1.03x / 1.02x / 0.99x
+interleaved, and 1.10x / 1.02x / 1.04x on a second 31-repeat interleaved run.
+The arithmetic settles it against the committed pair: Case B-1 measured the
+cubic solve at 8.6 us of a 34.8 us `fugacity_coefficients` call, so removing
+13-24 % of the solves cannot be worth 30 % of the flash. The Peng-Robinson half
+of this change is **1.00x - 1.05x** and is kept for the work it removes, not
+for a clock reading. That is a doubt this case records rather than resolves,
+and the thing that would resolve it is one uncontended pair.
+
+- **Tolerance:** exact. `==` on every comparison in (iii); no tolerance is used
+  anywhere in it. The Hessian comparison in (iv) is the one place a difference
+  is *reported* rather than asserted to be zero, and reporting it is the
+  finding.
+- **Independent route:** the 155-state pinned fixture
+  `tests/fixtures/flash/refactor_bit_identity_v3.json`, unchanged and not
+  regenerated; the nine benchmark `result_hash` values; and the full 2505-state
+  robustness map re-run at `f852726` and diffed field by field against
+  `robustness_64831bd.json` with wall time excluded - **0 differences over all
+  2505 states and every aggregate field**, and 2500 converged / 5 refused / 0
+  invariant violations either way. The sweep read 2017.3 s (33:37) against
+  2202.5 s (36:43) at `64831bd`, two loaded machines in different sessions, so
+  that pair is a direction and not a ratio. `robustness_64831bd.json` is pruned
+  per the `benchmarks/README.md` policy and its `.md` summary kept.
+- **Negative control:** the three activity-model workload cases, which make
+  zero memoized solves either way because no activity model is memoized - that
+  is a deliberate decision (ADR-0030 decision 6) precisely so they stay the
+  drift control; and
+  `test_two_models_never_read_each_others_entries`, which would fail if the key
+  did not carry model identity, together with the assertion inside it that the
+  two models actually disagree, so the test cannot pass vacuously.
+
+- **Suite time:** `pytest -q` **901 passed, 98 deselected, 300.74 s
+  (5:00) at `d8814de` -> 916 passed, 98 deselected, 286.03 s (4:46)**, the two
+  runs back to back on the one machine and both under the same contention.
+  The interesting number is the third: the **same 901 tests** (the default run
+  with `--ignore=tests/test_eos_memo.py`) read **235.36 s (3:55)**, reproduced
+  at 235.46 s on a repeat - **1.28x, -21.7 %**, and *under* the ~240 s ceiling
+  brain.md section 10 tracks, on a machine that was not even quiet.
+  `tests/test_examples.py` alone reads **101.64 s -> 85.95 s** (1.18x, 43 tests
+  either way, the file unchanged).
+  `pytest -q tests/test_robustness_map.py -m ""` - the slow full-sweep gate,
+  which re-runs all 2505 states in process and checks them against the
+  committed record - reads **52 passed in 2028.71 s (33:48)**.
+  **The default run as shipped is still over the ceiling, at 286 s**, and the
+  reason is this slice's own evidence: `tests/test_eos_memo.py` costs ~50 s
+  because it flashes every state **twice**, once with the memo and once
+  without, and that is the whole proof. **Nothing was marked `slow`** to hide
+  it - the `slow` policy forbids marking the only test of a capability, and a
+  bit-identity sweep run at half its states is a weaker proof, not a cheaper
+  one. So: the library change carries the pre-existing suite under the ceiling,
+  and the slice does not carry the whole default run under it. 15 tests added,
+  none removed.
+- **Test path:** `tests/test_eos_memo.py` (15), plus the whole existing suite
+  unchanged.
+- **Script:** `python -m chemthermo.bench --out record.json`,
+  `python -m chemthermo.bench --compare before.json after.json`, and
+  `python -m chemthermo.bench robustness --out record.json --summary-out record.md`.
 
 ---
 
