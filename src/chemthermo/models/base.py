@@ -53,6 +53,46 @@ class EquationOfState(ABC):
             Fugacity coefficients (dimensionless), one per component.
         """
 
+    def log_fugacity_coefficients(
+        self,
+        *,
+        mixture: Mixture,
+        temperature_K: float,
+        pressure_Pa: float,
+        composition: Sequence[float],
+        phase: str,
+    ) -> Sequence[float] | None:
+        """Return ``ln phi_i`` on the same root :meth:`fugacity_coefficients` would use.
+
+        **Optional, and a numerical guard rather than a second model** (ADR-0022).
+        ``phi_i = exp(ln phi_i)`` is not representable as a double once
+        ``|ln phi_i|`` passes about 709, and a chain molecule makes that
+        ordinary: a polyethylene of ``Mw = 53 000`` (``m = 1393.9``) dissolved
+        in n-pentane at 453 K and 10 MPa has ``ln phi_PE = -1690.6``, so
+        ``fugacity_coefficients`` returns an exact ``0.0`` for it and every
+        caller correctly refuses a non-positive fugacity coefficient. The model
+        is perfectly well defined there; only the exponential is not.
+
+        Callers must use this **only where the ``phi`` they already computed is
+        unusable**, and must otherwise keep taking ``log`` of that ``phi``, so
+        that no converging number moves. The default implementation returns
+        ``None`` ("this model cannot say"), which makes the guard inert and the
+        pre-ADR-0022 failure the outcome, exactly as before.
+
+        Args:
+            mixture: Mixture providing component properties.
+            temperature_K: Temperature in K.
+            pressure_Pa: Pressure in Pa.
+            composition: Mole fractions, sum to 1 within COMPOSITION_SUM_TOL.
+            phase: Phase label, with the same semantics
+                :meth:`fugacity_coefficients` uses.
+
+        Returns:
+            ``ln phi_i``, one per component, or ``None`` when this
+            implementation cannot produce them without exponentiating.
+        """
+        return None
+
     def phase_identity(
         self,
         *,

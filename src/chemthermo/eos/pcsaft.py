@@ -779,6 +779,44 @@ class PCSAFTEOS(EquationOfState, EOSProtocol):
         )
         return np.exp(np.asarray(ln_phi, dtype=float)).tolist()
 
+    def log_fugacity_coefficients(
+        self,
+        *,
+        mixture: Mixture,
+        temperature_K: float,
+        pressure_Pa: float,
+        composition: Sequence[float],
+        phase: str,
+    ) -> list[float]:
+        """Return ``ln phi_i`` on the named density root (ADR-0022's numerical guard).
+
+        Exactly :meth:`fugacity_coefficients` without the final ``exp``: same
+        root, same ``ln phi``, one fewer lossy step. It exists because a long
+        chain makes ``exp(ln phi)`` underflow - ``ln phi_PE = -1690.6`` for a
+        53 000 g/mol polyethylene in n-pentane at 453 K and 10 MPa, where
+        ``exp`` is ``0.0`` and every consumer refuses a non-positive fugacity
+        coefficient. See ``chemthermo.models.EquationOfState`` for the contract
+        and for why callers must reach for it only when the ``phi`` they
+        already have is unusable.
+        """
+        if phase not in (_VAPOR, _LIQUID):
+            raise ValueError("phase must be 'vapor' or 'liquid'.")
+
+        names = self._resolve_components(mixture)
+        density = self._root_for_phase(
+            names=names,
+            temperature_K=temperature_K,
+            pressure_Pa=pressure_Pa,
+            composition=composition,
+            phase=phase,
+        )
+        return self._ln_fugacity_coefficients(
+            names=names,
+            temperature_K=temperature_K,
+            density_mol_m3=density,
+            composition=composition,
+        )
+
     def density_roots(
         self,
         *,

@@ -38,7 +38,7 @@ import numpy as np
 from ..core import Mixture
 from ..exceptions import ConvergenceError, ModelError
 from ..models import ActivityModel, EquationOfState
-from ._common import as_float_array, normalize_composition
+from ._common import EosBranchTerms, as_float_array, eos_branch_terms, normalize_composition
 from .settings import FlashSettings
 
 
@@ -178,14 +178,19 @@ def _solve_k_loop(
             ln_f_y = np.log(gamma_y)
         else:
             assert eos is not None
+            phi_v: np.ndarray | None
+            phi_l: np.ndarray | None
+            ln_phi_v = ln_phi_l = K  # replaced below; only read when phi is None
             if roots_x is not None and roots_y is not None:
                 # ADR-0019: each phase on the root the stability test put it
                 # on. The two calls keep the historical order (``y`` first) and
                 # the arithmetic below is untouched, so a state whose phases
                 # are pinned to the historical ``("liquid", "vapor")`` pair
                 # reproduces the pre-slice doubles exactly.
-                phi_v = roots_y.fugacity_coefficients(y)
-                phi_l = roots_x.fugacity_coefficients(x)
+                terms_v = roots_y.branch_terms(y)
+                terms_l = roots_x.branch_terms(x)
+                phi_v, phi_l = terms_v.phi, terms_l.phi
+                ln_phi_v, ln_phi_l = terms_v.ln_phi, terms_l.ln_phi
             else:
                 phi_v = as_float_array(
                     eos.fugacity_coefficients(
@@ -206,29 +211,52 @@ def _solve_k_loop(
                     )
                 )
 
-            if phi_v.shape != phi_l.shape or phi_v.shape != K.shape:
-                raise ModelError("EOS returned inconsistent fugacity coefficient shapes.")
-            if np.any(phi_v <= 0.0) or np.any(phi_l <= 0.0):
-                raise ModelError("EOS returned non-positive fugacity coefficients.")
-
-            if mode == "gamma-phi":
-                assert activity_model is not None
-                gamma_l = as_float_array(
-                    activity_model.activity_coefficients(
-                        mixture=mixture,
-                        temperature_K=temperature,
-                        composition=x.tolist(),
+            if phi_v is None or phi_l is None:
+                # ADR-0022. At least one phase has an ``|ln phi|`` past the
+                # exponential's range - a long-chain polymer in a solvent, e.g.
+                # ``ln phi_PE = -1690.6`` for a 53 000 g/mol polyethylene in
+                # n-pentane at 453 K and 10 MPa - so ``phi`` is an exact ``0.0``
+                # and the ratio below would be ``0/0``. The *difference* of the
+                # logarithms is finite and is the same ``K``. This branch is
+                # reached only where ``phi_l / phi_v`` has no answer at all, so
+                # no previously converging number moves.
+                if ln_phi_l.shape != K.shape or ln_phi_v.shape != K.shape:
+                    raise ModelError("EOS returned inconsistent fugacity coefficient shapes.")
+                K_new = np.exp(ln_phi_l - ln_phi_v)
+                if np.any(~np.isfinite(K_new)) or np.any(K_new <= 0.0):
+                    raise ModelError(
+                        "Non-finite or non-positive K-values from the equation of state: the "
+                        "two phases' ln phi differ by more than the exponential's range "
+                        f"(max |d ln phi| = {float(np.max(np.abs(ln_phi_l - ln_phi_v))):.3e})."
                     )
-                )
-                if gamma_l.shape != K.shape:
-                    raise ModelError("Activity model returned inconsistent coefficient shapes.")
-                if np.any(gamma_l <= 0.0):
-                    raise ModelError("Activity model returned non-positive activity coefficients.")
-                K_new = gamma_l * phi_l / phi_v
+                ln_f_x = ln_phi_l
+                ln_f_y = ln_phi_v
             else:
-                K_new = phi_l / phi_v
-            ln_f_x = np.log(phi_l)
-            ln_f_y = np.log(phi_v)
+                if phi_v.shape != phi_l.shape or phi_v.shape != K.shape:
+                    raise ModelError("EOS returned inconsistent fugacity coefficient shapes.")
+                if np.any(phi_v <= 0.0) or np.any(phi_l <= 0.0):
+                    raise ModelError("EOS returned non-positive fugacity coefficients.")
+
+                if mode == "gamma-phi":
+                    assert activity_model is not None
+                    gamma_l = as_float_array(
+                        activity_model.activity_coefficients(
+                            mixture=mixture,
+                            temperature_K=temperature,
+                            composition=x.tolist(),
+                        )
+                    )
+                    if gamma_l.shape != K.shape:
+                        raise ModelError("Activity model returned inconsistent coefficient shapes.")
+                    if np.any(gamma_l <= 0.0):
+                        raise ModelError(
+                            "Activity model returned non-positive activity coefficients."
+                        )
+                    K_new = gamma_l * phi_l / phi_v
+                else:
+                    K_new = phi_l / phi_v
+                ln_f_x = np.log(phi_l)
+                ln_f_y = np.log(phi_v)
 
         max_delta = float(np.max(np.abs(K_new - K)))
         if max_delta < settings.tol:
@@ -399,8 +427,8 @@ class _PhaseRoot:
         self.selected = self.branch
         self.fallbacks = 0
 
-    def fugacity_coefficients(self, composition: np.ndarray) -> np.ndarray:
-        """``phi(w)`` on this phase's root, as the model returned it.
+    def branch_terms(self, composition: np.ndarray) -> EosBranchTerms:
+        """``phi(w)`` and ``ln phi(w)`` on this phase's root.
 
         ``composition`` must already be normalized - the split loop hands over
         exactly the array it built with
@@ -410,34 +438,41 @@ class _PhaseRoot:
         every double downstream. :meth:`ln_fugacity_terms` is the entry point
         that does normalize.
 
-        The raw coefficients are returned rather than their logarithm so that
-        the caller's ``K = phi^x / phi^y`` update stays the floating-point
-        expression it was before ADR-0019.
+        ``phi`` is carried alongside ``ln phi`` rather than being replaced by
+        it so that the caller's ``K = phi^x / phi^y`` update stays the
+        floating-point expression it was before ADR-0019; it is ``None`` only
+        where ``exp(ln phi)`` is not representable (ADR-0022), and the caller
+        then forms ``K`` in log space instead.
+
+        The lowest-Gibbs fallback compares ``sum_i w_i ln phi_i``, which is the
+        reduced residual Gibbs energy and is exactly what the pre-ADR-0022 code
+        computed as ``np.sum(w * np.log(phi))`` - the same double whenever
+        ``phi`` exists, and defined where it does not.
         """
         w = np.asarray(composition, dtype=float)
         failures: list[str] = []
 
         if self.branch is not None:
-            phi = self._branch_coefficients(self.branch, w, failures)
-            if phi is not None:
+            terms = self._branch_terms(self.branch, w, failures)
+            if terms is not None:
                 self.selected = self.branch
-                return phi
+                return terms
             self.fallbacks += 1
 
-        best: np.ndarray | None = None
+        best: EosBranchTerms | None = None
         best_label = ""
         best_g = math.inf
         for label in _ROOT_BRANCHES:
-            phi = self._branch_coefficients(label, w, failures)
-            if phi is None:
+            terms = self._branch_terms(label, w, failures)
+            if terms is None:
                 continue
-            g_res = float(np.sum(w * np.log(phi)))
+            g_res = float(np.sum(w * terms.ln_phi))
             if not math.isfinite(g_res):
                 failures.append(f"{label}: non-finite reduced residual Gibbs energy")
                 continue
             if g_res < best_g:
                 best_g = g_res
-                best = phi
+                best = terms
                 best_label = label
 
         if best is None:
@@ -448,6 +483,20 @@ class _PhaseRoot:
             )
         self.selected = best_label
         return best
+
+    def fugacity_coefficients(self, composition: np.ndarray) -> np.ndarray:
+        """``phi(w)`` on this phase's root, as the model returned it.
+
+        Raises ``ModelError`` where ``phi`` is not representable; callers that
+        can work in log space should use :meth:`branch_terms` instead.
+        """
+        terms = self.branch_terms(composition)
+        if terms.phi is None:
+            raise ModelError(
+                "Fugacity coefficients are not representable on this phase's root "
+                "(|ln phi| is too large to exponentiate); use branch_terms()."
+            )
+        return terms.phi
 
     def ln_fugacity_terms(self, composition: np.ndarray) -> np.ndarray:
         """``ln phi(w)`` on this phase's root, normalizing ``w`` first.
@@ -461,31 +510,24 @@ class _PhaseRoot:
         total = float(np.sum(values))
         if total <= 0.0:
             raise ModelError("Equation of state called with a non-positive composition.")
-        return np.log(self.fugacity_coefficients(values / total))
+        return self.branch_terms(values / total).ln_phi
 
-    def _branch_coefficients(
+    def _branch_terms(
         self, branch: str, w: np.ndarray, failures: list[str]
-    ) -> np.ndarray | None:
-        """``phi`` on one branch, or None when that branch is unusable here."""
+    ) -> EosBranchTerms | None:
+        """One branch's terms, or None when that branch is unusable here."""
         try:
-            values = as_float_array(
-                self._eos.fugacity_coefficients(
-                    mixture=self._mixture,
-                    temperature_K=self._temperature,
-                    pressure_Pa=self._pressure,
-                    composition=w.tolist(),
-                    phase=branch,
-                )
+            return eos_branch_terms(
+                self._eos,
+                mixture=self._mixture,
+                temperature=self._temperature,
+                pressure=self._pressure,
+                composition=w,
+                phase=branch,
             )
-        except Exception as exc:  # noqa: BLE001 - a root may be absent here
+        except ModelError as exc:
             failures.append(f"{branch}: {exc}")
             return None
-        if values.shape != w.shape:
-            raise ModelError("EOS returned inconsistent fugacity coefficient shapes.")
-        if np.any(~np.isfinite(values)) or np.any(values <= 0.0):
-            failures.append(f"{branch}: non-finite or non-positive fugacity coefficients")
-            return None
-        return values
 
 
 def _rachford_rice(z: np.ndarray, K: np.ndarray) -> tuple[float | None, float, float]:

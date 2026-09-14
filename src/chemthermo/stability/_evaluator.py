@@ -94,7 +94,7 @@ import numpy as np
 
 from ..core import Mixture
 from ..exceptions import ModelError
-from ..flash._common import as_float_array, wilson_k
+from ..flash._common import as_float_array, eos_branch_terms, wilson_k
 from ..models import ActivityModel, EquationOfState
 from ..models._antoine import antoine_saturation_pressures, antoine_temperature_range
 
@@ -300,24 +300,23 @@ class _CubicRootCandidate:
         self._pressure = pressure
 
     def ln_fugacity_terms(self, composition: np.ndarray) -> np.ndarray:
-        try:
-            values = as_float_array(
-                self._eos.fugacity_coefficients(
-                    mixture=self._mixture,
-                    temperature_K=self._temperature,
-                    pressure_Pa=self._pressure,
-                    composition=composition.tolist(),
-                    phase=self.label,
-                )
-            )
-        except Exception as exc:  # noqa: BLE001 - branch may be unavailable
-            raise ModelError(str(exc)) from exc
+        """``ln phi`` on this branch.
 
-        if values.shape != composition.shape:
-            raise ModelError("inconsistent fugacity coefficient shape")
-        if np.any(~np.isfinite(values)) or np.any(values <= 0.0):
-            raise ModelError("non-finite or non-positive fugacity coefficients")
-        return np.log(values)
+        Delegated to :func:`chemthermo.flash._common.eos_branch_terms`, which
+        takes ``np.log`` of the model's own ``phi`` whenever that is
+        representable - the pre-ADR-0022 double, unchanged - and falls back to
+        the model's logarithmic route only where ``exp(ln phi)`` has
+        under/overflowed, which is what makes a long-chain polymer usable here
+        at all.
+        """
+        return eos_branch_terms(
+            self._eos,
+            mixture=self._mixture,
+            temperature=self._temperature,
+            pressure=self._pressure,
+            composition=composition,
+            phase=self.label,
+        ).ln_phi
 
 
 class _ActivityLiquidCandidate:
