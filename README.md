@@ -1432,6 +1432,13 @@ optimizations measured against them (Peng-Robinson flash 1.17x, PC-SAFT
 liquid-liquid 1.32x, every result hash identical). The harness is internal: it
 is not importable from `chemthermo` and is not part of the public API.
 
+`python -m chemthermo.bench robustness --out record.json` is the coverage
+instrument next to that speed one: it sweeps all six model families over fixed
+state and composition grids (2110 states) and writes a classified record -
+phase verdict or refusal class per state, with the exact state, message and
+invariant residuals - so the next solver slice is chosen from counts rather
+than recall. See `benchmarks/README.md` and ADR-0027.
+
 ## Scope Policy
 
 VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capability class is categorically out of scope; implementation maturity may vary by module and release.

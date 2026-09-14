@@ -111,6 +111,56 @@ records simply do not carry it, and `--compare` reports it as "after only".
 Editing or removing a case invalidates every committed baseline for that case;
 say so here and regenerate.
 
+## The robustness map (ADR-0027)
+
+A second artefact lives here, and it measures coverage rather than speed:
+
+```bash
+python -m chemthermo.bench robustness --out benchmarks/robustness_<sha>.json \
+                                      --summary-out benchmarks/robustness_<sha>.md
+```
+
+| flag | meaning |
+| --- | --- |
+| `--family NAME` | run one of `pr-phi-phi`, `pcsaft`, `pcsaft-associating`, `modified-raoult`, `gamma-gamma`, `polymer` - the sweep partitions and resumes |
+| `--quick` | the 171-state cost-bounded subset across all six families (~9 s), which is what `tests/test_robustness_map.py` runs |
+| `--list` | the grid: every system, its state count and its quick count |
+| `--out` / `--summary-out` | the JSON record / the Markdown summary table |
+| `--quiet` | no per-system progress line |
+
+It flashes 2110 fixed states and puts each one in exactly **one** bucket: a
+phase verdict (`single-liquid`, `single-vapor`, `VLE`, `LLE`, `VLLE`, `LLL`),
+`converged-invariant-violated`, or one of eight refusal classes read off the
+exception type and message. The exact state, the exact message and the
+invariant residuals are recorded per state.
+
+**It is not a correctness check** - nothing here is compared against a
+published number or another implementation; `.agents/brain/validation-cases.md`
+is where that lives. It is not a bit-identity fixture either: phase
+*compositions* are deliberately not recorded, because `baseline_*.json` /
+`after_*.json` and `refactor_bit_identity_v3.json` are the baselines and a
+second one would have to be regenerated whenever a last bit moved. Read
+ADR-0027 before using it to justify anything.
+
+| file | what it is |
+| --- | --- |
+| `robustness_87f0820.json` | the full 2110-state sweep at `87f0820` |
+| `robustness_87f0820.md` | its summary table |
+
+At `87f0820`: **2074 of 2110 states converge, 36 refuse, 0 converge and
+violate an invariant.** Every refusal is in the `polymer` family; the whole
+Peng-Robinson, PC-SAFT, associating-PC-SAFT, modified-Raoult and
+`gamma-gamma` sweep (1858 states) refuses nothing. See ledger Case R-MAP-1 for
+the ranked classes and the diagnoses.
+
+Adding a system or a state to `chemthermo/bench/robustness.py` is a normal
+change - unlike the timing workload above, this grid is *meant* to grow -
+but it moves the committed counts, so regenerate the record and the
+`tests/test_robustness_map.py` expectation in the same commit. The JSON is
+about 1.8 MB (one entry per state, phase compositions excluded); regenerating
+it at a new commit means a new file, so prune the superseded one rather than
+accumulating a sweep per slice.
+
 ## The polymer case
 
 `pcsaft-polymer-lle` reads its parameters from
