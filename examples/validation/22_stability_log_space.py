@@ -59,10 +59,17 @@ citing Gross & Sadowski, *IECR* **41** (2002) 1084 - a paywalled table that was
 not read. They live in ``tests/fixtures/pcsaft/martini2009_polymers.json``, are
 never packaged, and nothing here is compared against measurement.
 
-``--full`` adds the 144-state Peng-Robinson stability grid (route 5) and a
+``--full`` adds the 144-state Peng-Robinson stability grid (route 5), a
 pressure scan from 0.4 to 2 MPa - the whole region where the feed is a vapour,
 every point of which either raised or was seeded from the wrong stationary
-point before this slice. The default takes about five seconds.
+point before this slice - and **route 6, the six states ADR-0026 retires**
+(validation Case P-16): 0.3 MPa and 2.8 to 3.2 MPa, the last states of the
+0.3-3.6 MPa sweep that ``flash_tp`` refused. Each is verified by a solve that
+shares no code with the flash - the 1-D equal-fugacity solve of route 3 for the
+vapour-liquid state, a two-equation Newton for the five liquid-liquid ones -
+and the 0.3 MPa iteration is printed residual by residual, with and without the
+curvature safeguard, so the repair is visible rather than asserted. The default
+takes about five seconds; ``--full`` about two minutes.
 
 Requires the optional ``feos`` dependency for route 4 only::
 
@@ -74,6 +81,7 @@ Routes 1, 2, 3 and 5 run without it; the script says so and still exits 0.
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import importlib.util
 import json
 import math
@@ -92,6 +100,8 @@ import chemthermo as ct
 from chemthermo.eos import PCSAFTEOS
 from chemthermo.eos import pcsaft as pcsaft_module
 from chemthermo.eos.pcsaft import R_J_PER_MOL_K
+from chemthermo.flash import _detect
+from chemthermo.flash._log_space import log_space_seed, log_space_split
 from chemthermo.models.base import KAPPA_LIQUID_THRESHOLD
 from chemthermo.parameters import PCSAFTParameters, PCSAFTRecord
 
@@ -122,6 +132,18 @@ SCAN_BEYOND_PA = (2.2e6, 2.5e6)
 
 #: Where `exp` stops existing, and therefore where the old clamp sat.
 LN_W_WINDOW = 700.0
+
+#: `--full` route 6 (ADR-0026, validation Case P-16): the six states of the
+#: 0.3-3.6 MPa sweep that raised `ConvergenceError` at HEAD 584c508. The first
+#: is vapour-liquid, the other five liquid-liquid.
+P16_VLE_PA = 3.0e5
+P16_LLE_PA = (2.8e6, 2.9e6, 3.0e6, 3.1e6, 3.2e6)
+#: The sweep those six came out of: both molar masses, 0.3-3.6 MPa at 0.1 MPa.
+SWEEP_PA = tuple(3.0e5 + 1.0e5 * step for step in range(34))
+#: Agreement between the flash and the independent two-equation Newton, on the
+#: polymer-rich composition. It is a relative tolerance because the quantity is
+#: 9e-04 and both solves are converged to ~1e-13 on their own residuals.
+TIE_LINE_REL_TOL = 1e-9
 
 NEWTON_TOL = 1e-12
 #: The melt's solvent mole fraction from the flash and from the 1-D solve.
@@ -774,6 +796,300 @@ def the_pressure_scan() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Route 6 (--full): the six refusals ADR-0026 retires (validation Case P-16)
+# ---------------------------------------------------------------------------
+
+
+def _ln_phi(pressure_Pa: float, x: Sequence[float], *, dense: bool) -> np.ndarray:
+    """``ln phi`` on one density root, from the (T, rho, x) interface alone."""
+    bound = PCSAFTEOS(
+        components=("Polyethylene", "n-Pentane"), parameters=binary_parameters(), kij=KIJ
+    )
+    roots = bound.density_roots(
+        temperature_K=TEMPERATURE_K, pressure_Pa=pressure_Pa, composition=list(x)
+    )
+    density = roots[-1] if dense else roots[0]
+    return np.asarray(
+        bound.ln_fugacity_coefficients(
+            temperature_K=TEMPERATURE_K, density_mol_m3=density, composition=list(x)
+        )
+    )
+
+
+def _independent_tie_line(pressure_Pa: float, start: tuple[float, float]) -> tuple[float, float]:
+    """A liquid-liquid tie line from a two-equation Newton written here.
+
+    The unknowns are ``ln x_polymer`` in each of the two liquids, and the
+    equations are the two equal-fugacity conditions written in logarithms:
+
+        ln x_P^I  + ln phi_P^I  =  ln x_P^II + ln phi_P^II
+        ln(1-x_P^I) + ln phi_S^I = ln(1-x_P^II) + ln phi_S^II
+
+    The feed never enters, so this knows nothing about Rachford-Rice, the phase
+    count, the stability test or the split; it is the tie line of the *model*.
+    The polymer-lean liquid holds ``exp(-94)`` polymer, which is why the
+    unknowns are logarithms.
+    """
+    values = np.asarray(start, dtype=float)
+
+    def equations(v: np.ndarray) -> np.ndarray:
+        first, second = float(v[0]), float(v[1])
+        x_i = [math.exp(first), -math.expm1(first)]
+        x_ii = [math.exp(second), -math.expm1(second)]
+        ln_phi_i = _ln_phi(pressure_Pa, x_i, dense=True)
+        ln_phi_ii = _ln_phi(pressure_Pa, x_ii, dense=True)
+        return np.array(
+            [
+                first + ln_phi_i[0] - second - ln_phi_ii[0],
+                math.log1p(-math.exp(first))
+                + ln_phi_i[1]
+                - math.log1p(-math.exp(second))
+                - ln_phi_ii[1],
+            ]
+        )
+
+    for _ in range(80):
+        residual = equations(values)
+        size = float(np.max(np.abs(residual)))
+        if size < NEWTON_TOL:
+            break
+        jacobian = np.zeros((2, 2))
+        for column in range(2):
+            step = 1e-6
+            plus = values.copy()
+            minus = values.copy()
+            plus[column] += step
+            minus[column] -= step
+            jacobian[:, column] = (equations(plus) - equations(minus)) / (2.0 * step)
+        direction = np.linalg.solve(jacobian, -residual)
+        scale = 1.0
+        while scale > 1e-12:
+            if float(np.max(np.abs(equations(values + scale * direction)))) < size:
+                break
+            scale *= 0.5
+        values = values + scale * direction
+    return float(values[0]), float(values[1])
+
+
+def the_six_refusals() -> None:
+    section("7. (--full) The six states ADR-0026 retires (validation Case P-16)")
+    print(
+        "  At HEAD 584c508 a 0.3-3.6 MPa sweep at 0.1 MPa over both molar masses - 68\n"
+        "  states - had six raising ConvergenceError, all on the Mw = 53 000 chain:\n"
+        "    0.3, 2.8, 2.9 MPa   the log-space stage spent its budget next to the\n"
+        "                        trivial solution (residual 3.9e-05 / 1.1e-08 / 6.0e+00)\n"
+        "    3.0, 3.1, 3.2 MPa   'neither the stability-seeded nor the Wilson K-values\n"
+        "                        bracket a Rachford-Rice root'\n"
+    )
+    mixture = binary_mixture()
+    eos = binary_eos()
+
+    # -- the iteration itself, before and after -----------------------------
+    print("  The 0.3 MPa log-space iteration, residual by residual:\n")
+    z = np.asarray(mixture.fractions, dtype=float)
+    stability = ct.stability_tp(
+        mixture, temperature_K=TEMPERATURE_K, pressure_Pa=P16_VLE_PA, eos=eos
+    )
+    assert stability.trial_composition is not None
+    ln_capital_w = _detect._stationary_point_ln_capital_w(stability)
+    _k, incipient = _detect._stability_k_seed(
+        mixture,
+        TEMPERATURE_K,
+        P16_VLE_PA,
+        z=z,
+        w=np.asarray(stability.trial_composition, dtype=float),
+        tpd_min=float(stability.tpd_min),
+        ln_capital_w=ln_capital_w,
+    )
+    u0 = log_space_seed(
+        z=z,
+        w=np.asarray(stability.trial_composition, dtype=float),
+        tpd_min=float(stability.tpd_min),
+        incipient_vapor=incipient == "vapor",
+        ln_capital_w=ln_capital_w,
+    )
+    roots_x, roots_y = _detect._phi_phi_roots(
+        eos,
+        mixture,
+        TEMPERATURE_K,
+        P16_VLE_PA,
+        feed_branch=stability.feed_branch,
+        incipient_branch=stability.phase_branch,
+        incipient_phase=incipient,
+        seed_label="stability-log",
+    )
+
+    def stage(iterations: int, safeguard: bool) -> float:
+        return log_space_split(
+            z=z,
+            u0=u0,
+            terms_i=roots_x.ln_fugacity_terms,
+            terms_ii=roots_y.ln_fugacity_terms,
+            settings=dataclasses.replace(
+                ct.FlashSettings(), second_order_max_iter=max(iterations, 1)
+            ),
+            curvature_safeguard=safeguard,
+        ).residual
+
+    print(f"  {'iteration':>10} {'ADR-0024 rule':>18} {'with the safeguard':>22}")
+    for iterations in (1, 2, 4, 6, 8, 10, 11, 12, 13, 20, 50, 100):
+        print(
+            f"  {iterations:10d} {stage(iterations, False):18.6e} {stage(iterations, True):22.6e}"
+        )
+    record_check(
+        "the ADR-0024 rule is still on a residual of ~4e-05 after 100 iterations",
+        3e-05 < stage(100, False) < 5e-05,
+    )
+    record_check(
+        "the safeguarded rule is below 1e-12 within 13",
+        stage(13, True) < 1e-12,
+    )
+
+    # -- the vapour-liquid state, against the 1-D solve ---------------------
+    print("\n  0.3 MPa, vapour-liquid, against the route-3 one-dimensional solve:")
+    result = ct.flash_tp(mixture, temperature_K=TEMPERATURE_K, pressure_Pa=P16_VLE_PA, eos=eos)
+    target = float(_ln_phi(P16_VLE_PA, [0.0, 1.0], dense=False)[1])
+
+    def residual(ln_x: float) -> float:
+        solvent = math.exp(ln_x)
+        return ln_x + float(_ln_phi(P16_VLE_PA, [1.0 - solvent, solvent], dense=True)[1]) - target
+
+    ln_x = math.log(float(result.phases["liquid"].composition.fractions[1])) - 1e-3
+    for _ in range(80):
+        value = residual(ln_x)
+        step = 1e-7
+        slope = (residual(ln_x + step) - residual(ln_x - step)) / (2.0 * step)
+        correction = -value / slope
+        ln_x += correction
+        if abs(correction) < NEWTON_TOL:
+            break
+    ours = float(result.phases["liquid"].composition.fractions[1])
+    theirs = math.exp(ln_x)
+    print(
+        f"    melt x_C5: flash {ours:.14f}   1-D {theirs:.14f}   |difference| {abs(ours - theirs):.2e}"
+    )
+    print(
+        f"    beta_vapour {result.vapor_fraction:.12f}   ln y_PE"
+        f" {float(result.diagnostics['log_space_ln_x_min']):.4f}"
+        f"   dG/RT {float(result.diagnostics['delta_g_split_rt']):.4e}"
+    )
+    record_check(
+        f"0.3 MPa: the melt matches the 1-D solve < {COMPOSITION_TOL:g}",
+        abs(ours - theirs) < COMPOSITION_TOL,
+    )
+    record_check(
+        "0.3 MPa: the curvature safeguard is what produced it",
+        result.diagnostics["log_space_curvature_safeguard"] is True,
+    )
+    for label, ok in (
+        ("a vapour and a liquid", sorted(result.phases) == ["liquid", "vapor"]),
+        (
+            f"mass balance < {MASS_BALANCE_TOL:g}",
+            float(result.diagnostics["mass_balance_residual"]) < MASS_BALANCE_TOL,
+        ),
+        (
+            f"equal fugacity < {LOG_FUGACITY_TOL:g}",
+            float(result.diagnostics["log_space_residual"]) < LOG_FUGACITY_TOL,
+        ),
+        ("dG_split/RT < 0", float(result.diagnostics["delta_g_split_rt"]) < 0.0),
+        ("post-split stable", result.diagnostics["post_split_status"] == "stable"),
+    ):
+        record_check(f"0.3 MPa: {label}", ok)
+
+    # -- the five liquid-liquid states, against a 2-equation Newton ---------
+    print("\n  2.8-3.2 MPa, liquid-liquid, against a two-equation Newton written here:")
+    print(
+        f"\n  {'P/MPa':>7} {'x_PE (rich, flash)':>21} {'x_PE (rich, Newton)':>21}"
+        f" {'rel.':>9} {'ln x_PE (lean)':>15} {'beta_rich':>12}"
+    )
+    for pressure_Pa in P16_LLE_PA:
+        result = ct.flash_tp(mixture, temperature_K=TEMPERATURE_K, pressure_Pa=pressure_Pa, eos=eos)
+        rich = max(result.phases, key=lambda n: result.phases[n].composition.fractions[0])
+        lean = min(result.phases, key=lambda n: result.phases[n].composition.fractions[0])
+        ours_rich = float(result.phases[rich].composition.fractions[0])
+        ours_lean = float(result.phases[lean].composition.fractions[0])
+        # Started one percent away in ln x from the flash's answer, so the
+        # Newton has real work to do and cannot be said to have been handed it.
+        first, second = _independent_tie_line(
+            pressure_Pa, (math.log(ours_rich) * 1.01, math.log(ours_lean) * 1.01)
+        )
+        theirs_rich = math.exp(first)
+        relative = abs(theirs_rich - ours_rich) / ours_rich
+        print(
+            f"  {pressure_Pa / 1e6:7.1f} {ours_rich:21.15e} {theirs_rich:21.15e}"
+            f" {relative:9.1e} {math.log(ours_lean):15.6f}"
+            f" {result.phase_fractions[rich]:12.9f}"
+        )
+        record_check(
+            f"{pressure_Pa / 1e6:.1f} MPa: the tie line matches the 2-equation Newton"
+            f" < {TIE_LINE_REL_TOL:g} relative",
+            relative < TIE_LINE_REL_TOL,
+        )
+        record_check(
+            f"{pressure_Pa / 1e6:.1f} MPa: two liquids, verified",
+            sorted(result.phases) == ["liquid1", "liquid2"]
+            and float(result.diagnostics["mass_balance_residual"]) < MASS_BALANCE_TOL
+            and float(result.diagnostics["fugacity_residual"]) < LOG_FUGACITY_TOL
+            and float(result.diagnostics["delta_g_split_rt"]) < 0.0
+            and result.diagnostics["post_split_status"] == "stable",
+        )
+
+
+def the_sweep() -> None:
+    section("8. (--full) The whole 0.3-3.6 MPa sweep, both molar masses, 68 states")
+    print(
+        "  The claim ADR-0026 makes is not about six states but about the sweep they\n"
+        "  came out of: no ConvergenceError anywhere in it, and a verdict sequence that\n"
+        "  changes character once and only once for each chain."
+    )
+    print(
+        f"\n  {'Mw':>7} {'states':>7} {'refused':>8} {'VLE':>5} {'LLE':>5}"
+        f" {'single':>7} {'VLE -> LLE between':>22} {'worst resid':>12}"
+    )
+    failures_here = 0
+    for mw_g_mol in (PE_SHORT_MW_G_MOL, PE_MW_G_MOL):
+        mixture = binary_mixture(mw_g_mol)
+        eos = binary_eos(KIJ, mw_g_mol)
+        verdicts: list[tuple[float, str]] = []
+        refused = 0
+        worst = 0.0
+        for pressure_Pa in SWEEP_PA:
+            try:
+                result = ct.flash_tp(
+                    mixture, temperature_K=TEMPERATURE_K, pressure_Pa=pressure_Pa, eos=eos
+                )
+            except ct.ConvergenceError:
+                refused += 1
+                verdicts.append((pressure_Pa, "REFUSED"))
+                continue
+            verdicts.append((pressure_Pa, str(result.diagnostics["phase_regime"])))
+            if len(result.phases) > 1:
+                worst = max(worst, float(result.diagnostics["fugacity_residual"]))
+        counts = {name: sum(1 for _p, v in verdicts if v == name) for name in ("VLE", "LLE")}
+        singles = sum(1 for _p, v in verdicts if v == "single-phase")
+        changes = [
+            (verdicts[index - 1][0], verdicts[index][0])
+            for index in range(1, len(verdicts))
+            if verdicts[index][1] != verdicts[index - 1][1]
+        ]
+        boundary = f"{changes[0][0] / 1e6:.1f}-{changes[0][1] / 1e6:.1f} MPa" if changes else "-"
+        print(
+            f"  {mw_g_mol:7.0f} {len(verdicts):7d} {refused:8d} {counts['VLE']:5d}"
+            f" {counts['LLE']:5d} {singles:7d} {boundary:>22} {worst:12.2e}"
+        )
+        failures_here += refused
+        record_check(f"Mw = {mw_g_mol:.0f}: no ConvergenceError in 34 states", refused == 0)
+        record_check(
+            f"Mw = {mw_g_mol:.0f}: the verdict changes character exactly once",
+            len(changes) == 1,
+        )
+        record_check(
+            f"Mw = {mw_g_mol:.0f}: every two-phase answer has residual < {LOG_FUGACITY_TOL:g}",
+            worst < LOG_FUGACITY_TOL,
+        )
+
+
+# ---------------------------------------------------------------------------
 
 
 def main() -> None:
@@ -781,7 +1097,10 @@ def main() -> None:
     parser.add_argument(
         "--full",
         action="store_true",
-        help="also run the 144-state stability grid and the 0.4-2 MPa scan",
+        help=(
+            "also run the 144-state stability grid, the 0.4-2 MPa scan, the six states "
+            "ADR-0026 retires and the whole 0.3-3.6 MPa sweep"
+        ),
     )
     # `parse_known_args`, not `parse_args`: `tests/test_examples.py` runs this
     # script through `runpy`, so `sys.argv` is pytest's.
@@ -805,6 +1124,8 @@ def main() -> None:
     the_dormancy(args.full)
     if args.full:
         the_pressure_scan()
+        the_six_refusals()
+        the_sweep()
 
     section("Summary")
     if failures:
@@ -814,7 +1135,10 @@ def main() -> None:
         raise SystemExit(1)
     print("  All checks passed.")
     if not args.full:
-        print("\n  (pass --full for the 144-state stability grid and the 0.4-2 MPa scan)")
+        print(
+            "\n  (pass --full for the 144-state stability grid, the 0.4-2 MPa scan, the six"
+            "\n   states ADR-0026 retires and the whole 0.3-3.6 MPa sweep)"
+        )
 
 
 if __name__ == "__main__":

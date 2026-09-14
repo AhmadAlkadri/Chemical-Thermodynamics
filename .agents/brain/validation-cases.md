@@ -31,7 +31,7 @@ case's own entry.
 | **L** | L-1..L-4 | `gamma-gamma` liquid-liquid `flash_tp` (activity model, no EOS): Tessier (2000) tie-lines, binodal/lever-rule cross-check, post-split stability of every two-phase phi-phi flash | `flash-lle-activity` (ADR-0009) |
 | **R** | R-1..R-4 | `modified-raoult` mode (activity liquid + ideal vapor): VLE/LLE from one tangent plane, the three-phase neighbourhood refusal window, cross-check against `thermo` | `flash-modified-raoult` (ADR-0010) |
 | **V** | V-1..V-5 | Three-phase (VLLE) discovery: the ternary tie-triangle, stability misses fixed by fixed candidate surfaces, the binary refusal window, multiphase Rachford-Rice against Okuno et al. (2010), the ternary verdict map | `flash-vlle-phase-addition` (ADR-0011), `stability-candidate-surfaces` (ADR-0012) |
-| **P** | P-0..P-15 | PC-SAFT: residual Helmholtz/derivatives against teqp, density roots, flash/stability integration, split robustness re-measured on the PC-SAFT grid, phase identity, association against FeOs, per-phase density roots (LLE), EOS phase addition/removal (VLLE), fixed EOS stability surfaces, polymer components, the polymer liquid-liquid split, the polymer vapour-liquid split in log mole numbers, the log-space stability normalization | `pcsaft-residual-helmholtz` (ADR-0014), `pcsaft-density-roots-flash` (ADR-0015), `pcsaft-association` (ADR-0018), `flash-eos-per-phase-roots` (ADR-0019), `flash-phase-addition-eos` (ADR-0020), `stability-eos-root-surfaces` (ADR-0021), `pcsaft-polymer-solvent` (ADR-0022), `pcsaft-polymer-vle` (ADR-0024), `stability-log-space-sums` (ADR-0025) |
+| **P** | P-0..P-16 | PC-SAFT: residual Helmholtz/derivatives against teqp, density roots, flash/stability integration, split robustness re-measured on the PC-SAFT grid, phase identity, association against FeOs, per-phase density roots (LLE), EOS phase addition/removal (VLLE), fixed EOS stability surfaces, polymer components, the polymer liquid-liquid split, the polymer vapour-liquid split in log mole numbers, the log-space stability normalization, the curvature safeguard and the Rachford-Rice denominator that close the 0.3-3.6 MPa sweep | `pcsaft-residual-helmholtz` (ADR-0014), `pcsaft-density-roots-flash` (ADR-0015), `pcsaft-association` (ADR-0018), `flash-eos-per-phase-roots` (ADR-0019), `flash-phase-addition-eos` (ADR-0020), `stability-eos-root-surfaces` (ADR-0021), `pcsaft-polymer-solvent` (ADR-0022), `pcsaft-polymer-vle` (ADR-0024), `stability-log-space-sums` (ADR-0025), `flash-polymer-edge-cases` (ADR-0026) |
 | **B** | B-1 | The `chemthermo.bench` measurement harness and its acceptance rule (baseline + after + identical result hashes + measured ratio) | `perf-baseline-and-root-reuse` (ADR-0023) |
 
 ---
@@ -3894,6 +3894,16 @@ compressibility.
   done in logarithms the melt is the minimizer (`tpd_min` -1452.21 / -1346.57)
   and **this stage, unchanged, converges from it**. The reversal is pinned in
   `tests/test_flash_log_space_stage.py::test_the_longest_chain_below_1_mpa_is_now_in_reach`.
+- **AMENDED by ADR-0026 (Case P-16).** The stage this case introduced had one
+  more weak point than either this case or ADR-0024 recorded: where its Newton
+  direction is not a descent direction for the two-phase Gibbs energy it falls
+  back to `-r`, whose *length* is `|r|`, so next to the trivial solution - where
+  the Gibbs Hessian is indefinite and the direction is therefore always
+  rejected - it crawls instead of converging. Three states of the
+  `Mw = 53 000` chain measured it (0.3, 2.8 and 2.9 MPa). The stage now retries
+  itself once with a curvature safeguard where it finishes above
+  `FlashSettings.tol`; **every number in this case is unchanged**, because the
+  retry is a second call made only where the first one had already failed.
 - **Nothing here is compared against measurement.** The parameters are the
   Case P-12 fixture, the `k_ij` was fitted elsewhere, and the polymer is
   modelled as monodisperse.
@@ -3920,7 +3930,8 @@ compressibility.
   `slow`).
 - **Script:** `python examples/validation/21_pcsaft_polymer_vle.py` (routes 1,
   2, 3 and 5 need no optional dependency; about 5 s; `--full` adds the 25-point
-  pressure scan and the bisected VL/LL boundary, about 30 s).
+  pressure scan and the bisected VL/LL boundary - and, since ADR-0026, the same
+  scan for the `Mw = 53 000` chain, which takes it to about 1 min 15 s).
 
 ---
 
@@ -4231,8 +4242,14 @@ no melt stationary point distinct from it, and both the verdict and the split
 are **identical** to before (2.2 MPa: `tpd_min = -8.4453e-02`, melt
 `x_polymer = 0.0021352851683857058`, `beta = 0.9664497477547337`; 2.5 MPa:
 `-1.7459e-02`, `0.0012513825804704919`, `0.9427518353436072`). At 0.3 MPa and
-2.8-3.2 MPa `flash_tp` raised before and raises now - a pre-existing gap in the
-split stage's budget at a shallow near-critical verdict, untouched here.
+2.8-3.2 MPa `flash_tp` raised before and raised after this slice too.
+**AMENDED by ADR-0026 (Case P-16):** those six states now converge, and the
+"gap in the split stage's budget at a shallow near-critical verdict" recorded
+here was two different things - the log-space stage falling back to a step
+whose length is `|r|` next to the trivial solution (0.3, 2.8, 2.9 MPa), and a
+Rachford-Rice denominator cancelling to an exact zero for a `K` of `1e-18`
+(3.0-3.2 MPa). Neither is a budget. Every number in this case is unchanged by
+that repair, which engages only where `flash_tp` was about to raise.
 
 ### Negative controls and what is *not* claimed
 
@@ -4302,4 +4319,234 @@ split stage's budget at a shallow near-critical verdict, untouched here.
   `tests/test_flash_log_space_stage.py` (the former pinned miss, reversed).
 - **Script:** `python examples/validation/22_stability_log_space.py` (routes 1,
   2, 3 and 5 need no optional dependency; about 5 s; `--full` adds the
-  144-state Peng-Robinson stability grid and the 0.4-2 MPa scan, about 10 s).
+  144-state Peng-Robinson stability grid and the 0.4-2 MPa scan - and, since
+  ADR-0026, routes 6 to 8 of Case P-16, which take it to about 1 min 40 s).
+
+---
+
+## Case P-16: The last six refusals of the 0.3-3.6 MPa polymer sweep
+
+- **Source:** for the vapour-liquid state, the **one-dimensional** equal-fugacity
+  solve of Case P-14, written independently in the example (the vapour taken as
+  *exactly* pure solvent, one unknown carried as `ln x_solvent`,
+  finite-difference Newton started a thousandth away from `flash_tp`'s answer);
+  for the five liquid-liquid states, a **two-equation Newton** written in the
+  example on the two equal-fugacity conditions in logarithms, in which the feed
+  never appears, so it knows nothing about Rachford-Rice, the phase count, the
+  stability test or the split; **FeOs 0.10.1** chemical potentials at
+  chemthermo's converged phases and densities; and, for the Rachford-Rice
+  defect, the binary closed form `beta = -(z_1 a_1 + z_2 a_2) / (a_1 a_2)` with
+  `a_i = K_i - 1`.
+- **Location:** `chemthermo/flash/_log_space.py`
+  (`_safeguarded_directions`, `log_space_split(curvature_safeguard=...)`),
+  `chemthermo/flash/_split.py` (`_rr_denominators`,
+  `_rachford_rice(convex_denominators=...)`,
+  `_extended_rachford_rice(convex_denominators=...)`),
+  `chemthermo/flash/_detect.py` (`_phi_phi_log_space`'s retry,
+  `_flash_tp_tangent_plane`'s last-resort bracket); slice
+  `flash-polymer-edge-cases` (ADR-0026). **No model equation, no stability
+  solver, no seed, no tolerance and no public signature changed.**
+- **Parameters and provenance:** exactly Cases P-13, P-14 and P-15's -
+  polyethylene from `tests/fixtures/pcsaft/martini2009_polymers.json`
+  (`m/M = 0.026300 mol/g`, so `m = 1393.9` at `Mw = 53 000` and `m = 431.32` at
+  `Mw = 16 400`), n-pentane from Gross & Sadowski (2001) Table 1,
+  `k_ij = -0.006` except for the FeOs route, which runs at `k_ij = 0` on both
+  sides because feos 0.10.1 cannot be given one from Python. Nothing here is
+  compared against measurement.
+- **Assumptions:** monodisperse polymer; 453.0 K throughout; feed stated as a
+  polymer **mass** fraction (5 wt%, so at `Mw = 53 000`
+  `z = (7.163935601491655e-05, 0.9999283606439852)`).
+
+### (i) The defect, measured before it was repaired
+
+A 0.3-3.6 MPa sweep at 0.1 MPa steps over both molar masses - 68 states - run
+against a worktree at HEAD `584c508`:
+
+| P / MPa | message | measured |
+| --- | --- | --- |
+| 0.3 | "did not converge the phi-phi split in log mole numbers" | residual `3.901e-05` after 100 iterations |
+| 2.8 | same | `1.078e-08` after 100 |
+| 2.9 | same | `6.031e+00` after 100 |
+| 3.0 | "neither the stability-seeded nor the Wilson K-values bracket a Rachford-Rice root" | `tpd_min = -1.2537e-03` |
+| 3.1 | same | `-1.2021e-03` |
+| 3.2 | same | `-1.1538e-03` |
+
+All six are on the `Mw = 53 000` chain; all 34 `Mw = 16 400` states converged
+before and after. **Two** causes, neither of them about polymers:
+
+**(a) 0.3, 2.8, 2.9 MPa - the log-space stage crawls next to the trivial
+solution.** ADR-0024's stage keeps the Newton direction only while it descends
+the two-phase Gibbs energy and otherwise falls back to `-r`, whose *length* is
+`|r|`. At 0.3 MPa the Newton direction is rejected at every one of the 100
+iterations and the stage moves `ln n_solvent` from `-3.18038` to `-3.17648` -
+by `4e-03`, where the answer is `3.2` away - with the residual flat at
+`3.9e-05`. Both phases stay within a percent of the feed in the solvent: this
+is the neighbourhood of the trivial solution, where the Gibbs Hessian in the
+mole numbers is **indefinite** (measured eigenvalues `-1.337e-04` and
+`+3.967e+06`), which is exactly when the Newton direction is not a descent
+direction. Ruled out by measurement, not argument: the finite-difference
+Jacobian (step-independent to four figures over `h = 1e-06 .. 1e-02`, and
+`dr/dn` symmetric to `1.5e-07` at `h = 1e-04`); damping (the line search
+accepts a full step, zero backtracks, at all 100 iterations); and a scaling
+accident of the polymer row (the polymer residual converges in 8 iterations; it
+is the solvent row that cannot move).
+
+**(b) 3.0, 3.1, 3.2 MPa - the Rachford-Rice denominator cancels to zero.** The
+stability seed at 3.0 MPa is `K = (1.11871119e-18, 1.00132622)`, which straddles
+one, and `f(0) = +1.2545e-03`, `f(1) = -6.41e+13` bracket a root at
+`beta = 0.94591`. `_rachford_rice` forms `t_i = 1 + v (K_i - 1)`; `K_i - 1` is
+an **exact** `-1.0` for any `K_i` below the spacing of doubles at one, so at
+`v = 1` the sum is an exact `0.0`, the positivity guard fires and `f(1)` is
+reported `nan`. The Wilson fallback loses `K` the same way (a non-volatile
+component's Wilson estimate is `1e-10`, ADR-0022), so the second attempt fails
+for the first attempt's reason and the flash refuses.
+
+### (ii) The six states, after, each against an independent solve
+
+| P / MPa | verdict | route | fugacity residual | mass balance | `dG/RT` | post-split | independent |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 0.3 | VLE | `stability-log`, safeguarded | 4.865e-13 | 1.11e-16 | -1.0864e-01 | stable | melt `x_C5` **1.4e-14** absolute |
+| 2.8 | LLE | `stability-log`, safeguarded | 9.095e-13 | 1.11e-16 | -4.1682e-03 | stable | tie line **2.5e-13** relative |
+| 2.9 | LLE | `stability-log`, safeguarded | 9.095e-13 | 1.11e-16 | -3.9940e-03 | stable | **7.1e-13** |
+| 3.0 | LLE | `stability`, convex bracket | 7.276e-12 | 1.11e-16 | -3.8290e-03 | stable | **5.7e-13** |
+| 3.1 | LLE | `stability`, convex bracket | 3.865e-12 | 1.11e-16 | -3.6725e-03 | stable | **1.0e-12** |
+| 3.2 | LLE | `stability`, convex bracket | 2.274e-13 | 1.11e-16 | -3.5238e-03 | stable | **2.8e-13** |
+
+The compositions, which are what the independent solves reproduce:
+
+| P / MPa | polymer-rich `x_polymer` | polymer-lean `ln x_polymer` | polymer-rich phase fraction |
+| --- | --- | --- | --- |
+| 0.3 (melt) | 0.036808345719672377 | -1528.39130415 (the vapour) | 0.0019462802420003 |
+| 2.8 | 9.231250339583601e-04 | -93.81711157873 | 0.07760525755403569 |
+| 2.9 | 9.084501098780754e-04 | -90.20777508681 | 0.07885887759376387 |
+| 3.0 | 8.940738921079231e-04 | -86.82803360271 | 0.08012688509001775 |
+| 3.1 | 8.799780999223999e-04 | -83.65315387491 | 0.08141038512348653 |
+| 3.2 | 8.661464766005232e-04 | -80.66231922913 | 0.08271043980469528 |
+
+At 0.3 MPa the melt's solvent mole fraction from the flash is
+`0.963191654280328` and from the one-dimensional solve
+`0.963191654280342`; the polymer's own equal-fugacity condition in logarithms
+agrees to `0.0` (`ln f_polymer = -1577.4489967184` on both sides), which is the
+equation no linear parametrization can write down. The five liquid-liquid tie
+lines come from a two-equation Newton started **one percent away in `ln x`**
+from the flash's answer, so it is not handed its own result.
+
+**FeOs at chemthermo's phases**, all six states at `k_ij = 0` on both sides:
+worst `|d mu_i / RT|` between the two phases **6.139e-12** with FeOs's
+fourteen-figure dispersion constants substituted in, **3.145e-07** as shipped -
+the same ten-versus-fourteen-figure difference reported in Cases P-6 to P-12,
+not a disagreement about the equilibrium.
+
+### (iii) The iteration, before and after, at 0.3 MPa
+
+Same seed, same model, same tolerance; only the direction rule differs.
+
+| iteration | ADR-0024 rule | with the curvature safeguard |
+| --- | --- | --- |
+| 0 (seed) | 1.494998e+03 | 1.494998e+03 |
+| 1 | 1.597822e-01 | 7.917254e+01 |
+| 2 | 2.772935e-02 | 1.281896e+02 |
+| 4 | 1.053965e-03 | 2.597397e+02 |
+| 6 | 7.351891e-05 | 7.922556e+01 |
+| 8 | 3.898817e-05 | 1.682776e-01 |
+| 10 | 3.898861e-05 | 2.094748e-04 |
+| 11 | 3.898883e-05 | 9.641553e-09 |
+| 12 | 3.898905e-05 | 1.136868e-12 |
+| 13 | 3.898926e-05 | 4.865205e-13 |
+| 20 | 3.899078e-05 | 4.865205e-13 |
+| 100 | 3.900817e-05 | 4.865205e-13 |
+
+The safeguarded sequence gets **worse** before it gets better - iterations 1 to
+6 are the modified-Newton direction climbing out of the trivial basin along the
+negative-curvature eigenvector - and is then quadratic. The unsafeguarded one
+never leaves.
+
+### (iv) The sweep, and bit-identity
+
+The 68-state sweep re-run against a worktree at `584c508`, comparing every
+field a caller can observe - phase names, both compositions, phase fractions,
+`vapor_fraction` and every diagnostics number - with `==`:
+
+| outcome | states |
+| --- | --- |
+| identical, bit for bit | **62** |
+| `ConvergenceError` -> a verified split | **6** (the table above) |
+| converged before, moved in any digit | **0** |
+| converged before, raises now | **0** |
+
+Verdict sequences, both chains, 0.3-3.6 MPa: **VLE for 23 states then LLE for
+11**, changing character exactly once, between 2.5 and 2.6 MPa for each - and
+for `Mw = 16 400` the bisected boundary of Case P-13 is unmoved at
+2.5868/2.5873 MPa. Worst equal-fugacity residual over all 68: `9.66e-13`
+(`Mw = 16 400`), `1.23e-11` (`Mw = 53 000`). The `-> single-phase` leg of the
+sequence is above this band and is checked by the 0.3-12 MPa scans in
+`examples/validation/21_pcsaft_polymer_vle.py --full`.
+
+**The 2.5 MPa vapour-liquid state, which Case P-15 left converging through the
+log-space stage, is unchanged**: `converged_stage = "second-order-log"`, 33
+stage iterations, `log_space_residual = 6.821210263296962e-13`, melt
+`x_polymer = 0.0012513825804704919`, `beta = 0.9427518353436072` - the same
+doubles as before the slice.
+
+### Negative controls and what is *not* claimed
+
+- **The curvature safeguard is never used on a first attempt.** It is a second
+  call to the same function from the same seed, made only where the first call
+  finished above `FlashSettings.tol` - which before this slice was a
+  `ConvergenceError`. `diagnostics["log_space_curvature_safeguard"]` is `False`
+  on every log-space state that converged before (measured on the sweep) and
+  `True` on the three it repairs.
+- **The convex Rachford-Rice denominator is off by default, and that is
+  deliberate.** Switching it on everywhere was implemented and measured: it
+  re-routes **15 of the 62** already-converging sweep states - `Mw = 16 400` at
+  2.2-2.5 MPa from `stability-log`/`second-order-log` to
+  `stability`/`second-order`, and 2.6-3.6 MPa in the last bits - because a seed
+  that had had no in-window root suddenly has one. Those answers are as correct
+  as before; moving them is a different slice. Asserted instead, with `==`:
+  over 400 random K-sets and every K-vector of five real Peng-Robinson split
+  iterations, `convex_denominators=True` returns the *same double* wherever the
+  naive form had an answer at all.
+- **The fixture did not move.** `refactor_bit_identity_v3.json` (155 states)
+  passes **unchanged** and was not regenerated; none of its states reaches the
+  log-space stage, so none of them gained or lost a diagnostics key. All nine
+  ADR-0023 benchmark cases report **identical result hashes**
+  (`python -m chemthermo.bench --compare`, the two records measured back to back
+  on one machine; per-case ratios 0.99x-1.03x, i.e. noise).
+- **A narrow band near 5.2 MPa on the `Mw = 53 000` chain still refuses**, and
+  is neither caused nor repaired here. Measured at 5.175, 5.2 and 5.3 MPa
+  (5.0, 5.1, 5.4 and 5.5 MPa converge), identically at `584c508`, with the same
+  message and residual (`5.8e-04` after 100 successive-substitution and 101
+  second-order iterations). It is outside the 0.3-3.6 MPa band this case
+  measures and it enters through the *other* log-space entry point
+  (`_phi_phi_second_order`, seeded from a failed linear iterate); the symmetric
+  retry there was implemented and measured **not** to repair it, so it was not
+  shipped (ADR-0002: no unexercised paths).
+  `examples/validation/21_pcsaft_polymer_vle.py --full` prints it.
+- **Nothing here is a statement about polyethylene.** The polymer parameters
+  are one open secondary source citing a paywalled table that was not read, the
+  polymer is monodisperse, and no number in this case is compared against
+  measurement.
+- **Suite time:** `pytest -q` **239.83 s (3:59) for 839 tests at `584c508` ->
+  251.77 s (4:11) for 852**, uncontended on the one machine; `pytest -q -m slow`
+  **751.87 s (12:31) for 53 -> 818.06 s (13:38) for 56**. 16 tests added, none
+  removed; the three marked `slow` are all *repetitions* - three further
+  pressures on the same liquid-liquid tie line, of which two (2.8 and 3.0 MPa,
+  one per repair) run by default. 4:11 is a little over the ~4 min target and
+  is stated rather than trimmed further, as it was at the previous two slices;
+  the starting point on this machine was already 3:59.
+- **Independent route:** the one-dimensional equal-fugacity solve; a
+  two-equation Newton on the tie line in which the feed does not appear; FeOs's
+  chemical potentials; the binary closed form of the Rachford-Rice root; and,
+  for the direction rule itself, a Jacobian written out by hand in the test
+  whose Gibbs Hessian is indefinite.
+- **Test path:** `tests/test_pcsaft_polymer.py` (the six states, 3 by default
+  and 3 `slow`, plus the K-value the bracket lost),
+  `tests/test_flash_log_space_stage.py` (the stall, the repair, the contract of
+  `_safeguarded_directions`, the reported flag),
+  `tests/test_rachford_rice_extended.py` (the cancellation, the root it hid,
+  the bit-identity of the flag being off).
+- **Script:** `python examples/validation/22_stability_log_space.py --full`
+  (routes 6, 7 and 8: the before/after iteration trace, the six states against
+  their independent solves, and the whole 68-state sweep; about 1 min 40 s in
+  total) and `python examples/validation/21_pcsaft_polymer_vle.py --full` (the
+  two 0.3-12 MPa verdict scans, about 1 min 15 s).

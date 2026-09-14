@@ -1226,8 +1226,18 @@ untouched - `ComponentData` still requires `Tc` / `Pc` / `omega` and
   rounds to `(1.0, 0.0)` there; `diagnostics["ln_sum_W"]` is equation (7)'s
   `-tpd`, and `sum_W` itself is then `inf`.
 
-See ADR-0022, ADR-0024 and ADR-0025, validation Cases P-12, P-13, P-14 and
-P-15, `examples/basic/pcsaft_polymer_demo.py`,
+- **The whole 0.3-3.6 MPa band converges since ADR-0026.** Six states of that
+  68-state sweep still raised at the previous slice - 0.3, 2.8 and 2.9 MPa,
+  where the log-space stage spent its budget crawling next to the trivial
+  solution, and 3.0 to 3.2 MPa, where a `K` of `1e-18` made
+  `1 + (K - 1)` cancel to an exact zero and Rachford-Rice reported a bracket it
+  had. Both are repaired where, and only where, the flash would otherwise
+  refuse: `diagnostics["log_space_curvature_safeguard"]` and
+  `diagnostics["rachford_rice_convex_denominators"]` say which. No tolerance
+  changed, and the 62 states that converged before are bit-identical.
+
+See ADR-0022, ADR-0024, ADR-0025 and ADR-0026, validation Cases P-12, P-13,
+P-14, P-15 and P-16, `examples/basic/pcsaft_polymer_demo.py`,
 `examples/validation/20_pcsaft_polymer_vs_feos.py`,
 `examples/validation/21_pcsaft_polymer_vle.py` and
 `examples/validation/22_stability_log_space.py`.
