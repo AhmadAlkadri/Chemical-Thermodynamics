@@ -4738,8 +4738,10 @@ adjudicating it needs a reference and a `kij`, and is not this case.
   all of it PC-SAFT states. 4:27 is over the ~4:20 target and is stated rather
   than trimmed further, as at the previous two slices; a third run of the same
   suite in the same session measured 285.13 s, so read +-7 % into any of these.
-  `pytest -q -m slow tests/test_robustness_map.py` passes (the full sweep
-  reproduces the committed totals).
+  `pytest -q -m slow tests/test_robustness_map.py` passes in **879.98 s
+  (14:39)** - the full 2110-state sweep, reproducing the committed record's
+  totals, verdict counts and refusal-class counts. The rest of the `slow` set
+  was not re-run in this slice; nothing here touches the code it covers.
 - **Independent route:** none, by design - see the source note. The one
   independent argument in the case is the lever rule of class 2, which shares
   no code with the split it contradicts.
