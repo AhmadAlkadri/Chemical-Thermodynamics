@@ -1,0 +1,100 @@
+{
+  "fixture_version": 1,
+  "model": "PC-SAFT",
+  "name": "Polymer PC-SAFT parameters as tabulated by Martini et al. (2009)",
+  "citation": {
+    "secondary_source": "R. E. Martini, M. Cismondi, S. E. Barbosa and S. B. Brignole (as listed on the manuscript), 'PC-SAFT equation: a predictive tool to determine experimental conditions for polymer blend demixing', Separation Science and Technology 44(11) (2009) 2489-2512, DOI 10.1080/01496390903017634.",
+    "copy_used": "Author manuscript deposited in the CONICET institutional repository, https://ri.conicet.gov.ar/handle/11336/140616 (open access).",
+    "location": "Table 1 (pure-component PC-SAFT parameters of the polymers, with the m/M convention stated in its footnote), Table 2 (solvent parameters), Table 3 (PE/n-pentane k_ij per polymer molar mass).",
+    "primary_source": "J. Gross and G. Sadowski, 'Modeling Polymer Systems Using the Perturbed-Chain Statistical Associating Fluid Theory Equation of State', Ind. Eng. Chem. Res. 41 (2002) 1084-1093, DOI 10.1021/ie010449g - which Table 1 of the secondary source cites as reference [20] for these values.",
+    "primary_source_read": false,
+    "provenance_caveat": "AS TABULATED BY MARTINI ET AL. 2009 CITING GROSS & SADOWSKI 2002; NOT VERIFIED AGAINST THE PRIMARY TABLE. The 2002 paper is behind the ACS paywall (pubs.acs.org returns HTTP 403 from the environment that produced this file) and a search for a second open source printing the same three numbers found none: no polymer records exist in FeOs's or Clapeyron.jl's packaged PC-SAFT parameter files, and every open hit for the numeric values leads back to this one manuscript. Unlike the packaged Gross & Sadowski (2001) records - which two independent secondary sources confirm digit for digit - these values rest on a single secondary source.",
+    "redistribution_note": "These values are a citation-backed TEST AND EXAMPLE FIXTURE only. They are NOT packaged runtime data, are never loaded as defaults, and must not be presented as chemthermo's own parameter set. chemthermo packages no polymer parameters."
+  },
+  "units": {
+    "segments_per_g": "mol/g - the m/M of the source's Table 1; the segment number of a sample is m = segments_per_g * MW_g_mol",
+    "sigma_A": "Angstrom",
+    "epsilon_k_K": "K",
+    "MW_g_mol": "g/mol"
+  },
+  "polymers": [
+    {
+      "name": "Polyethylene",
+      "abbreviation": "PE",
+      "segments_per_g": 0.0263,
+      "sigma_A": 4.0217,
+      "epsilon_k_K": 247.5,
+      "table_1_sample": {
+        "Mw_g_mol": 53000,
+        "Mn_g_mol": 18000,
+        "polydispersity": 2.94,
+        "Tm_K": 399
+      }
+    },
+    {
+      "name": "Polypropylene",
+      "abbreviation": "PP",
+      "segments_per_g": 0.02305,
+      "sigma_A": 4.1,
+      "epsilon_k_K": 217.0,
+      "table_1_sample": {
+        "Mw_g_mol": 345500,
+        "Mn_g_mol": 67800,
+        "polydispersity": 5.1,
+        "Tm_K": 429
+      }
+    },
+    {
+      "name": "Polystyrene",
+      "abbreviation": "PS",
+      "segments_per_g": 0.019,
+      "sigma_A": 4.1071,
+      "epsilon_k_K": 267.0,
+      "table_1_sample": {
+        "Mw_g_mol": 272000,
+        "Mn_g_mol": 127000,
+        "polydispersity": 2.14
+      }
+    }
+  ],
+  "solvents": [
+    {
+      "name": "n-Pentane",
+      "m": 2.6896,
+      "sigma_A": 3.7729,
+      "epsilon_k_K": 231.2,
+      "note": "Table 2. Identical to the packaged Gross & Sadowski (2001) Table 1 record, which is where chemthermo reads it from; repeated here only so this fixture states the full binary."
+    },
+    {
+      "name": "n-Hexane",
+      "m": 3.0576,
+      "sigma_A": 3.7983,
+      "epsilon_k_K": 236.77,
+      "note": "Table 2; also identical to the packaged record."
+    },
+    {
+      "name": "n-Heptane",
+      "m": 3.4831,
+      "sigma_A": 3.8049,
+      "epsilon_k_K": 238.4,
+      "note": "Table 2; also identical to the packaged record."
+    }
+  ],
+  "binary_kij": {
+    "system": "Polyethylene / n-pentane",
+    "location": "Table 3",
+    "fitted_to": "Cloud-point data of E. Kiran and W. Zhuang, Polymer 33 (1992) 5259, which the source cites as its reference [30] for the polymer samples; the k_ij values are the source's own PC-SAFT fit to those data and were NOT read from the experimental paper here.",
+    "values": [
+      { "sample": "PE 2.15", "Mw_g_mol": 2150, "polydispersity": 1.14, "kij": -0.02 },
+      { "sample": "PE 16.4", "Mw_g_mol": 16400, "polydispersity": 1.16, "kij": -0.006 },
+      { "sample": "PE 108", "Mw_g_mol": 108000, "polydispersity": 1.32, "kij": 0.0 },
+      { "sample": "PE 420", "Mw_g_mol": 420000, "polydispersity": 2.66, "kij": 0.0014 }
+    ]
+  },
+  "notes": [
+    "The m/M convention: Table 1's footnote reads 'The segment number m depends on the molecular mass M of a polymer. It is determined from m/M by multiplying with the molecular mass M.' So m = segments_per_g * MW_g_mol - 431.32 for the Mw = 16400 sample and 1393.9 for the Mw = 53000 one.",
+    "chemthermo models these as MONODISPERSE: one chain length, one component. The samples above have polydispersities of 1.14 to 5.1, so a chemthermo answer built from them is the answer for a single-chain-length idealization of the sample, not for the sample.",
+    "The source's figures give cloud-point pressures (for example PE 53000 in n-pentane between 403 and 460 K, roughly 80 to 160 bar). Those are FIGURE DATA and were not digitized; nothing in this repository asserts a number against them. Comparisons to them are qualitative and are labelled as such.",
+    "An earlier recollection of these parameters had PE epsilon/k = 252.0 and PS m/M = 0.0205. The table above is what the cited manuscript prints; the recollection is not reproduced anywhere and is recorded here only so that the discrepancy is not silently lost."
+  ]
+}
