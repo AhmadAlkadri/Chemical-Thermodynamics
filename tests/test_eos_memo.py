@@ -30,6 +30,7 @@ from __future__ import annotations
 
 import json
 import math
+import threading
 from pathlib import Path
 from typing import Any, Callable, Sequence
 
@@ -389,6 +390,42 @@ def test_two_models_never_read_each_others_entries() -> None:
     assert alone_plain["phases"] != alone_shifted["phases"], (
         "the two models must disagree, or this test proves nothing"
     )
+
+
+def test_two_threads_flashing_at_once_get_what_each_gets_alone() -> None:
+    """The memo is a ContextVar, so a thread never sees another thread's.
+
+    Two different PC-SAFT models at one ``(T, P, x)``, run concurrently on one
+    shared pair of model objects. Threads do not inherit a context, so each
+    flash installs its own memo at its own default and neither can read the
+    other's entries; the answers must be the ones each model gives alone.
+    """
+    names = ("Methane", "n-Hexane")
+    mixture = _mixture(names, (0.5, 0.5))
+    plain = PCSAFTEOS(components=names)
+    shifted = PCSAFTEOS(components=names, kij=0.03)
+
+    def run(eos: PCSAFTEOS) -> Any:
+        return _encode_flash(ct.flash_tp(mixture, temperature_K=200.0, pressure_Pa=3.5e6, eos=eos))
+
+    alone = [run(plain), run(shifted)]
+    concurrent: list[Any] = [None, None]
+
+    def worker(slot: int, eos: PCSAFTEOS) -> None:
+        concurrent[slot] = run(eos)
+
+    threads = [
+        threading.Thread(target=worker, args=(0, plain)),
+        threading.Thread(target=worker, args=(1, shifted)),
+    ]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    _identical(alone[0], concurrent[0], "plain kij / threaded")
+    _identical(alone[1], concurrent[1], "shifted kij / threaded")
+    assert _eos_memo.active_memo() is None
 
 
 def test_the_peng_robinson_key_separates_two_states_that_share_a_composition() -> None:
