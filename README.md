@@ -1441,6 +1441,19 @@ optimizations measured against them (Peng-Robinson flash 1.17x, PC-SAFT
 liquid-liquid 1.32x, every result hash identical). The harness is internal: it
 is not importable from `chemthermo` and is not part of the public API.
 
+Since ADR-0030 each `flash_tp` / `stability_tp` call also carries a bounded
+**call-local memo** of the density/compressibility root solves it makes, so a
+state solved once in a call is not solved again in it. Nothing is cached on a
+model - both model classes stay frozen and stateless, the memo lives in the
+call and is discarded when it returns - and a hit returns the identical object
+the first solve produced, which is what makes it bit-identical rather than
+merely close. Measured as integer counts of the same fixed workload, and so
+independent of the machine: **25.5 %, 13.5 % and 14.8 % fewer PC-SAFT density
+solves** on the three PC-SAFT cases and **18.7 %, 13.1 % and 23.8 % fewer
+cubic solves** on the three Peng-Robinson ones, with the three activity-model
+cases unchanged at zero either way (they are the drift control). Every result
+hash is identical and no fixture was regenerated.
+
 `python -m chemthermo.bench robustness --out record.json` is the coverage
 instrument next to that speed one: it sweeps all ten model families over fixed
 state and composition grids (2505 states) and writes a classified record -
@@ -1456,8 +1469,11 @@ original 2110 states. Nine of those fourteen were one class,
 phase-addition search can now take back, and a multiphase log-space stage for
 a three-liquid set holding a component at `x ~ 1e-12` - leaving **5 at
 `64831bd`**, all of them the deprecated `gamma-phi` path's own by-design
-behaviour. See `benchmarks/README.md`, ADR-0027 (and its
-`robustness-map-coverage` amendment), ADR-0028 and ADR-0029.
+behaviour - and **5 again at `f852726`**, where the whole record is identical
+field for field to the `64831bd` one because ADR-0030 is a performance change
+and re-running the sweep is how that is proved over 2505 states. See
+`benchmarks/README.md`, ADR-0027 (and its `robustness-map-coverage`
+amendment), ADR-0028, ADR-0029 and ADR-0030.
 
 ## Scope Policy
 
