@@ -1236,8 +1236,17 @@ untouched - `ComponentData` still requires `Tc` / `Pc` / `omega` and
   `diagnostics["rachford_rice_convex_denominators"]` say which. No tolerance
   changed, and the 62 states that converged before are bit-identical.
 
-See ADR-0022, ADR-0024, ADR-0025 and ADR-0026, validation Cases P-12, P-13,
-P-14, P-15 and P-16, `examples/basic/pcsaft_polymer_demo.py`,
+- **Since ADR-0028 the robustness map refuses nothing.** The 36 states the map
+  of ADR-0027 refused were all this system, and all three causes were a stage
+  being started in the wrong place rather than stepping wrongly; the log-space
+  stage is now retried from the tangent-plane stationary point, at a phase
+  fraction the lever rule bounds, and the stability test is retried once with
+  substitution's full budget. Each retry runs only where the flash was about to
+  refuse, and all 2074 states that converged before are identical in the
+  regenerated record.
+
+See ADR-0022, ADR-0024, ADR-0025, ADR-0026 and ADR-0028, validation Cases P-12,
+P-13, P-14, P-15, P-16 and P-17, `examples/basic/pcsaft_polymer_demo.py`,
 `examples/validation/20_pcsaft_polymer_vs_feos.py`,
 `examples/validation/21_pcsaft_polymer_vle.py` and
 `examples/validation/22_stability_log_space.py`.
@@ -1437,7 +1446,9 @@ instrument next to that speed one: it sweeps all six model families over fixed
 state and composition grids (2110 states) and writes a classified record -
 phase verdict or refusal class per state, with the exact state, message and
 invariant residuals - so the next solver slice is chosen from counts rather
-than recall. See `benchmarks/README.md` and ADR-0027.
+than recall. It found 36 refusals at `87f0820`, every one of them
+polyethylene / n-pentane, and **0 at `9adf390`** after ADR-0028 retired them.
+See `benchmarks/README.md`, ADR-0027 and ADR-0028.
 
 ## Scope Policy
 
