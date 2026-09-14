@@ -117,6 +117,7 @@ from ..core import Mixture
 from ..exceptions import ConvergenceError, ModelError
 from ..models import ActivityModel, EquationOfState
 from ._assemble import _multi_phase_result
+from ._multiphase_log_space import MultiphaseLogSpaceSplit, multiphase_log_space_split
 from ._multiphase_rr import _multiphase_rachford_rice, _NoMultiphaseSolution
 from ._split import _PhaseRoot
 from ._verify import (
@@ -349,6 +350,14 @@ class _MultiphaseSolution:
         converged_stage: Which stage met the tolerance, or None.
         removal_index: Index of the phase whose fraction is non-positive, or
             None when every fraction is positive.
+        removal_order: Every phase this solve names as removable, best first,
+            so ``removal_order[0] == removal_index`` whenever there is one.
+            The tail is what makes a removal **reversible** (ADR-0029): the
+            search can come back and take the next candidate when the first one
+            led nowhere. Empty when ``removal_index`` is None.
+        log_space_iterations: Iterations spent in the ADR-0029 multiphase
+            log-space stage. Zero unless that stage ran, which it does only
+            where this solve was about to raise.
     """
 
     __slots__ = (
@@ -356,7 +365,9 @@ class _MultiphaseSolution:
         "converged_stage",
         "fractions",
         "labels",
+        "log_space_iterations",
         "removal_index",
+        "removal_order",
         "residual",
         "rr_iterations",
         "second_order_iterations",
@@ -377,6 +388,8 @@ class _MultiphaseSolution:
         rr_iterations: int,
         converged_stage: str | None,
         removal_index: int | None,
+        removal_order: tuple[int, ...] = (),
+        log_space_iterations: int = 0,
     ) -> None:
         self.labels = labels
         self.compositions = compositions
@@ -388,6 +401,8 @@ class _MultiphaseSolution:
         self.rr_iterations = rr_iterations
         self.converged_stage = converged_stage
         self.removal_index = removal_index
+        self.removal_order = removal_order
+        self.log_space_iterations = log_space_iterations
 
 
 def _phase_residual(compositions: Sequence[np.ndarray], terms: Sequence[np.ndarray]) -> float:
@@ -406,6 +421,21 @@ def _phase_residual(compositions: Sequence[np.ndarray], terms: Sequence[np.ndarr
     return worst
 
 
+def _ranked_removals(values: Sequence[float] | np.ndarray) -> tuple[int, ...]:
+    """Phases that ``values`` marks as removable, most negative first.
+
+    ``values`` is either the converged phase fractions or, for a receding
+    feasible region, the rate of change of each fraction along the recession
+    direction. In both cases a non-positive entry says "this phase is not
+    there", and ``argmin`` is the entry the search has always acted on; the
+    ranking is that same rule read past its first place, so the first element
+    is exactly the pre-ADR-0029 choice.
+    """
+    array = np.asarray(values, dtype=float)
+    ranked = [int(index) for index in np.argsort(array, kind="stable")]
+    return tuple(index for index in ranked if float(array[index]) <= _ABSENT_PHASE_FRACTION)
+
+
 class _SsiOutcome:
     """What one run of multiphase successive substitution produced."""
 
@@ -414,6 +444,7 @@ class _SsiOutcome:
         "fractions",
         "iterations",
         "removal_index",
+        "removal_order",
         "residual",
         "rr_iterations",
         "terms",
@@ -429,6 +460,7 @@ class _SsiOutcome:
         iterations: int,
         rr_iterations: int,
         removal_index: int | None,
+        removal_order: tuple[int, ...] = (),
     ) -> None:
         self.compositions = compositions
         self.fractions = fractions
@@ -437,6 +469,7 @@ class _SsiOutcome:
         self.iterations = iterations
         self.rr_iterations = rr_iterations
         self.removal_index = removal_index
+        self.removal_order = removal_order
 
 
 def _multiphase_ssi(
@@ -454,6 +487,12 @@ def _multiphase_ssi(
     phases in a binary away from its three-phase temperature) is *not* an
     error: the recession direction names the phase whose amount runs negative,
     and that index is returned for removal.
+
+    Both removal signals name a *ranking*, not one phase: several fractions can
+    be non-positive at once, and several rates can be negative along one
+    recession direction. The first entry is the removal this function has
+    always chosen; the rest are recorded because that choice can be wrong and
+    the search has to be able to take it back (ADR-0029).
     """
     beta: np.ndarray | None = None
     fractions = np.zeros(len(compositions))
@@ -485,6 +524,7 @@ def _multiphase_ssi(
                 iterations=iteration,
                 rr_iterations=rr_iterations,
                 removal_index=departing,
+                removal_order=_ranked_removals(rates),
             )
         beta = solution.beta
         rr_iterations += solution.iterations
@@ -516,6 +556,7 @@ def _multiphase_ssi(
         iterations=iterations,
         rr_iterations=rr_iterations,
         removal_index=(smallest if float(fractions[smallest]) <= _ABSENT_PHASE_FRACTION else None),
+        removal_order=_ranked_removals(fractions),
     )
 
 
@@ -709,6 +750,7 @@ def _solve_phase_set(
             rr_iterations=rr_iterations,
             converged_stage=None,
             removal_index=outcome.removal_index,
+            removal_order=outcome.removal_order,
         )
 
     converged_stage = "successive-substitution" if residual < settings.tol else None
@@ -736,16 +778,42 @@ def _solve_phase_set(
                 residual = refined_residual
                 converged_stage = "second-order" if residual < settings.tol else converged_stage
 
-    smallest = int(np.argmin(fractions))
-    removal_index = smallest if float(fractions[smallest]) <= _ABSENT_PHASE_FRACTION else None
-    if removal_index is None:
-        removal_index = _collapsed_phase(current, settings)
+    removal_index, removal_order = _removal_signal(current, fractions, settings)
+
+    log_space_iterations = 0
+    if removal_index is None and residual > settings.tol:
+        # ADR-0029. Reached only on the branch that raises below, so no result
+        # that was ever returned can move. The linear stage above cannot be
+        # made to work on a phase set holding a component at `x ~ 1e-12` in the
+        # phase that carries the mass balance; see `_multiphase_log_space`.
+        refined = _multiphase_log_space_stage(
+            z=z,
+            compositions=current,
+            fractions=fractions,
+            terms_by_phase=terms_by_phase,
+            settings=settings,
+        )
+        if refined is not None:
+            log_space_residual = _phase_residual(refined.compositions, refined.terms)
+            if log_space_residual < residual:
+                current = refined.compositions
+                fractions = refined.fractions
+                evaluated = refined.terms
+                residual = log_space_residual
+                log_space_iterations = refined.iterations
+                converged_stage = "second-order-log" if residual < settings.tol else converged_stage
+                removal_index, removal_order = _removal_signal(current, fractions, settings)
 
     if removal_index is None and residual > settings.tol:
+        detail = (
+            ""
+            if log_space_iterations == 0
+            else f" and {log_space_iterations} log-space Newton iterations (ADR-0029)"
+        )
         raise ConvergenceError(
             "The multiphase split did not converge; equal-fugacity residual="
             f"{residual:.3e} after {ssi_iterations} successive-substitution and "
-            f"{second_order_iterations} second-order iterations."
+            f"{second_order_iterations} second-order iterations{detail}."
         )
 
     return _MultiphaseSolution(
@@ -759,7 +827,64 @@ def _solve_phase_set(
         rr_iterations=rr_iterations,
         converged_stage=converged_stage,
         removal_index=removal_index,
+        removal_order=removal_order,
+        log_space_iterations=log_space_iterations,
     )
+
+
+def _removal_signal(
+    compositions: Sequence[np.ndarray],
+    fractions: np.ndarray,
+    settings: FlashSettings,
+) -> tuple[int | None, tuple[int, ...]]:
+    """``(removal_index, removal_order)`` of a converged phase set.
+
+    A non-positive phase fraction comes first (the negative flash), and two
+    phases that have merged onto one another come second; the merged case names
+    a single phase, because "these two are one" is not a ranking.
+    """
+    ranked = _ranked_removals(fractions)
+    if ranked:
+        return ranked[0], ranked
+    collapsed = _collapsed_phase(compositions, settings)
+    if collapsed is None:
+        return None, ()
+    return collapsed, (collapsed,)
+
+
+def _multiphase_log_space_stage(
+    *,
+    z: np.ndarray,
+    compositions: Sequence[np.ndarray],
+    fractions: np.ndarray,
+    terms_by_phase: Sequence[Callable[[np.ndarray], np.ndarray]],
+    settings: FlashSettings,
+) -> MultiphaseLogSpaceSplit | None:
+    """Walk the ADR-0029 log-space stage, unsafeguarded then safeguarded.
+
+    Two entries for the same reason ADR-0028's ladder has three: the
+    unsafeguarded iteration is the cheaper one and is what every state
+    measured for ADR-0029 needs, and the ADR-0026 curvature safeguard is what a
+    phase set parked next to an indefinite Hessian would need. The best
+    residual wins; ``None`` means neither entry could even start.
+    """
+    best: MultiphaseLogSpaceSplit | None = None
+    for curvature_safeguard in (False, True):
+        attempt = multiphase_log_space_split(
+            z=z,
+            compositions=compositions,
+            fractions=fractions,
+            terms_by_phase=terms_by_phase,
+            settings=settings,
+            curvature_safeguard=curvature_safeguard,
+        )
+        if attempt is None:
+            return best
+        if best is None or attempt.residual < best.residual:
+            best = attempt
+        if best.residual < settings.tol:
+            break
+    return best
 
 
 def _collapsed_phase(compositions: Sequence[np.ndarray], settings: FlashSettings) -> int | None:
@@ -777,6 +902,88 @@ def _collapsed_phase(compositions: Sequence[np.ndarray], settings: FlashSettings
         for earlier in range(later):
             if _is_same_phase(compositions[later], compositions[earlier], trivial_tol):
                 return later
+    return None
+
+
+class _RemovalChoice:
+    """A phase set as it stood before a removal, and the removals not yet tried.
+
+    Removal is the one step of the ADR-0011 search that was irreversible: the
+    solve names the phase whose amount is most negative, the search drops it,
+    and there is no way back. ADR-0029 makes it reversible, because the ranking
+    the solve produces can be wrong - see the branch in
+    :func:`_flash_tp_phase_addition` that pops this.
+
+    Attributes:
+        labels: Candidate labels of the pre-removal set.
+        surfaces: Its per-phase tangent-plane term callables.
+        compositions: The compositions that solve reached, pre-removal.
+        remaining: Indices into the pre-removal set that have not been removed
+            yet, best first.
+    """
+
+    __slots__ = ("compositions", "labels", "remaining", "surfaces")
+
+    def __init__(
+        self,
+        *,
+        labels: list[str],
+        surfaces: list[Callable[[np.ndarray], np.ndarray]],
+        compositions: list[np.ndarray],
+        remaining: list[int],
+    ) -> None:
+        self.labels = labels
+        self.surfaces = surfaces
+        self.compositions = compositions
+        self.remaining = remaining
+
+
+def _record_removal(
+    undo: list[_RemovalChoice],
+    *,
+    labels: Sequence[str],
+    surfaces: Sequence[Callable[[np.ndarray], np.ndarray]],
+    compositions: Sequence[np.ndarray],
+    candidates: Sequence[int],
+) -> None:
+    """Remember a phase set and the removals it offers beyond the one taken.
+
+    ``candidates[0]`` is the removal the caller is about to make, so only the
+    tail is recorded. A set that offers no alternative is still pushed, with an
+    empty tail, so the stack mirrors the search's own history.
+    """
+    undo.append(
+        _RemovalChoice(
+            labels=list(labels),
+            surfaces=list(surfaces),
+            compositions=[np.array(value, dtype=float) for value in compositions],
+            remaining=[int(index) for index in candidates[1:]],
+        )
+    )
+
+
+def _take_next_removal(
+    undo: list[_RemovalChoice],
+) -> tuple[list[str], list[Callable[[np.ndarray], np.ndarray]], list[np.ndarray]] | None:
+    """Undo removals until one offers an untried candidate, and take it.
+
+    Returns the restored phase set with that candidate removed, or ``None``
+    when every removal on the stack has been exhausted - which is when the
+    caller raises, exactly as it always did. Each candidate is taken at most
+    once and the stack only shrinks, so the search still terminates.
+    """
+    while undo:
+        choice = undo[-1]
+        if not choice.remaining:
+            undo.pop()
+            continue
+        index = choice.remaining.pop(0)
+        labels = [value for position, value in enumerate(choice.labels) if position != index]
+        surfaces = [value for position, value in enumerate(choice.surfaces) if position != index]
+        compositions = [
+            value for position, value in enumerate(choice.compositions) if position != index
+        ]
+        return labels, surfaces, compositions
     return None
 
 
@@ -948,10 +1155,14 @@ def _flash_tp_phase_addition(
     #: search added last. See the "duplicate incipient phase" branch below.
     pending: list[_PhaseInstability] = []
     added_index: int | None = len(current_labels) - 1 if additions else None
+    #: Removals whose *other* candidates have not been tried, newest last. See
+    #: the "the removal was the wrong one" branch below (ADR-0029).
+    undo: list[_RemovalChoice] = []
     removals = 0
     total_ssi = 0
     total_second_order = 0
     total_rr = 0
+    total_log_space = 0
 
     for _round in range(rounds):
         solution = _solve_phase_set(
@@ -964,15 +1175,41 @@ def _flash_tp_phase_addition(
         total_ssi += solution.ssi_iterations
         total_second_order += solution.second_order_iterations
         total_rr += solution.rr_iterations
+        total_log_space += solution.log_space_iterations
 
         if solution.removal_index is not None:
             if len(current_labels) <= 2:
-                raise ConvergenceError(
-                    "A two-phase set converged to a non-positive phase fraction, which "
-                    "would leave no split at all. This is a solver failure, not a phase "
-                    "count: the tangent-plane test had already proved the feed unstable."
-                )
+                # ADR-0029: the removal that produced this pair was a *choice*
+                # among the phases the previous solve named, and a two-phase
+                # set with a non-positive fraction is that choice turning out
+                # to be wrong - the feed is not inside this pair's tie line,
+                # while the tangent-plane test has proved it is not one phase
+                # either. Undo the removal and take the next candidate. The
+                # measured state: PC-SAFT water / n-hexane, z_water = 0.05,
+                # just above T3, where LLV recedes, the recession direction
+                # names the *hexane-rich* liquid as the phase leaving, and the
+                # water-rich pair that is left over then negative-flashes; the
+                # answer is the pair the other removal leaves (Case P-18 (i)).
+                restored = _take_next_removal(undo)
+                if restored is None:
+                    raise ConvergenceError(
+                        "A two-phase set converged to a non-positive phase fraction, which "
+                        "would leave no split at all. This is a solver failure, not a phase "
+                        "count: the tangent-plane test had already proved the feed unstable."
+                    )
+                current_labels, current_surfaces, current = restored
+                removals += 1
+                added_index = None
+                history.append(_phase_set_label(current_labels))
+                continue
             index = solution.removal_index
+            _record_removal(
+                undo,
+                labels=current_labels,
+                surfaces=current_surfaces,
+                compositions=solution.compositions,
+                candidates=solution.removal_order,
+            )
             # ADR-0020: a phase the search has just added, removed again by the
             # multiphase Rachford-Rice *before it could move*, is a stationary
             # point that duplicates a phase already in the set - not a phase
@@ -1067,6 +1304,7 @@ def _flash_tp_phase_addition(
             total_ssi=total_ssi,
             total_second_order=total_second_order,
             total_rr=total_rr,
+            total_log_space=total_log_space,
         )
 
     raise ConvergenceError(
@@ -1096,6 +1334,7 @@ def _assemble(
     total_ssi: int,
     total_second_order: int,
     total_rr: int,
+    total_log_space: int,
 ) -> FlashResult:
     """Verify the converged phase set and build the `FlashResult`.
 
@@ -1146,6 +1385,11 @@ def _assemble(
         **model.label_diagnostics(measured),
         **report.diagnostics,
     }
+    if total_log_space:
+        # Conditional, on the ADR-0016 principle: a phase set that converged
+        # without the ADR-0029 stage carries the diagnostics mapping it carried
+        # before that slice, key for key.
+        diagnostics["log_space_iterations"] = total_log_space
     if two_phase_g_rt is not None:
         diagnostics["delta_g_vs_two_phase_rt"] = split_g - two_phase_g_rt
 
