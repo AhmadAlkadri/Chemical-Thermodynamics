@@ -38,7 +38,13 @@ import numpy as np
 from ..core import Mixture
 from ..exceptions import ConvergenceError, ModelError
 from ..models import ActivityModel, EquationOfState
-from ._common import EosBranchTerms, as_float_array, eos_branch_terms, normalize_composition
+from ._common import (
+    EosBranchTerms,
+    as_float_array,
+    eos_branch_terms,
+    eos_branch_terms_all,
+    normalize_composition,
+)
 from .settings import FlashSettings
 
 
@@ -459,12 +465,26 @@ class _PhaseRoot:
                 return terms
             self.fallbacks += 1
 
+        # The lowest-Gibbs rule has to see both roots, so it asks for both in
+        # one call: at the same composition two per-branch asks make the model
+        # solve for its density roots twice, for roots equal to the last bit
+        # (ADR-0023). The pinned branch above deliberately does not come
+        # through here - it has no use for the other root.
+        branches = eos_branch_terms_all(
+            self._eos,
+            mixture=self._mixture,
+            temperature=self._temperature,
+            pressure=self._pressure,
+            composition=w,
+            phases=_ROOT_BRANCHES,
+        )
         best: EosBranchTerms | None = None
         best_label = ""
         best_g = math.inf
         for label in _ROOT_BRANCHES:
-            terms = self._branch_terms(label, w, failures)
+            terms = branches.terms.get(label)
             if terms is None:
+                failures.append(f"{label}: {branches.failures[label]}")
                 continue
             g_res = float(np.sum(w * terms.ln_phi))
             if not math.isfinite(g_res):

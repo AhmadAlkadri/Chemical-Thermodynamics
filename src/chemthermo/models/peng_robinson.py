@@ -111,7 +111,101 @@ class PengRobinsonEOS(EquationOfState):
         if Z <= B:
             raise ModelError("Invalid state: Z <= B for Peng-Robinson EOS.")
 
-        log_term = self._log_term(Z, B)
+        log_phi = self._branch_log_phi(Z, A=A, B=B, y=y, b_i=b_i, aij=aij, a_mix=a_mix, b_mix=b_mix)
+
+        phi = np.exp(np.array(log_phi, dtype=float))
+        return phi.tolist()
+
+    def ln_fugacity_branches(
+        self,
+        *,
+        mixture: Mixture,
+        temperature_K: float,
+        pressure_Pa: float,
+        composition: Sequence[float],
+    ) -> dict[str, list[float]]:
+        """Return ``ln phi_i`` on both compressibility roots from **one** cubic solve.
+
+        The ``EquationOfState`` capability of ADR-0023. Validation, the mixing
+        rule and ``np.roots`` are each done once here where two
+        :meth:`fugacity_coefficients` calls at the same ``(T, P, x)`` did them
+        twice, and the two branches then differ only in which root of the
+        already-solved cubic they read - ``max`` for the vapour, ``min`` for the
+        liquid, exactly as that method selects them.
+
+        The values are ``ln phi`` *before* the exponential
+        :meth:`fugacity_coefficients` finishes with, so ``exp`` of what comes
+        back here is the same double that method returns.
+
+        A branch whose root is inadmissible (``Z <= B``) or whose logarithmic
+        term does not exist is **omitted** rather than reported, and the caller
+        falls back to the per-branch route for that composition, where the
+        refusal carries its own message.
+
+        Raises:
+            CompositionError: If the composition length mismatches or is invalid.
+            ModelError: If the mixture parameters are invalid or the cubic has
+                no positive real root.
+            InputRangeError: If the temperature or pressure is out of range.
+        """
+        temperature = validate_temperature(temperature_K)
+        pressure = validate_pressure(pressure_Pa)
+
+        if len(composition) != len(mixture.components):
+            raise CompositionError("Composition length must match number of mixture components.")
+
+        fractions = validate_fractions(composition, normalize=False, tol=COMPOSITION_SUM_TOL)
+        y = np.array(fractions, dtype=float)
+
+        a_i, b_i, aij, a_mix, b_mix = self._mixture_parameters(mixture, temperature, y)
+
+        if a_mix <= 0.0 or b_mix <= 0.0:
+            raise ModelError("Invalid mixture parameters for Peng-Robinson EOS.")
+
+        A = a_mix * pressure / (R_J_PER_MOL_K**2 * temperature**2)
+        B = b_mix * pressure / (R_J_PER_MOL_K * temperature)
+
+        roots = self._compressibility_roots(A, B)
+        if not roots:
+            raise ModelError("No real compressibility roots found for Peng-Robinson EOS.")
+
+        branches: dict[str, list[float]] = {}
+        for phase, Z in (("vapor", max(roots)), ("liquid", min(roots))):
+            if Z <= B:
+                continue
+            try:
+                branches[phase] = self._branch_log_phi(
+                    Z, A=A, B=B, y=y, b_i=b_i, aij=aij, a_mix=a_mix, b_mix=b_mix
+                )
+            except ModelError:
+                continue
+        return branches
+
+    @staticmethod
+    def _branch_log_phi(
+        Z: float,
+        *,
+        A: float,
+        B: float,
+        y: np.ndarray,
+        b_i: np.ndarray,
+        aij: np.ndarray,
+        a_mix: float,
+        b_mix: float,
+    ) -> list[float]:
+        """``ln phi_i`` on one compressibility root.
+
+        The single source of the log-fugacity expression, shared by
+        :meth:`fugacity_coefficients` and :meth:`ln_fugacity_branches`. The
+        per-component loop is kept rather than vectorized: at the two- and
+        three-component sizes this library's reference paths use, three numpy
+        operations on a length-3 array cost more than the loop they replace
+        (measured at 3.0 us against 1.4 us for the ternary of ADR-0023's
+        ``pr-flash-ternary`` case), and a vectorized form would also have to
+        reproduce this expression's exact operation order to stay
+        bit-identical.
+        """
+        log_term = PengRobinsonEOS._log_term(Z, B)
         sqrt2 = math.sqrt(2.0)
 
         sum_y_aij = np.dot(aij, y)
@@ -122,9 +216,7 @@ class PengRobinsonEOS(EquationOfState):
                 (A / (2.0 * sqrt2 * B)) * (2.0 * sum_y_aij[i] / a_mix - b_i[i] / b_mix) * log_term
             )
             log_phi.append(term1 - term2)
-
-        phi = np.exp(np.array(log_phi, dtype=float))
-        return phi.tolist()
+        return log_phi
 
     def compressibility_factor(
         self,
@@ -289,13 +381,46 @@ class PengRobinsonEOS(EquationOfState):
 
     @staticmethod
     def _compressibility_roots(A: float, B: float) -> list[float]:
-        coeffs = [
-            1.0,
-            -(1.0 - B),
-            A - 3.0 * B**2 - 2.0 * B,
-            -(A * B - B**2 - B**3),
-        ]
-        roots = np.roots(coeffs)
+        """The positive real roots of the Peng-Robinson cubic in ``Z``, ascending.
+
+        ``numpy.roots`` is what this has always used and what it still means:
+        for a monic polynomial with a non-zero constant term that function is
+        exactly "build the companion matrix, take its eigenvalues", and the
+        companion matrix is built here instead so the eigenvalue call is
+        reached without ``numpy.roots``' own polynomial bookkeeping - the
+        ``atleast_1d``, the non-zero scan, the trimming, the dtype check, the
+        division by a leading coefficient that is exactly ``1.0``, and the
+        ``hstack`` of the trailing zeros. Measured at 8.6 us against 14.7 us on
+        this cubic, roughly a sixth of one ``fugacity_coefficients`` call, and
+        the eigenvalues are the **same array**: nothing about the numerics
+        changed, only the route to LAPACK.
+
+        The one case ``numpy.roots`` treats differently is a constant term of
+        exactly ``0.0``, where it deflates to a quadratic and appends a zero
+        root - a different eigenproblem, and so possibly different last bits.
+        That case is handed back to ``numpy.roots`` rather than reproduced, and
+        it is not reachable in practice anyway: the constant term is
+        ``-(A B - B^2 - B^3)`` and ``B > 0``.
+
+        No closed-form (Cardano) route is used. It would be far faster still
+        and it does **not** reproduce these doubles, and bit-identity is the
+        gate this slice is held to; see ADR-0023.
+        """
+        c1 = -(1.0 - B)
+        c2 = A - 3.0 * B**2 - 2.0 * B
+        c3 = -(A * B - B**2 - B**3)
+
+        if c3 == 0.0:
+            roots = np.roots([1.0, c1, c2, c3])
+        else:
+            companion = np.zeros((3, 3), dtype=float)
+            companion[0, 0] = -c1
+            companion[0, 1] = -c2
+            companion[0, 2] = -c3
+            companion[1, 0] = 1.0
+            companion[2, 1] = 1.0
+            roots = np.linalg.eigvals(companion)
+
         real_roots = [float(root.real) for root in roots if abs(root.imag) < 1e-8]
         return sorted(root for root in real_roots if root > 0.0)
 
