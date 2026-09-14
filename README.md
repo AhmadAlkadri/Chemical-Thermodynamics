@@ -264,8 +264,18 @@ before:
 A result that needed the second stage says so, and **only then** carries the
 extra keys `converged_stage`, `ssi_iterations`, `second_order_iterations` and
 `negative_flash_steps` - read them with `.get()`. A converged vapor fraction
-outside `(0, 1)` is still an error: it contradicts the stability verdict that
-started the split.
+outside `(0, 1)` is still an error after the stage has run: it contradicts the
+stability verdict that started the split. (Since ADR-0024 a first stage that
+converges *on* such a vapor fraction - the trivial solution - is handed to the
+second-order stage before that error is raised, rather than refused outright.)
+
+Since ADR-0024 there is a **third** stage for splits whose compositions leave
+machine range - a polymer/solvent vapour-liquid state, where the equilibrium
+vapour holds `exp(-450)` of polymer and the tangent-plane minimizer's K-values
+bracket no vapor fraction at all. It is the same Gibbs minimization written in
+`u = ln n`, it runs only where the first two cannot, and it reports
+`converged_stage = "second-order-log"` plus `log_space_*` keys. See
+[Polymers](#polymers-adr-0022) and ADR-0024.
 
 `FlashSettings(second_order=False)` turns the stage off;
 `phase_detection="wilson-heuristic"` is the full pre-ADR-0016 behavior and
@@ -1163,15 +1173,44 @@ untouched - `ComponentData` still requires `Tc` / `Pc` / `omega` and
   double, so every previously converging number is unchanged. Measured: 0 of
   274 branch evaluations in log space for water / n-hexane, 0 of 600 for the
   `Mw = 16400` polymer, 1025 of 1025 for the `Mw = 53000` one.
-- **Below the solvent's saturation pressure the split does not converge.** At
-  453 K and under about 3 MPa n-pentane still has a vapour root, the
-  equilibrium is vapour-liquid rather than liquid-liquid, and `flash_tp` raises
-  `ConvergenceError` while `stability_tp` still reports the feed unstable. That
-  gap is pinned by test, not worked around.
+- **Below the solvent's saturation pressure the equilibrium is vapour-liquid,
+  and the split runs in log mole numbers** (ADR-0024). At 453 K and under about
+  2.6 MPa n-pentane still has a vapour root, and the answer is a solvent vapour
+  over a solvent-swollen melt: at 1 MPa the melt holds `x_pentane = 0.971468`
+  (13 wt% solvent) and the vapour holds `ln y_polymer = -450.53`. Neither the
+  seed nor the iteration fits in linear mole numbers - the tangent-plane
+  minimizer is an essentially pure melt whose K-values span `1e+180` and
+  bracket no Rachford-Rice root at all - so `flash_tp` seeds and finishes that
+  split in `u = ln n` instead, and says so in
+  `diagnostics["converged_stage"] == "second-order-log"`. Every state that
+  converged before ADR-0024 still takes the ordinary path, bit for bit.
 
-See ADR-0022, validation Cases P-12 and P-13,
-`examples/basic/pcsaft_polymer_demo.py` and
-`examples/validation/20_pcsaft_polymer_vs_feos.py`.
+  ```python
+  result = ct.flash_tp(mixture, temperature_K=453.0, pressure_Pa=1.0e6, eos=eos)
+  result.phases["liquid"].composition.fractions   # (0.0285316, 0.9714684) - the melt
+  result.vapor_fraction                           # 0.99189
+  result.diagnostics["log_space_ln_x_min"]        # -450.53 = ln y_polymer
+  ```
+
+- **A mole fraction may come back as exactly `0.0`.** For a `Mw = 53000` chain
+  the vapour's polymer mole fraction is `exp(-1315)`, and `0.0` is the nearest
+  double there is. The number is not lost - it is
+  `diagnostics["log_space_ln_x_min"]` for the component named in
+  `["log_space_ln_x_min_component"]` - and the material balance is then
+  *exact*, because the melt holds every mole of polymer the feed had. Read
+  `diagnostics["log_space_residual"]` for that component's equal-fugacity
+  residual: `fugacity_residual` is taken over the components present in both
+  phases and cannot see it.
+
+- **The longest chain below 1 MPa is still out of reach.** `Mw = 53000` at 0.5
+  and 1 MPa does not converge, because `stability_tp`'s deepest stationary
+  point there is a shallow vapour-side one and the melt is never found. That is
+  a stability trial-set limitation for `m = 1393.9`, pinned by test.
+
+See ADR-0022 and ADR-0024, validation Cases P-12, P-13 and P-14,
+`examples/basic/pcsaft_polymer_demo.py`,
+`examples/validation/20_pcsaft_polymer_vs_feos.py` and
+`examples/validation/21_pcsaft_polymer_vle.py`.
 
 ### Association (ADR-0018)
 
@@ -1312,6 +1351,16 @@ from `chemthermo` if you prefer to build the block as an object.
   both sides. The fitted-`k_ij` answer is checked against an independently
   written two-equation Newton instead, to 1.7e-15. See validation Cases P-12
   and P-13 and `examples/validation/20_pcsaft_polymer_vs_feos.py`.
+- The polymer/solvent **vapour-liquid** split of ADR-0024 is validated the same
+  way, one regime lower in pressure: at 0.5, 1 and 2 MPa FeOs's chemical
+  potentials at chemthermo's converged phases are equal to **2.6e-12** with
+  matched universal constants (2.5e-07 as shipped), and the melt's solvent
+  mole fraction agrees with a one-dimensional equal-fugacity solve - the vapour
+  taken as exactly pure solvent - to 1.2e-15 - 2.5e-14 absolute, at the fitted
+  `k_ij = -0.006`. The polymer's own equal-fugacity condition, which is only
+  writable in logarithms (`ln f_polymer` of -492 to -531), closes to 7.4e-13.
+  See validation Case P-14 and
+  `examples/validation/21_pcsaft_polymer_vle.py`.
 
 ## EOS extension points
 
