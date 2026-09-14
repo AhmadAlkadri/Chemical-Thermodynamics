@@ -40,30 +40,45 @@ What it is **not**
 
 The grids
 ---------
-Six families, ~2100 states, every one of them fixed in this module and
-documented at its definition below:
+Ten families, every one of them fixed in this module and documented at its
+definition below. The first six are the ADR-0027 grid; the last four
+(ADR-0027 amendment, "robustness-map-coverage") fill the gaps that ADR-0027 /
+ADR-0028 named as unranked: EOS three-phase windows, the legacy ``gamma-phi``
+mode, near-critical PR states and the CO2/n-decane / methane/n-pentane windows
+that produced past defects, and associating ternaries.
 
-======================  =======  =================================================
-family                  states   what it sweeps
-======================  =======  =================================================
-``pr-phi-phi``            1270   8 Peng-Robinson mixtures over the Case F-1 wide
-                                 scan (11 T x 13 P), plus a second feed for each
-                                 ternary on a coarser grid
-``pcsaft``                 204   the 188-state Case F-4 grid, plus two nonzero
-                                 ``kij`` binaries at 8 states each
-``pcsaft-associating``     260   water / n-hexane, water / ethanol, water /
-                                 1-propanol / n-hexane, methanol / n-hexane over
-                                 4 T x 5 P x 3-4 feeds
-``modified-raoult``        108   Tessier P1 ternary and P2 quaternary at 1 atm
-                                 over 5 T x 8 feeds, plus water / 1-butanol
-``gamma-gamma``             16   the Tessier P1 / P2 feeds, activity-only
-``polymer``                252   PE 16400 and PE 53000 in n-pentane at 453 K,
-                                 0.3-12 MPa, 3 weight fractions, plus a ternary
-======================  =======  =================================================
+===============================  =======  =============================================
+family                            states   what it sweeps
+===============================  =======  =============================================
+``pr-phi-phi``                     1270   8 Peng-Robinson mixtures over the Case F-1 wide
+                                          scan (11 T x 13 P), plus a second feed for each
+                                          ternary on a coarser grid
+``pcsaft``                          204   the 188-state Case F-4 grid, plus two nonzero
+                                          ``kij`` binaries at 8 states each
+``pcsaft-associating``               260   water / n-hexane, water / ethanol, water /
+                                          1-propanol / n-hexane, methanol / n-hexane over
+                                          4 T x 5 P x 3-4 feeds
+``modified-raoult``                  108   Tessier P1 ternary and P2 quaternary at 1 atm
+                                          over 5 T x 8 feeds, plus water / 1-butanol
+``gamma-gamma``                       16   the Tessier P1 / P2 feeds, activity-only
+``polymer``                          252   PE 16400 and PE 53000 in n-pentane at 453 K,
+                                          0.3-12 MPa, 3 weight fractions, plus a ternary
+``eos-three-phase``                  117   PC-SAFT water/n-hexane around T3 (Case P-9),
+                                          PC-SAFT and Peng-Robinson water/ethanol/n-hexane
+                                          tie-triangles (Case P-10)
+``gamma-phi-legacy``                  30   the deprecated ``flash_mode="gamma-phi"`` path,
+                                          NRTL-packaged Methane/Ethane, over the CLI's
+                                          state and a small T/P grid
+``pr-near-critical``                 104   Peng-Robinson near the two-phase boundary of
+                                          two mixtures, plus Case F-2 and the CO2/n-decane
+                                          / methane/n-pentane defect windows
+``pcsaft-associating-ternary``       144   water/ethanol/n-hexane and water/1-propanol/
+                                          n-hexane PC-SAFT over 3 T x 3 P x 8 feeds
+===============================  =======  =============================================
 
 ``--family NAME`` runs one family, so the sweep partitions and resumes.
-``--quick`` runs a fixed ~150-state subset across all six, cheap enough for the
-default test suite; see :data:`QUICK_NOTE`.
+``--quick`` runs a fixed cost-bounded subset across all ten, cheap enough for
+the default test suite; see :data:`QUICK_NOTE`.
 
 Classification
 --------------
@@ -142,6 +157,10 @@ FAMILIES: tuple[str, ...] = (
     "modified-raoult",
     "gamma-gamma",
     "polymer",
+    "eos-three-phase",
+    "gamma-phi-legacy",
+    "pr-near-critical",
+    "pcsaft-associating-ternary",
 )
 
 VERDICTS: tuple[str, ...] = (
@@ -174,12 +193,16 @@ INVARIANT_VIOLATED = "converged-invariant-violated"
 QUICK_NOTE = (
     "The quick subset is a fixed offset/stride sample of each system's state list "
     "plus explicitly pinned states. It is COST-BOUNDED, not representative: the "
-    "offsets and strides of the three PC-SAFT families were chosen from the full "
-    "run's per-state wall times so that the default test suite stays inside its "
-    "budget, and the pinned indices are refusal states, one per refusal stage the "
-    "full sweep found that costs under ~1.5 s. Read it as a smoke test of the "
-    "instrument plus those pinned defects - 171 states in about 9 s, against 2110 "
-    "states in about 15 minutes for the full map."
+    "offsets and strides of the costly families (the three original PC-SAFT ones "
+    "plus the eos-three-phase and pcsaft-associating-ternary families slice "
+    "robustness-map-coverage added) were chosen from the full run's per-state wall "
+    "times so that the default test suite stays inside its budget, and the pinned "
+    "indices are refusal states, one per refusal stage the full sweep found that "
+    "costs under ~1.5 s (a PC-SAFT three-phase state can cost 13-40 s, so those "
+    "families' quick bucket counts are not representative of their full-sweep "
+    "verdict mix). Read it as a smoke test of the instrument plus those pinned "
+    "defects - 224 states in about 14 s, against 2505 states in about 37 minutes "
+    "for the full map."
 )
 
 
@@ -398,9 +421,27 @@ def _invariant_violations(
         if not (delta_g < 0.0):
             violations.append(f"delta_g_split_rt = {delta_g!r} is not negative")
 
-    # The post-split stability test must have passed where it ran.
+    # The post-split stability test must have passed where it ran. The legacy
+    # gamma-phi path never sets `post_split_checked` (ADR-0007, ADR-0010: it
+    # has no stability test to check against), so this is silently dormant
+    # there by construction - not by a family-specific carve-out - and the
+    # `gamma-phi-legacy` family's summary says so explicitly rather than
+    # relying on that absence to be read correctly.
     if diagnostics.get("post_split_checked") and diagnostics.get("post_split_status") != "stable":
         violations.append(f"post_split_status = {diagnostics.get('post_split_status')!r}")
+
+    # A three-phase answer must be the lower-Gibbs choice against the
+    # two-phase pair the ADR-0011/ADR-0020 phase addition/removal search
+    # started from. Present only on a result that entered the search and
+    # returned three phases; absent everywhere else (a two-phase answer, or a
+    # result the search never touched), so this is dormant on every family
+    # but `eos-three-phase` and the rare state elsewhere that lands on three
+    # phases by chance.
+    if len(names) == 3 and "delta_g_vs_two_phase_rt" in diagnostics:
+        delta_g_vs_two_phase = float(diagnostics["delta_g_vs_two_phase_rt"])
+        residuals["delta_g_vs_two_phase_rt"] = delta_g_vs_two_phase
+        if not (delta_g_vs_two_phase < 0.0):
+            violations.append(f"delta_g_vs_two_phase_rt = {delta_g_vs_two_phase!r} is not negative")
 
     return violations, residuals
 
@@ -457,6 +498,31 @@ def _pr_prepare(names: Sequence[str], z: Sequence[float]) -> Callable[[], Any]:
 
 def _pr_flash(context: Any, spec: StateSpec) -> ct.FlashResult:
     mixture, eos = context
+    return ct.flash_tp(
+        mixture, temperature_K=spec.temperature_K, pressure_Pa=spec.pressure_Pa, eos=eos
+    )
+
+
+def _pr_composition_prepare(names: Sequence[str]) -> Callable[[], Any]:
+    """Like :func:`_pr_prepare`, but the composition varies within one system.
+
+    ``_pr_prepare`` fixes ``z`` at prepare time and ``_pr_flash`` ignores
+    ``spec.composition`` entirely, which is fine where every state of a
+    system shares one feed (every ``pr-phi-phi`` and ``pr-near-critical``
+    system does). The ``eos-three-phase`` PR ternary sweeps 12 feeds within
+    one system, so it needs the mixture rebuilt per state instead - the same
+    shape :func:`_pcsaft_prepare` / :func:`_pcsaft_flash` already use.
+    """
+
+    def prepare() -> Any:
+        return tuple(names), PengRobinsonEOS()
+
+    return prepare
+
+
+def _pr_composition_flash(context: Any, spec: StateSpec) -> ct.FlashResult:
+    names, eos = context
+    mixture = ct.Mixture.from_database(list(names), list(spec.composition), normalize=True)
     return ct.flash_tp(
         mixture, temperature_K=spec.temperature_K, pressure_Pa=spec.pressure_Pa, eos=eos
     )
@@ -1033,6 +1099,416 @@ def _polymer_systems() -> list[RobustnessSystem]:
 
 
 # ---------------------------------------------------------------------------
+# Family 7: EOS three-phase windows (slice robustness-map-coverage)
+# ---------------------------------------------------------------------------
+#
+# ADR-0027's "What remains" and brain.md roadmap item 1 named this the biggest
+# gap: "no three-phase EOS window is in the grid (the only VLLE states are 4
+# modified-Raoult ones)". ADR-0011 / ADR-0020 gave `flash_tp` a phase
+# addition/removal search that serves both the activity path and an equation
+# of state; this family sweeps the three windows that search is validated on
+# (Cases P-9, P-10) instead of the single feed each ledger case happens to
+# pin.
+
+#: The water / n-hexane three-phase temperature, from the independent
+#: 4-equation Newton of validation Case P-9 (`tests/test_flash_vlle_eos.py`,
+#: residual 1.74e-12, cross-checked against FeOs to 6.8e-11). Cited here
+#: rather than re-derived, so building the grid needs no solve.
+EOS3P_T3_K = 334.807826336
+
+#: Offsets around T3: four below (where the search runs V -> LV -> LLV -> LL,
+#: Case P-9 (i)), the point itself (Case P-9 (iii), no three-phase
+#: `FlashResult` claimed - Gibbs' phase rule), four above (Case P-9 (ii),
+#: straight VLE, the search is not entered).
+EOS3P_T3_OFFSETS_K: tuple[float, ...] = (-1.0, -0.5, -0.1, -0.01, 0.0, 0.01, 0.1, 0.5, 1.0)
+EOS3P_WATER_HEXANE_Z: tuple[float, ...] = (0.05, 0.3, 0.5, 0.7, 0.95)
+
+#: PC-SAFT water / ethanol / n-hexane tie-triangle temperatures: 333 K is
+#: Case P-10 (i)'s validated VLLE point, 331/335/337 K bracket it (Case P-10
+#: (i) itself scans 328-337 K and finds the region closes below ~331 K).
+EOS3P_TERNARY_T_K: tuple[float, ...] = (331.0, 333.0, 335.0, 337.0)
+
+#: A coarse simplex grid, every mole fraction strictly positive as
+#: `test_every_swept_composition_is_a_normalizable_feed` requires: the three
+#: corners, the three edge midpoints, three interior points, the centroid and
+#: two of the feeds Case P-10 itself already uses (kept for continuity, not
+#: because they are special).
+EOS3P_TERNARY_FEEDS: tuple[tuple[float, float, float], ...] = (
+    (0.8, 0.1, 0.1),
+    (0.1, 0.8, 0.1),
+    (0.1, 0.1, 0.8),
+    (0.6, 0.2, 0.2),
+    (0.2, 0.6, 0.2),
+    (0.2, 0.2, 0.6),
+    (0.4, 0.4, 0.2),
+    (0.4, 0.2, 0.4),
+    (0.2, 0.4, 0.4),
+    (0.34, 0.33, 0.33),
+    (0.5, 0.3, 0.2),
+    (0.3, 0.3, 0.4),
+)
+
+#: The Peng-Robinson three-*liquid* temperature of Case P-10 (ii) (280 K) and
+#: a second temperature on the same feed grid (300 K), `kij = 0` throughout.
+EOS3P_PR_T_K: tuple[float, ...] = (280.0, 300.0)
+
+
+def _eos_three_phase_systems() -> list[RobustnessSystem]:
+    built: list[RobustnessSystem] = []
+
+    t3_states = tuple(
+        StateSpec((z1, 1.0 - z1), EOS3P_T3_K + offset, ATMOSPHERE_PA)
+        for offset in EOS3P_T3_OFFSETS_K
+        for z1 in EOS3P_WATER_HEXANE_Z
+    )
+    built.append(
+        RobustnessSystem(
+            family="eos-three-phase",
+            name="eos3p-pcsaft-water-n-hexane-t3-scan",
+            description=(
+                "Water/n-Hexane PC-SAFT (2B water, kij = 0) at 1 atm, T3 +/- 1 K "
+                f"({len(EOS3P_T3_OFFSETS_K)} offsets) x {len(EOS3P_WATER_HEXANE_Z)} "
+                "z_water feeds (Case P-9)"
+            ),
+            components=("Water", "n-Hexane"),
+            model="PC-SAFT (2B association, kij = 0)",
+            route="flash_tp (phi-phi, phase addition/removal, ADR-0020)",
+            prepare=_pcsaft_prepare(("Water", "n-Hexane")),
+            flash=_pcsaft_flash,
+            states=t3_states,
+        )
+    )
+
+    ternary_states = tuple(
+        StateSpec(feed, temperature_K, ATMOSPHERE_PA)
+        for temperature_K in EOS3P_TERNARY_T_K
+        for feed in EOS3P_TERNARY_FEEDS
+    )
+    built.append(
+        RobustnessSystem(
+            family="eos-three-phase",
+            name="eos3p-pcsaft-water-ethanol-n-hexane",
+            description=(
+                "Water/Ethanol/n-Hexane PC-SAFT (2B water, 2B ethanol, kij = 0) at "
+                f"1 atm, {len(EOS3P_TERNARY_T_K)} T x {len(EOS3P_TERNARY_FEEDS)} feeds "
+                "(Case P-10 tie-triangle)"
+            ),
+            components=("Water", "Ethanol", "n-Hexane"),
+            model="PC-SAFT (2B association, kij = 0)",
+            route="flash_tp (phi-phi, phase addition/removal, ADR-0020)",
+            prepare=_pcsaft_prepare(("Water", "Ethanol", "n-Hexane")),
+            flash=_pcsaft_flash,
+            states=ternary_states,
+        )
+    )
+
+    pr_states = tuple(
+        StateSpec(feed, temperature_K, ATMOSPHERE_PA)
+        for temperature_K in EOS3P_PR_T_K
+        for feed in EOS3P_TERNARY_FEEDS
+    )
+    built.append(
+        RobustnessSystem(
+            family="eos-three-phase",
+            name="eos3p-pr-water-ethanol-n-hexane",
+            description=(
+                "Water/Ethanol/n-Hexane Peng-Robinson (kij = 0) at 1 atm, "
+                f"{len(EOS3P_PR_T_K)} T x {len(EOS3P_TERNARY_FEEDS)} feeds "
+                "(Case P-10 three-liquid state)"
+            ),
+            components=("Water", "Ethanol", "n-Hexane"),
+            model="Peng-Robinson (kij = 0)",
+            route="flash_tp (phi-phi, phase addition/removal, ADR-0020)",
+            prepare=_pr_composition_prepare(("Water", "Ethanol", "n-Hexane")),
+            flash=_pr_composition_flash,
+            states=pr_states,
+        )
+    )
+    return built
+
+
+# ---------------------------------------------------------------------------
+# Family 8: the legacy gamma-phi path
+# ---------------------------------------------------------------------------
+#
+# ADR-0027's roadmap said it plainly: "`gamma-phi` is not swept at all".
+# `flash_mode="gamma-phi"` has been DEPRECATED since ADR-0010 - no stability
+# test (ADR-0007), Wilson-heuristic phase detection only (ADR-0008 decision
+# 4) - but it is still public and still reachable from the CLI
+# (`--flash-mode gamma-phi`), whose only packaged activity parameters are the
+# synthetic Methane/Ethane NRTL pair (`tests/fixtures` has no gamma-phi
+# fixture; the pair lives in `chemthermo/parameters/data/activity/nrtl.json`).
+# This family sweeps it on that pair with Peng-Robinson, over a grid that
+# contains the CLI contract test's exact state (240 K, 3 MPa,
+# `tests/test_cli_tp_flash.py`).
+
+GAMMA_PHI_LEGACY_NAMES: tuple[str, ...] = ("Methane", "Ethane")
+GAMMA_PHI_LEGACY_Z: tuple[float, float] = (0.5, 0.5)
+GAMMA_PHI_LEGACY_T_K: tuple[float, ...] = (200.0, 220.0, 240.0, 260.0, 280.0, 300.0)
+GAMMA_PHI_LEGACY_P_PA: tuple[float, ...] = (1.0e6, 2.0e6, 3.0e6, 4.0e6, 5.0e6)
+
+
+def _gamma_phi_legacy_prepare() -> Callable[[], Any]:
+    def prepare() -> Any:
+        mixture = ct.Mixture.from_database(
+            list(GAMMA_PHI_LEGACY_NAMES), list(GAMMA_PHI_LEGACY_Z), normalize=True
+        )
+        return mixture, PengRobinsonEOS(), ct.NRTL()
+
+    return prepare
+
+
+def _gamma_phi_legacy_flash(context: Any, spec: StateSpec) -> ct.FlashResult:
+    mixture, eos, model = context
+    return ct.flash_tp(
+        mixture,
+        temperature_K=spec.temperature_K,
+        pressure_Pa=spec.pressure_Pa,
+        eos=eos,
+        activity_model=model,
+        flash_mode="gamma-phi",
+    )
+
+
+def _gamma_phi_legacy_systems() -> list[RobustnessSystem]:
+    states = tuple(
+        StateSpec(GAMMA_PHI_LEGACY_Z, temperature_K, pressure_Pa)
+        for temperature_K in GAMMA_PHI_LEGACY_T_K
+        for pressure_Pa in GAMMA_PHI_LEGACY_P_PA
+    )
+    return [
+        RobustnessSystem(
+            family="gamma-phi-legacy",
+            name="gammaphi-methane-ethane",
+            description=(
+                "Methane/Ethane z=(0.5, 0.5), NRTL (packaged synthetic pair) + "
+                f"Peng-Robinson, DEPRECATED gamma-phi mode, {len(GAMMA_PHI_LEGACY_T_K)} T "
+                f"x {len(GAMMA_PHI_LEGACY_P_PA)} P including the CLI contract state "
+                "(240 K, 3 MPa)"
+            ),
+            components=GAMMA_PHI_LEGACY_NAMES,
+            model="Peng-Robinson (kij = 0) vapor / NRTL (synthetic pair) liquid",
+            route="flash_tp (gamma-phi, DEPRECATED, ADR-0010)",
+            prepare=_gamma_phi_legacy_prepare(),
+            flash=_gamma_phi_legacy_flash,
+            states=states,
+        )
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Family 9: Peng-Robinson near-critical and past-defect windows
+# ---------------------------------------------------------------------------
+#
+# Two mixtures swept fine around a two-phase boundary located here by
+# bisecting `stability_tp`'s verdict (stable / unstable) - a plain binary
+# search on pressure at a fixed anchor temperature, run once and its result
+# cited as a constant (like `EOS3P_T3_K` above), so building the grid needs no
+# solve. Both anchors are states this repository already names: the
+# Methane/Ethane/Propane one is ADR-0016's own words, "the weakly unstable
+# near-critical methane/ethane/propane at 290 K / 8 MPa"; the Methane/n-Pentane
+# one is Case F-2's disagreement state. Plus Case F-2's three states verbatim,
+# and two more windows - CO2/n-decane around the ADR-0016 negative-flash
+# defect state (PC-SAFT there, Peng-Robinson here: new coverage of the same
+# binary and state) and a second Methane/n-Pentane window - both "windows that
+# produced past defects" per the slice declaration.
+NEARCRIT_MEP_NAMES: tuple[str, ...] = ("Methane", "Ethane", "Propane")
+NEARCRIT_MEP_Z: tuple[float, ...] = (0.5, 0.3, 0.2)
+NEARCRIT_MEP_T0_K = 290.0
+#: Bisected on stability_tp's stable/unstable verdict at T0, 60 iterations
+#: halving a (8.0e6, 8.2e6) Pa bracket: stable above, unstable below, to a
+#: final bracket width under 2e-9 Pa.
+NEARCRIT_MEP_P0_PA = 8_076_427.991645763
+
+NEARCRIT_MP_NAMES: tuple[str, ...] = ("Methane", "n-Pentane")
+NEARCRIT_MP_Z: tuple[float, ...] = (0.6, 0.4)
+NEARCRIT_MP_T0_K = 175.0
+#: Bisected the same way over a (1.778e6, 2.0e6) Pa bracket.
+NEARCRIT_MP_P0_PA = 1_884_640.4242924503
+
+#: Case F-2's disagreement state and its two further states (all
+#: Methane(0.6)/n-Pentane(0.4)): the legacy Wilson heuristic calls each one
+#: single-phase, the tangent plane finds a two-phase split, and both agree
+#: with `thermo`'s `FlashVL` and a Gibbs-energy comparison.
+F2_STATES_K_PA: tuple[tuple[float, float], ...] = (
+    (175.0, 1.778e6),
+    (150.0, 6.8399e5),
+    (210.0, 4.6784e6),
+)
+
+#: CO2/n-decane around the ADR-0016 negative-flash defect state (successive
+#: substitution oscillates without a curvature-safeguarded stage; PC-SAFT
+#: there, `kij = 0`).
+CO2_DECANE_WINDOW_NAMES: tuple[str, ...] = ("Carbon dioxide", "n-Decane")
+CO2_DECANE_WINDOW_Z: tuple[float, float] = (0.9, 0.1)
+CO2_DECANE_WINDOW_T_K: tuple[float, ...] = (230.0, 240.0, 250.0)
+CO2_DECANE_WINDOW_P_PA: tuple[float, ...] = (0.5e6, 1.0e6, 1.5e6, 2.0e6)
+
+#: A second Methane/n-Pentane window, away from Case F-2's own three states,
+#: bracketing the Rachford-Rice region found while bisecting
+#: `NEARCRIT_MP_P0_PA` above.
+METHANE_PENTANE_WINDOW_T_K: tuple[float, ...] = (185.0, 195.0, 205.0)
+METHANE_PENTANE_WINDOW_P_PA: tuple[float, ...] = (1.5e6, 2.5e6, 3.5e6)
+
+
+def _nearcrit_grid_states(
+    composition: tuple[float, ...], t0_k: float, p0_pa: float
+) -> tuple[StateSpec, ...]:
+    """8 T x 5 P states: T0 +/- 5 K, P0 +/- 10 %, around a bisected boundary."""
+    temperatures = tuple(t0_k - 5.0 + 10.0 * i / 7.0 for i in range(8))
+    pressures = tuple(p0_pa * (0.9 + 0.2 * i / 4.0) for i in range(5))
+    return tuple(
+        StateSpec(composition, temperature_K, pressure_Pa)
+        for temperature_K in temperatures
+        for pressure_Pa in pressures
+    )
+
+
+def _nearcrit_systems() -> list[RobustnessSystem]:
+    return [
+        RobustnessSystem(
+            family="pr-near-critical",
+            name="nearcrit-methane-ethane-propane",
+            description=(
+                "Methane/Ethane/Propane z=(0.5, 0.3, 0.2), 8 T x 5 P around the "
+                f"boundary at {NEARCRIT_MEP_T0_K:g} K located by bisecting "
+                "stability_tp (ADR-0016's near-critical state)"
+            ),
+            components=NEARCRIT_MEP_NAMES,
+            model="Peng-Robinson (kij = 0)",
+            route="flash_tp (phi-phi)",
+            prepare=_pr_prepare(NEARCRIT_MEP_NAMES, NEARCRIT_MEP_Z),
+            flash=_pr_flash,
+            states=_nearcrit_grid_states(NEARCRIT_MEP_Z, NEARCRIT_MEP_T0_K, NEARCRIT_MEP_P0_PA),
+        ),
+        RobustnessSystem(
+            family="pr-near-critical",
+            name="nearcrit-methane-n-pentane",
+            description=(
+                "Methane/n-Pentane z=(0.6, 0.4), 8 T x 5 P around the boundary at "
+                f"{NEARCRIT_MP_T0_K:g} K located by bisecting stability_tp"
+            ),
+            components=NEARCRIT_MP_NAMES,
+            model="Peng-Robinson (kij = 0)",
+            route="flash_tp (phi-phi)",
+            prepare=_pr_prepare(NEARCRIT_MP_NAMES, NEARCRIT_MP_Z),
+            flash=_pr_flash,
+            states=_nearcrit_grid_states(NEARCRIT_MP_Z, NEARCRIT_MP_T0_K, NEARCRIT_MP_P0_PA),
+        ),
+        RobustnessSystem(
+            family="pr-near-critical",
+            name="nearcrit-f2-methane-n-pentane",
+            description="Methane/n-Pentane z=(0.6, 0.4), Case F-2's 3 states",
+            components=NEARCRIT_MP_NAMES,
+            model="Peng-Robinson (kij = 0)",
+            route="flash_tp (phi-phi)",
+            prepare=_pr_prepare(NEARCRIT_MP_NAMES, NEARCRIT_MP_Z),
+            flash=_pr_flash,
+            states=tuple(
+                StateSpec(NEARCRIT_MP_Z, temperature_K, pressure_Pa)
+                for temperature_K, pressure_Pa in F2_STATES_K_PA
+            ),
+        ),
+        RobustnessSystem(
+            family="pr-near-critical",
+            name="nearcrit-window-co2-n-decane",
+            description=(
+                "Carbon dioxide/n-Decane z=(0.9, 0.1), 3 T x 4 P around the "
+                "ADR-0016 negative-flash defect state (240 K, 1 MPa; PC-SAFT "
+                "there, Peng-Robinson here)"
+            ),
+            components=CO2_DECANE_WINDOW_NAMES,
+            model="Peng-Robinson (kij = 0)",
+            route="flash_tp (phi-phi)",
+            prepare=_pr_prepare(CO2_DECANE_WINDOW_NAMES, CO2_DECANE_WINDOW_Z),
+            flash=_pr_flash,
+            states=tuple(
+                StateSpec(CO2_DECANE_WINDOW_Z, temperature_K, pressure_Pa)
+                for temperature_K in CO2_DECANE_WINDOW_T_K
+                for pressure_Pa in CO2_DECANE_WINDOW_P_PA
+            ),
+        ),
+        RobustnessSystem(
+            family="pr-near-critical",
+            name="nearcrit-window-methane-n-pentane",
+            description=(
+                "Methane/n-Pentane z=(0.6, 0.4), 3 T x 3 P, a second window away "
+                "from Case F-2's own three states"
+            ),
+            components=NEARCRIT_MP_NAMES,
+            model="Peng-Robinson (kij = 0)",
+            route="flash_tp (phi-phi)",
+            prepare=_pr_prepare(NEARCRIT_MP_NAMES, NEARCRIT_MP_Z),
+            flash=_pr_flash,
+            states=tuple(
+                StateSpec(NEARCRIT_MP_Z, temperature_K, pressure_Pa)
+                for temperature_K in METHANE_PENTANE_WINDOW_T_K
+                for pressure_Pa in METHANE_PENTANE_WINDOW_P_PA
+            ),
+        ),
+    ]
+
+
+# ---------------------------------------------------------------------------
+# Family 10: PC-SAFT associating ternaries near their cloud points
+# ---------------------------------------------------------------------------
+#
+# `pcsaft-associating` (family 3) sweeps four binary/ternary associating
+# systems but only one of them - water/1-propanol/n-hexane - is a ternary.
+# This family adds a second associating ternary and a finer feed grid on both,
+# aimed at their cloud points (the LLE/VLE boundary a ternary tie-line sweep
+# crosses) rather than at the four-feed coverage sample family 3 already has.
+
+ASSOC3_T_K: tuple[float, ...] = (320.0, 340.0, 360.0)
+ASSOC3_P_PA: tuple[float, ...] = (0.1e6, 0.5e6, 1.0e6)
+#: A coarse simplex grid, every mole fraction strictly positive: the three
+#: near-corner points, the three near-edge midpoints, one near-centroid and
+#: the ADR-0022-style 40/30/30 feed.
+ASSOC3_FEEDS: tuple[tuple[float, float, float], ...] = (
+    (0.7, 0.15, 0.15),
+    (0.15, 0.7, 0.15),
+    (0.15, 0.15, 0.7),
+    (0.5, 0.25, 0.25),
+    (0.25, 0.5, 0.25),
+    (0.25, 0.25, 0.5),
+    (0.4, 0.3, 0.3),
+    (0.34, 0.33, 0.33),
+)
+ASSOC3_SYSTEMS: tuple[tuple[str, ...], ...] = (
+    ("Water", "Ethanol", "n-Hexane"),
+    ("Water", "1-Propanol", "n-Hexane"),
+)
+
+
+def _associating_ternary_systems() -> list[RobustnessSystem]:
+    built: list[RobustnessSystem] = []
+    for names in ASSOC3_SYSTEMS:
+        states = tuple(
+            StateSpec(feed, temperature_K, pressure_Pa)
+            for temperature_K in ASSOC3_T_K
+            for pressure_Pa in ASSOC3_P_PA
+            for feed in ASSOC3_FEEDS
+        )
+        built.append(
+            RobustnessSystem(
+                family="pcsaft-associating-ternary",
+                name="assoc3-" + "-".join(name.lower().replace(" ", "") for name in names),
+                description=(
+                    f"{'/'.join(names)}, {len(ASSOC3_T_K)} T x {len(ASSOC3_P_PA)} P x "
+                    f"{len(ASSOC3_FEEDS)} feeds, near their cloud points"
+                ),
+                components=names,
+                model="PC-SAFT (2B association, kij = 0)",
+                route="flash_tp (phi-phi)",
+                prepare=_pcsaft_prepare(names),
+                flash=_pcsaft_flash,
+                states=states,
+            )
+        )
+    return built
+
+
+# ---------------------------------------------------------------------------
 # The sweep
 # ---------------------------------------------------------------------------
 
@@ -1073,6 +1549,27 @@ QUICK_SAMPLING: Mapping[str, tuple[int, int, int | None, tuple[int, ...]]] = {
     "polymer-pe53000-pentane": (39, 73, 2, (0, 106)),
     "polymer-pe16400-pentane-hexane": (4, 1, 1, ()),
     "polymer-pe53000-pentane-hexane": (4, 1, 1, ()),
+    # index 40 = z_water=0.05, T3+1 K: multiphase-solver-failure / collapsed
+    # (a converged two-phase set with a non-positive phase fraction).
+    "eos3p-pcsaft-water-n-hexane-t3-scan": (0, 1, 0, (40,)),
+    # index 13 = feed (0.1, 0.8, 0.1), 333 K: cheap single-phase state (~0.4 s);
+    # the VLLE vertices themselves cost 13-40 s each (ADR-0020) and are left to
+    # the full sweep and the dedicated slow-marked verdict test below.
+    "eos3p-pcsaft-water-ethanol-n-hexane": (0, 1, 0, (13,)),
+    # Every state of this system shares one pressure and one of two
+    # temperatures, so a stride sample risks two feeds landing on the same
+    # (T, P) - ambiguous for the (system, T, P) refusal pin below. Pinned
+    # only: index 4 = feed (0.2, 0.6, 0.2), 280 K (multiphase-solver-failure /
+    # split); index 18 = feed (0.4, 0.4, 0.2), 300 K (same class).
+    "eos3p-pr-water-ethanol-n-hexane": (0, 1, 0, (4, 18)),
+    "nearcrit-methane-ethane-propane": (0, 10, 4, ()),
+    "nearcrit-methane-n-pentane": (0, 10, 4, ()),
+    "nearcrit-window-co2-n-decane": (0, 4, 3, ()),
+    "nearcrit-window-methane-n-pentane": (0, 3, 3, ()),
+    # index 9 = feed (0.15, 0.7, 0.15), 320 K, 0.5 MPa: single-phase, ~0.6 s;
+    # the LLE states cost several seconds each and are left to the full sweep.
+    "assoc3-water-ethanol-n-hexane": (0, 1, 0, (9,)),
+    "assoc3-water-1-propanol-n-hexane": (0, 1, 0, (9,)),
 }
 
 #: Every Peng-Robinson system takes this stride from index 0.
@@ -1100,6 +1597,10 @@ def systems(family: str | None = None) -> tuple[RobustnessSystem, ...]:
     built.extend(_modified_raoult_systems())
     built.extend(_gamma_gamma_systems())
     built.extend(_polymer_systems())
+    built.extend(_eos_three_phase_systems())
+    built.extend(_gamma_phi_legacy_systems())
+    built.extend(_nearcrit_systems())
+    built.extend(_associating_ternary_systems())
     built = [_with_quick_sampling(system) for system in built]
     if family is None:
         return tuple(built)
@@ -1302,8 +1803,8 @@ def run_sweep(
     """Run the sweep and return a complete record.
 
     Args:
-        quick: Run the ~150-state subset instead of the whole map.
-        family: Restrict to one of :data:`FAMILIES`; ``None`` runs all six.
+        quick: Run the ~220-state subset instead of the whole map.
+        family: Restrict to one of :data:`FAMILIES`; ``None`` runs all ten.
         progress: Print one line per system as it finishes.
 
     Returns:
