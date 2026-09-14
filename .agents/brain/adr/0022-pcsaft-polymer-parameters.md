@@ -180,13 +180,14 @@ work of Stage I than after.
 - Tradeoff: the polymer parameters rest on a single secondary source and are
   never packaged, so a user of this capability must supply their own - which is
   the honest state of the art here, not a deficiency of the code.
-- Cost: `pytest -q` goes from 233.2 s for 750 tests to **265.7 s (4:25) for
-  796** - about 19 s of new tests and 8 s of the two new example scripts under
-  `tests/test_examples.py` - and `pytest -q -m slow` gains about 44 s for six
-  more. That is a little over the ~4 min budget; six tests are already marked
-  `slow` per the dev-contract rule (each a finer bisection or a repetition of
-  something the default run brackets) and the rest is the capability itself, so
-  the next lever is Stage I rather than more markers.
+- Cost: `pytest -q` goes from 233.2 s for 750 tests to **265.7 s and 273.6 s
+  for 796** (two runs on the same machine, 4:25 and 4:33) - about 19 s of new tests and 8 s of the two new example scripts under
+  `tests/test_examples.py` - and `pytest -q -m slow` goes from 827 s (13:47)
+  for 22 tests to **856.2 s (14:16) for 28**. The default run is a little over
+  the ~4 min budget; six tests are already marked `slow` per the dev-contract
+  rule (each a finer bisection or a repetition of something the default run
+  brackets) and the rest is the capability itself, so the next lever is
+  Stage I rather than more markers.
 
 ## Next slice
 `perf-profile-baseline` (Stage I), unchanged from `brain.md`'s recommendation:
