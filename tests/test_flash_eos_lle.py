@@ -391,6 +391,7 @@ def test_the_pinned_root_is_the_historical_branch_on_the_whole_phi_phi_grid(
     audited state by state and regenerated, not relaxed.
     """
     from chemthermo.flash import _detect
+    from chemthermo.flash._common import EosBranchTerms
     from chemthermo.flash._split import _PhaseRoot
 
     created: list["_Recording"] = []
@@ -401,10 +402,14 @@ def test_the_pinned_root_is_the_historical_branch_on_the_whole_phi_phi_grid(
             self.seen: list[tuple[np.ndarray, np.ndarray]] = []
             created.append(self)
 
-        def fugacity_coefficients(self, composition: np.ndarray) -> np.ndarray:
-            phi = super().fugacity_coefficients(composition)
-            self.seen.append((np.asarray(composition, dtype=float).copy(), phi.copy()))
-            return phi
+        def branch_terms(self, composition: np.ndarray) -> EosBranchTerms:
+            terms = super().branch_terms(composition)
+            # ADR-0022's log-space guard must stay dormant here: Peng-Robinson
+            # fugacity coefficients on this grid are all representable, so the
+            # split takes the same `phi_l / phi_v` it always took.
+            assert terms.phi is not None
+            self.seen.append((np.asarray(composition, dtype=float).copy(), terms.phi.copy()))
+            return terms
 
     monkeypatch.setattr(_detect, "_PhaseRoot", _Recording)
 
