@@ -35,18 +35,31 @@ class StabilityTrial:
             (``vapor="ideal"``). None for a single-candidate evaluator (an
             activity-coefficient model on its own) or if unavailable.
         surface: Label of the phase candidate this trial *iterated on*, held
-            fixed for every successive-substitution and Newton step (ADR-0012).
-            None when the trial re-selected the lowest-Gibbs candidate at every
-            iterate, which is every trial of an equation of state and of an
-            activity-coefficient model on its own. It normally equals
+            fixed for every successive-substitution and Newton step (ADR-0012
+            for the modified-Raoult pair, ADR-0021 for the density roots of an
+            equation of state). None when the trial re-selected the
+            lowest-Gibbs candidate at every iterate: every trial of an
+            activity-coefficient model on its own, and the degenerate
+            single-active-component trials. It normally equals
             ``phase_branch``; a difference means the trial converged to a
             stationary point of its own surface at a composition where the
             *other* candidate has the lower Gibbs energy, and ``tpd`` is then
             the (smaller) lowest-Gibbs value, not the surface's own.
-        surface_fallback: True when ``surface`` was named but the candidate was
-            not evaluable at some iterate and the lowest-Gibbs candidate had to
-            be used there instead. Always False for the modified-Raoult pair,
-            whose two candidates are both evaluable at every composition.
+        surface_fallback: True when the trial could not run on ``surface``
+            alone. Two things set it, and both mean "there was no choice of
+            surface here": the named candidate raised at an iterate (ADR-0012
+            decision 5 - never reached through the modified-Raoult pair, whose
+            two candidates are evaluable at every composition), and, for an
+            equation of state, the model having a **single** admissible density
+            root, which both ``phase`` labels then name (ADR-0021). The second
+            is measured where the solver compares the branches anyway - the
+            trial's stopping point - and not at every iterate, so this flag
+            answers "did this trial *stop* in a one-root region", not "did it
+            ever meet one". ADR-0021 decision 4 says why, and records how often
+            the condition holds over the validation grids (89 % of iterates).
+        surface_fallback_count: How many model evaluations inside this trial set
+            it (0 when ``surface_fallback`` is False). Evaluations, not
+            iterations.
         composition: Normalized trial composition ``w`` at the final point.
         termination_reason: Short machine-readable reason string.
         ssi_iterations: Successive-substitution iterations performed.
@@ -72,6 +85,7 @@ class StabilityTrial:
     converged_stage: str | None = None
     surface: str | None = None
     surface_fallback: bool = False
+    surface_fallback_count: int = 0
 
     def __post_init__(self) -> None:
         if not self.label.strip():
@@ -80,6 +94,10 @@ class StabilityTrial:
             raise InputRangeError("Trial iterations must be non-negative.")
         if self.ssi_iterations < 0 or self.second_order_iterations < 0:
             raise InputRangeError("Trial stage iteration counts must be non-negative.")
+        if self.surface_fallback_count < 0:
+            raise InputRangeError("Trial surface-fallback count must be non-negative.")
+        if self.surface_fallback != (self.surface_fallback_count > 0):
+            raise ValueError("surface_fallback must be True if and only if its count is positive.")
 
 
 @dataclass(frozen=True)
@@ -113,8 +131,11 @@ class StabilityResult:
             trial was pinned to a phase-candidate surface (ADR-0012),
             ``trial_surfaces`` holds the per-surface trial counts as a
             deterministic ``"<label>:<count>"`` string in order of first
-            appearance, and ``minimizing_trial_surface`` names the surface the
-            minimizing trial ran on. ``tpd_from_sum_W`` is then equation (7) on
+            appearance, ``surface_fallback_trial_count`` counts the trials that
+            had to leave their surface at least once,
+            ``surface_fallback_evaluation_count`` sums those evaluations, and
+            ``minimizing_trial_surface`` names the surface the minimizing trial
+            ran on. ``tpd_from_sum_W`` is then equation (7) on
             *that* surface: it equals ``tpd_min`` whenever the minimizing trial
             stopped where its own candidate is the lowest-Gibbs one, which is
             every unstable verdict measured so far.
