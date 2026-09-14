@@ -3413,3 +3413,282 @@ recorded in Case P-10; the binary window is Case P-9.
 - **Script:** `examples/validation/19_eos_stability_surfaces.py` (about 5 s;
   `--full` for both offsets, the matched-constants comparison, the two
   41-point scans, the bisected boundary and the Peng-Robinson grid).
+
+---
+
+## Case P-12: PC-SAFT properties for a polymer, against FeOs
+
+- **Source:** **FeOs 0.10.1** (feos-org/feos, MIT OR Apache-2.0), the same
+  Gross & Sadowski model in Rust with every derivative by automatic
+  differentiation. FeOs packages no polymer parameters but takes a segment
+  number directly, so it is given the **derived** `m = (m/M) Mw` this package
+  computes from the segments-per-mass record - which makes the comparison a
+  check of the convention as well as of the equations.
+- **Location:** `chemthermo/parameters/pcsaft.py` (`PCSAFTRecord.segments_per_g`),
+  `chemthermo/core/component.py` (`Component.custom`), `chemthermo/eos/pcsaft.py`;
+  slice `pcsaft-polymer-solvent` (ADR-0022).
+- **Parameters and provenance.** Polyethylene: `m/M = 0.0263` mol/g,
+  `sigma = 4.0217 A`, `eps/k = 247.5 K`. n-pentane: the packaged Gross &
+  Sadowski (2001) record, `m = 2.6896`, `sigma = 3.7729 A`, `eps/k = 231.20 K`.
+  The polymer row is **as tabulated by Martini, Cismondi, Barbosa & Brignole,
+  *Sep. Sci. Technol.* 44(11) (2009) (author manuscript, CONICET open
+  repository), Table 1, citing Gross & Sadowski, *IECR* 41 (2002) 1084 - and is
+  NOT verified against that primary table**, which is paywalled and was not
+  read. A search for a second open source printing the same three numbers found
+  none (FeOs and Clapeyron.jl carry no polymer records; every open hit leads
+  back to this one manuscript). The values are therefore a cited **test
+  fixture**, `tests/fixtures/pcsaft/martini2009_polymers.json`, and are never
+  packaged runtime data. An earlier recollection of `eps/k = 252.0` for PE and
+  `m/M = 0.0205` for PS is recorded in the fixture's notes as *not* reproduced
+  anywhere.
+- **Assumptions:** `k_ij = 0` on both sides (FeOs cannot be given one - see
+  Case P-13); the polymer is **monodisperse**, one chain length and one
+  component, while the samples these parameters describe have polydispersities
+  of 1.14 to 2.94. Nothing here is compared against measurement.
+- **Components / units:** polyethylene (`Mw = 16400` and `53000` g/mol, so
+  `m = 431.32` and `1393.9`) and n-pentane at 453.0 K. Densities in mol/m^3,
+  pressures in Pa, everything compared dimensionless.
+
+### (i) Segment number from the mass-based parameter
+
+- **Expected outcome:** `m = (m/M) * Mw`, derived in the record rather than by
+  the caller.
+- **Achieved:** `431.32` for `Mw = 16400` and `1393.9` for `Mw = 53000`, equal
+  to `0.0263 * Mw` to the last bit. A record giving both `m` and
+  `segments_per_g`, or neither, or `segments_per_g` with no `MW_g_mol`, raises
+  `PCSAFTParameterError`.
+
+### (ii) Density roots of the pure melt
+
+- **Expected outcome:** one mechanically stable root at every pressure over
+  1-30 MPa, of a plausible melt magnitude, measuring as a liquid.
+- **Achieved** (453.0 K, `Mw = 16400`): one root at every pressure, densities
+  `46.1654`, `46.9073`, `47.6454`, `48.3130` mol/m^3 at 1, 10, 20 and 30 MPa,
+  i.e. **0.757112, 0.769280, 0.781384, 0.792333 g/cm^3**. For `Mw = 53000` the
+  same pressures give 0.757789 to 0.792889 g/cm^3. Monotone in pressure, no
+  overflow anywhere in the `eta` scan, and `phase_identity` returns `"liquid"`
+  at each - independently confirmed by a `kappa = P/(rho dP/drho)` recomputed
+  in the test from the public `pressure_Pa`, all far below the 0.5 threshold.
+- **Unverified remark, not an assertion:** commonly tabulated polyethylene melt
+  densities near 450 K are around **0.77-0.80 g/cm^3**. That figure was not
+  read from a source here; it is recorded to say the magnitude is not absurd,
+  and the test brackets `0.75 < rho < 0.80` as a sanity range only.
+
+### (iii) `A^res/RT`, `Z` and `ln phi` against FeOs
+
+- **Expected outcome:** agreement to 1e-10 with matched universal constants,
+  over eleven states whose densities are chemthermo's **own** liquid roots
+  (pure melt at both molar masses at 1 / 10 / 30 MPa; 5, 10 and 15 wt% polymer
+  in n-pentane at 10 MPa; 5 and 15 wt% at 15 MPa).
+- **Achieved, matched constants:** worst `|dA^res/RT| = 9.10e-13`,
+  `|dZ| = 5.94e-12`, `max |d ln phi| = 5.00e-12`.
+- **Achieved, as shipped:** `2.85e-07`, `1.12e-06`, `1.41e-06`. That residual
+  is the 42 universal constants of the 2001 dispersion term (chemthermo
+  packages the ten printed figures, FeOs hard-codes fourteen) - an *input*
+  difference, as in Cases P-6 to P-11.
+- **Cross-check on the root itself:** FeOs's pressure at chemthermo's melt
+  density reproduces the target pressure to better than 1e-5 relative at every
+  melt state.
+
+### (iv) The exponential's range
+
+- **Expected outcome:** the model is finite where `exp(ln phi)` is not, and the
+  ADR-0022 guard is what carries it.
+- **Achieved:** polyethylene `Mw = 53000` (`m = 1393.9`) at 5 wt% in n-pentane,
+  453 K, 10 MPa: `ln phi_polymer = -1690.615`, and `exp` of that is an exact
+  `0.0` (the smallest positive double is `exp(-744.44)`). At 8 MPa the same
+  quantity is `-1678.189`. `PCSAFTEOS.log_fugacity_coefficients` returns the
+  same doubles as the `(T, rho, x)` route, `==`.
+- **Before the guard:** `stability_tp` raised `ModelError("No usable
+  fugacity-coefficient branch for stability analysis (vapor: non-finite or
+  non-positive fugacity coefficients; liquid: ...)")` at every pressure tried
+  (5, 10, 15, 20 MPa).
+- **Guard instrumentation** (counted at
+  `chemthermo.flash._common.eos_branch_terms`): PC-SAFT water / n-hexane at
+  298.15 K / 1 atm, **0 of 274** branch evaluations in log space; the
+  `Mw = 16400` polymer flash at 8 MPa, **0 of 600**; the `Mw = 53000` one,
+  **1025 of 1025**. The 144-state Peng-Robinson replay test additionally
+  asserts `terms.phi is not None` at every split iterate.
+
+- **Tolerance:** asserted 1e-10 on `A^res/RT`, `Z` and `ln phi` with matched
+  constants (achieved <= 5.94e-12); 1e-5 as shipped (achieved 1.41e-06); 1e-5
+  relative on the melt pressure round trip.
+- **Independent route:** FeOs, which shares no code and takes every derivative
+  by automatic differentiation.
+- **Negative control:** the packaged parameter set contains no component whose
+  name matches `poly` (asserted), so nothing here reaches runtime data.
+- **Test path:** `tests/validation/test_pcsaft_polymer_vs_feos.py`,
+  `tests/test_pcsaft_polymer.py`.
+- **Script:** `examples/validation/20_pcsaft_polymer_vs_feos.py` (about 4 s;
+  `--full` for the FeOs-flash survey, the `Mw = 53000` chain and the cloud
+  point).
+
+---
+
+## Case P-13: The polyethylene / n-pentane liquid-liquid split
+
+- **Source:** an equal-fugacity Newton written independently in the test and in
+  the example (two unknowns, carried as logarithms so the 1e-05 branch keeps
+  its digits, finite-difference Jacobian, started a thousandth away from
+  `flash_tp`'s answer); **FeOs 0.10.1** chemical potentials at chemthermo's
+  converged phases and densities; and FeOs's own `tp_flash` at the one pressure
+  where it converges on this system.
+- **Location:** `chemthermo/flash/_split.py`, `chemthermo/flash/_common.py`,
+  `chemthermo/stability/_evaluator.py`; slice `pcsaft-polymer-solvent`
+  (ADR-0022). No solver equation changed.
+- **Parameters and provenance:** as Case P-12, plus `k_ij = -0.006`, which the
+  same secondary source's Table 3 gives for the `Mw = 16400` (polydispersity
+  1.16) sample and which **that source fitted** to the cloud-point data of
+  Kiran & Zhuang, *Polymer* 33 (1992) 5259. Those experimental data were not
+  read here and nothing below is compared against them.
+- **Assumptions:** monodisperse polymer; 453.0 K throughout; feeds stated as
+  polymer **mass** fractions and converted with the component's molar mass.
+
+### (i) The cloud point, by bisecting the stability verdict
+
+- **Expected outcome:** two phases at low pressure, one phase at high pressure,
+  one switch.
+- **Achieved** (5 wt% polymer, `k_ij = -0.006`): `unstable` at 5.0 and 8.0 MPa,
+  `stable` at 10.0, 15.0, 20.0, 25.0 and 30.0 MPa. Bisecting the verdict to
+  1 Pa gives **9,751,759 Pa = 9.7518 MPa = 97.518 bar**.
+- The cited source's figures put separation pressures for this system in the
+  tens-to-few-hundred bar range. **The figures were not digitized**; this is a
+  magnitude remark, not a comparison, and no number here is fitted to them.
+
+### (ii) The split at 8 MPa
+
+- **Expected outcome:** two liquid phases, all three verification residuals
+  satisfied, phase fractions in `(0, 1)`, post-split stable.
+- **Achieved:** `liquid1` / `liquid2`, `vapor_fraction = None`,
+  `phase_regime = "LLE"`, `phase_label_method = "compressibility"`,
+  `phase_i_branch = phase_ii_branch = "liquid"`.
+  - polymer-rich phase: `x_polymer = 9.751377e-04`, fraction `0.2282983`,
+    `rho = 5782.65` mol/m^3, `kappa = 6.805e-02`;
+  - solvent-rich phase: `x_polymer = 1.1478711e-05`, fraction `0.7717017`,
+    `rho = 6218.31` mol/m^3, `kappa = 1.225e-01`;
+  - feed `x_polymer = 2.314804e-04`.
+  - `mass_balance_residual = 2.71e-20`, `fugacity_residual = 3.41e-13`,
+    `delta_g_split_rt = -1.6914873e-04`, `post_split_status = "stable"` with
+    `post_split_tpd_min = -1.30e-14`, `converged_stage = "second-order"`
+    (100 successive substitutions then 6 Newton steps).
+  - Both `kappa` values are recomputed in the test from the public
+    `pressure_Pa` by finite difference, so the liquid identities do not rest on
+    `phase_identity`'s own derivative.
+- **Independent Newton:** `x_polymer = 1.1478711124e-05` and `9.7513772864e-04`,
+  i.e. **max `|dx_polymer| = 1.70e-15`** against `flash_tp`, with its own
+  residual at 1.0e-12.
+- **A tie line, not a feed property:** a 10 wt% feed at the same state returns
+  the same two compositions to 1e-9 relative.
+- **FeOs chemical potentials at chemthermo's phases** (8 MPa, `k_ij = 0` on
+  both sides): **4.55e-13** with matched universal constants, **4.13e-08** as
+  shipped. FeOs's own flash *raises* at this state, and this route does not
+  need it to converge - only to evaluate.
+
+### (iii) FeOs's own flash, and where it is not a reference
+
+- **Measured**, 5 wt% feed, 453 K, `k_ij = 0`, feos 0.10.1:
+
+  | P / MPa | FeOs `tp_flash` | chemthermo |
+  | --- | --- | --- |
+  | 3 | degenerate: both phases equal to nine figures, vapour fraction exactly 0.5 | two liquids, `dG/RT = -3.41e-03` |
+  | 5 | `RuntimeError: `rachford_rice` encountered illegal values during the iteration` | two liquids, `dG/RT = -1.35e-03` |
+  | 8 | same `RuntimeError` | two liquids, `dG/RT = -1.69e-04` |
+  | 10 | converges | two liquids |
+  | 11, 15 | `RuntimeError: No phase split according to stability analysis` | one liquid |
+
+- **At 10 MPa**, the one usable comparison: the polymer-rich branch agrees to
+  `|dx| = 5.77e-13` (matched constants; 1.88e-12 as shipped), the solvent-rich
+  branch to `1.23e-09`, densities to `9.3e-08` relative and the phase fraction
+  to `1.41e-06`. That is **not** the 1e-11 of Case P-12 because 10 MPa is
+  within 8 % of this system's `k_ij = 0` cloud point (10.768 MPa) and both
+  solvers are near a plait point: measured in chemthermo's own model,
+  chemthermo's converged pair has an equal-fugacity residual of **1.06e-07**
+  and FeOs's has **9.07e-06**, so chemthermo's is the tighter stationary point
+  by about 86x. Recorded as conditioning, not as disagreement.
+- **`k_ij` could not be given to FeOs.** `BinaryRecord.from_json_str` and
+  `Parameters.from_records` both accept one, but `EquationOfState.pcsaft` then
+  raises `RuntimeError: missing field `k_ij`` in feos 0.10.1 for every
+  serialization tried (bare float, `{"k_ij": x}`, `{"k_ij": [x]}`, with and
+  without `l_ij`, and via `Parameters.new_binary`). Every FeOs comparison in
+  this case therefore runs at `k_ij = 0` on both sides.
+
+### (iv) LCST-type behaviour and the `k_ij` trend (both qualitative)
+
+- **At a fixed 10 MPa**, 5 wt%: `stable` at 400, 405, ..., 450 and 453 K;
+  `unstable` at 455 and 460 K. Bisecting gives a switch at **454.56 K**. The
+  polymer comes out of solution on **heating**, which is the direction the
+  cited manuscript's Figure 1 describes (the region above its cloud-point curve
+  is single phase). **The figure was not digitized**; the check is qualitative
+  and is labelled as such in the test and the examples.
+- **Cloud-point pressure against `k_ij`** (5 wt%, 453 K, bisected to 1 kPa):
+  `k_ij = -0.006` -> **97.518 bar**, `k_ij = 0` -> **107.680 bar**,
+  `k_ij = +0.02` -> **215.074 bar**. Monotone increasing, which is the
+  manuscript's own statement. Again qualitative: no value of theirs is
+  reproduced.
+
+### (v) Asymmetry stress
+
+- **Permutation invariance:** reversing the component order moves the two
+  phase compositions by at most **3.47e-15** and the phase fractions by
+  **9.31e-13**.
+- **Determinism:** two identical calls return `==` compositions and `==` phase
+  fractions.
+- **Extreme feeds at 8 MPa:** 0.1 wt% (`x_polymer = 4.40e-06`) and 40 wt%
+  (`x_polymer = 2.92e-03`) both return a **single stable liquid** and neither
+  raises. Both are outside the binodal, which runs from `1.15e-05` to
+  `9.75e-04` there - the dilute feed below the solvent-rich branch and the
+  concentrated one above the polymer-rich branch.
+- **Three components:** polyethylene / n-pentane / n-hexane (5 wt% polymer,
+  equal solvent masses) at 5 MPa returns two liquids with
+  `mass_balance_residual = 5.55e-17`, `fugacity_residual = 8.06e-08`,
+  `dG/RT = -1.73e-05`, post-split stable.
+- **The long chain:** `Mw = 53000` (`m = 1393.9`) at 8 MPa returns
+  `x_polymer = 3.729971e-04` and `6.269597e-10`, fractions `0.192063` /
+  `0.807937`, `mass_balance_residual = 0.0`,
+  `fugacity_residual = 4.55e-13`, `dG/RT = -4.1379e-04`, post-split stable.
+  Every one of its 1025 branch evaluations runs in log space (Case P-12 (iv)).
+- **No post-split refusal was observed** on any state in this case: the worst
+  `post_split_tpd_min` measured is `-1.30e-14`, inside `tpd_tol = 1e-8` by six
+  orders.
+- **The second-order stage's mole-number box is not reached.** The smallest
+  mole number it sees on these systems is `1.2e-20` (the `Mw = 53000`
+  solvent-rich phase at 5 MPa), against its existing `1e-300` floor. The guard
+  the slice design anticipated there was therefore **not added**: there is no
+  measured failure behind it.
+
+### (vi) A gap in the phi-phi split, pinned and not patched
+
+- **Below about 3 MPa** at 453 K, n-pentane is subcritical and the mixture has
+  **two** density roots, so the equilibrium in question is vapour-liquid rather
+  than liquid-liquid. `stability_tp` still reports the 5 wt% feed `unstable`
+  (2 roots at 1 and 2 MPa), and the split then stops after **one**
+  successive-substitution step with an equal-fugacity residual of **2.99e+02**
+  (1 MPa) and **3.19e+02** (2 MPa); `flash_tp` raises `ConvergenceError`.
+- **The ternary does the same at 3 MPa**, running away to
+  `beta = -6.33e+10` and raising the ADR-0016 "vapor fraction outside (0, 1)"
+  error. At 5 MPa and above it converges (see (v)).
+- This is a gap in the **phi-phi split** for polymer/solvent vapour-liquid
+  states, not a property of the polymer support ADR-0022 adds, and it is not
+  patched here. Both states are pinned by test so that any future change to
+  them is deliberate. `pcsaft-polymer-vle-ethylene` is the named later
+  candidate.
+
+- **Tolerance:** asserted 1e-12 absolute on the independent Newton's tie line
+  (achieved 1.70e-15); 1e-12 on the mass balance (achieved 2.71e-20); 1e-8 on
+  the fugacity residual (achieved 3.41e-13); `dG < 0` and post-split stable;
+  1e-8 on FeOs's chemical potentials with matched constants (achieved
+  4.55e-13); 1e-8 absolute on the FeOs tie line at 10 MPa (achieved 1.23e-09);
+  1e-13 on permutation invariance (achieved 3.47e-15).
+- **Independent route:** the two-equation Newton written in the test and again
+  in the example; FeOs's chemical potentials; FeOs's own flash where it
+  converges.
+- **Negative control:** two states that must keep raising (`1 MPa` binary,
+  `3 MPa` ternary), the 155-state bit-identity fixture, which does not move,
+  and the guard instrumentation showing the log-space route is dormant on every
+  pre-ADR-0022 state.
+- **Test path:** `tests/test_pcsaft_polymer.py` (23 by default, 5 `slow`),
+  `tests/validation/test_pcsaft_polymer_vs_feos.py` (5 by default, 1 `slow`),
+  `tests/test_component_custom.py`.
+- **Script:** `examples/basic/pcsaft_polymer_demo.py` (about 5 s; `--full` for
+  the cloud-point bisection and the `Mw = 53000` chain) and
+  `examples/validation/20_pcsaft_polymer_vs_feos.py`.

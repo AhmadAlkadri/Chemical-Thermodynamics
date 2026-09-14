@@ -1075,6 +1075,104 @@ eos = PCSAFTEOS(components=("My fluid",), parameters=parameters)
 
 A component with no record raises `PCSAFTParameterError`.
 
+### Polymers (ADR-0022)
+
+A polymer's PC-SAFT parameters are published per unit **mass** - `m/M` in
+mol/g - because the chain length depends on the molar mass of the particular
+sample, so one parameter set covers every molar mass of that polymer. Say that
+with `segments_per_g` and `MW_g_mol`, and the segment number is derived for
+you:
+
+```python
+import chemthermo as ct
+from chemthermo import PCSAFTParameters, PCSAFTRecord
+from chemthermo.eos import PCSAFTEOS
+
+parameters = PCSAFTParameters.from_records(
+    [
+        PCSAFTRecord(                      # m = 0.0263 * 16400 = 431.32
+            name="Polyethylene",
+            segments_per_g=0.0263,         # mol/g, as published
+            MW_g_mol=16400.0,              # this sample
+            sigma_A=4.0217,
+            epsilon_k_K=247.5,
+            source="your citation here",
+        ),
+        PCSAFTRecord(name="n-Pentane", m=2.6896, sigma_A=3.7729, epsilon_k_K=231.20),
+    ]
+)
+
+polymer = ct.Component.custom(          # no databank entry, no critical point
+    "Polyethylene", mw_kg_per_mol=16.4, formula="(C2H4)n", volatile=False
+)
+mixture = ct.Mixture.from_components(
+    [polymer, ct.Component.from_database("n-Pentane")],
+    [2.314804e-04, 0.99976852],         # 5 wt% polymer, as mole fractions
+)
+result = ct.flash_tp(
+    mixture,
+    temperature_K=453.0,
+    pressure_Pa=8.0e6,
+    eos=PCSAFTEOS(parameters=parameters, kij=-0.006),
+)
+# -> liquid1 / liquid2, x_polymer = 9.75e-04 and 1.15e-05, vapor_fraction None
+```
+
+Exactly one of `m` and `segments_per_g` may be given; both, or neither, raises,
+because they are two spellings of the same parameter.
+
+`Component.custom(name, *, mw_kg_per_mol, formula=, tc_k=, pc_pa=, omega=,
+volatile=, antoine=, source=)` builds a component the databank does not carry.
+The molar mass is **required** and is in kg/mol like every other molar mass
+here; the critical constants are **optional**, because a polymer has none, and
+`component.tc_k` raises `PropertyNotFoundError` rather than returning a
+placeholder if you ask for one you did not supply. `volatile=False` replaces
+that component's Wilson K-value *estimate* by a fixed `1e-10` ("essentially
+absent from the vapour-like trial"), which is what keeps the deterministic
+stability trial set complete without critical constants. It is an initial
+estimate only: no verdict, composition or fugacity is a function of it, and
+nothing else in the package reads `volatile`. The packaged databank schema is
+untouched - `ComponentData` still requires `Tc` / `Pc` / `omega` and
+`schema_version` is still 1.
+
+**What is and is not claimed.**
+
+- **No polymer parameters are packaged, and none should be read from here.**
+  The polyethylene numbers above are a *cited test fixture*,
+  `tests/fixtures/pcsaft/martini2009_polymers.json`: as tabulated by Martini,
+  Cismondi, Barbosa & Brignole, *Sep. Sci. Technol.* **44** (2009) (author
+  manuscript, CONICET open repository), citing Gross & Sadowski, *IECR* **41**
+  (2002) 1084. **That primary table was not read** - it is paywalled - and no
+  second open source printing the same three values was found. Unlike the
+  packaged 2001 records, which two independent sources confirm digit for digit,
+  these rest on one. Supply and cite your own.
+- **A polymer here is monodisperse**: one chain length, one component. Real
+  samples are not (the ones these parameters describe have polydispersities of
+  1.14 to 2.94), and representing a distribution as several pseudo-components
+  is a capability this package does not have.
+- **Nothing is compared against measurement.** The `k_ij = -0.006` above was
+  fitted *by the cited source* to cloud-point data this package never touches.
+  The qualitative behaviours that are checked - the split appearing on heating
+  at fixed pressure, and the cloud-point pressure rising with `k_ij` - are
+  compared with statements in that source's text, not with digitized figures.
+- **A long chain can exceed the exponential's range.** A polyethylene of
+  `Mw = 53000` (`m = 1393.9`) in n-pentane at 453 K has `ln phi = -1690.6`, and
+  `exp` of that is an exact `0.0`. `EquationOfState.log_fugacity_coefficients`
+  (optional, `None` by default; implemented by `PCSAFTEOS`) is the log-space
+  route the flash falls back to **only** where `phi` does not exist as a
+  double, so every previously converging number is unchanged. Measured: 0 of
+  274 branch evaluations in log space for water / n-hexane, 0 of 600 for the
+  `Mw = 16400` polymer, 1025 of 1025 for the `Mw = 53000` one.
+- **Below the solvent's saturation pressure the split does not converge.** At
+  453 K and under about 3 MPa n-pentane still has a vapour root, the
+  equilibrium is vapour-liquid rather than liquid-liquid, and `flash_tp` raises
+  `ConvergenceError` while `stability_tp` still reports the feed unstable. That
+  gap is pinned by test, not worked around.
+
+See ADR-0022, validation Cases P-12 and P-13,
+`examples/basic/pcsaft_polymer_demo.py` and
+`examples/validation/20_pcsaft_polymer_vs_feos.py`.
+
 ### Association (ADR-0018)
 
 Five more compounds ship with association parameters from Gross & Sadowski,
@@ -1201,6 +1299,19 @@ from `chemthermo` if you prefer to build the block as an object.
   chemthermo's phases equal to 1.2e-11 with matched universal constants
   (2.6e-06 as shipped). See validation Case P-8 and
   `examples/validation/17_pcsaft_lle_vs_feos.py`.
+- The **polymer/solvent** capability is validated against FeOs the same way:
+  `A^res/RT`, `Z` and `ln phi` for polyethylene melts and polyethylene /
+  n-pentane liquids over eleven states agree to 5.0e-12 with matched universal
+  constants (1.4e-06 as shipped), and FeOs's chemical potentials at
+  chemthermo's converged phases are equal to 4.5e-13. Two facts about the
+  reference are recorded rather than hidden: FeOs's own `tp_flash` **raises**
+  on this system at 5 and 8 MPa and returns a degenerate pair at 3 MPa
+  (it converges at 10 MPa, where the tie line agrees to 1.2e-09 in the
+  solvent-rich polymer mole fraction), and `k_ij` cannot be given to FeOs's
+  PC-SAFT from Python in feos 0.10.1, so those comparisons run at `k_ij = 0` on
+  both sides. The fitted-`k_ij` answer is checked against an independently
+  written two-equation Newton instead, to 1.7e-15. See validation Cases P-12
+  and P-13 and `examples/validation/20_pcsaft_polymer_vs_feos.py`.
 
 ## EOS extension points
 
