@@ -3,7 +3,9 @@
 Holds the three pure-component parameters every non-associating PC-SAFT
 component needs (Gross & Sadowski, Ind. Eng. Chem. Res. 40 (2001) 1244):
 
-- ``m``            - number of segments per chain (dimensionless),
+- ``m``            - number of segments per chain (dimensionless), given
+  directly or, for a polymer, as ``segments_per_g`` (mol/g) times ``MW_g_mol``
+  (g/mol) - the ``m/M`` convention of ADR-0022,
 - ``sigma_A``      - segment diameter, in Angstrom,
 - ``epsilon_k_K``  - segment dispersion energy divided by the Boltzmann
   constant, ``epsilon / k_B``, in K.
@@ -117,33 +119,114 @@ class PCSAFTAssociationRecord:
             )
 
 
+def _resolve_segment_number(record: "PCSAFTRecord") -> float:
+    """Return ``m``, derived from ``segments_per_g * MW_g_mol`` when that is how it was given.
+
+    Raises:
+        PCSAFTParameterError: If both specifications are present, if neither
+            is, or if ``segments_per_g`` was given without a molar mass to
+            multiply it by.
+    """
+    name = record.name
+    if record.segments_per_g is None:
+        if record.m is None:
+            raise PCSAFTParameterError(
+                f"PC-SAFT record for {name!r} gives neither 'm' nor 'segments_per_g'; one of "
+                "the two is required (see ADR-0022 for the segments-per-mass convention)."
+            )
+        return float(record.m)
+
+    if record.m is not None:
+        raise PCSAFTParameterError(
+            f"PC-SAFT record for {name!r} gives both 'm' and 'segments_per_g'. They are two "
+            "spellings of the same parameter (m = segments_per_g * MW_g_mol); give exactly one."
+        )
+    per_gram = float(record.segments_per_g)
+    if not np.isfinite(per_gram) or per_gram <= 0.0:
+        raise PCSAFTParameterError(
+            f"PC-SAFT parameter 'segments_per_g' for {name!r} must be finite and positive "
+            f"(got {record.segments_per_g!r})."
+        )
+    if record.MW_g_mol is None:
+        raise PCSAFTParameterError(
+            f"PC-SAFT record for {name!r} gives 'segments_per_g' (mol/g) but no 'MW_g_mol'; the "
+            "segment number of a polymer is m = segments_per_g * MW_g_mol, so the molar mass of "
+            "this particular sample is required."
+        )
+    molar_mass = float(record.MW_g_mol)
+    if not np.isfinite(molar_mass) or molar_mass <= 0.0:
+        raise PCSAFTParameterError(
+            f"PC-SAFT parameter 'MW_g_mol' for {name!r} must be finite and positive "
+            f"(got {record.MW_g_mol!r})."
+        )
+    return per_gram * molar_mass
+
+
 @dataclass(frozen=True)
 class PCSAFTRecord:
     """Pure-component PC-SAFT parameters for one compound.
 
-    ``name`` is the canonical (normalized) component name. ``MW_g_mol`` is
-    optional and unused by the equation of state itself; the packaged records
-    omit it because the component databank is the source of truth for molar
-    mass. ``association`` is ``None`` for a non-associating compound and a
+    ``name`` is the canonical (normalized) component name. ``association`` is
+    ``None`` for a non-associating compound and a
     :class:`PCSAFTAssociationRecord` otherwise (ADR-0018).
+
+    Two ways to say how long the chain is (ADR-0022)
+    ------------------------------------------------
+    A small molecule has a segment number: ``m`` is given directly, which is
+    how every packaged record and every record written before ADR-0022 is
+    spelled, and ``MW_g_mol`` stays the optional, unused annotation it always
+    was (the component databank is the source of truth for molar mass).
+
+    A **polymer** does not. Its parameters are fitted per unit *mass* and the
+    chain length follows from the molar mass of the particular sample, which is
+    the ``m/M`` convention of Gross & Sadowski's polymer work: give
+    ``segments_per_g`` in mol/g together with ``MW_g_mol`` in g/mol, and
+
+        m = segments_per_g * MW_g_mol
+
+    is derived here, once, so no caller multiplies it by hand. ``MW_g_mol`` is
+    then **required** and load-bearing rather than annotation - it is the one
+    number that distinguishes a 16 400 g/mol polyethylene (``m = 431.32``) from
+    a 53 000 g/mol one (``m = 1393.9``).
+
+    Exactly one of ``m`` and ``segments_per_g`` may be given. Both, or neither,
+    is an error rather than a silently preferred default: the two say the same
+    thing in different units, and a record carrying disagreeing versions of one
+    parameter is a data defect, not a choice.
+
+    This models a **monodisperse** polymer - one chain length, one component.
+    A real sample has a distribution (the sources cited in
+    ``tests/fixtures/pcsaft/martini2009_polymers.json`` quote polydispersities
+    of 1.14 to 2.94), and representing it as several pseudo-components is a
+    different capability that this record does not provide.
     """
 
     name: str
-    m: float
-    sigma_A: float
-    epsilon_k_K: float
+    m: float | None = None
+    sigma_A: float | None = None
+    epsilon_k_K: float | None = None
     MW_g_mol: float | None = None
     source: str = ""
     association: PCSAFTAssociationRecord | None = None
+    segments_per_g: float | None = None
 
     def __post_init__(self) -> None:
         if not self.name:
             raise PCSAFTParameterError("PC-SAFT component names must be non-empty.")
+        # ``m`` may be given directly or derived from the segments-per-mass
+        # convention; ``sigma_A`` and ``epsilon_k_K`` are only defaulted so
+        # that ``m`` can precede them with a default of its own, and a record
+        # without them is rejected right here.
+        object.__setattr__(self, "m", _resolve_segment_number(self))
         for label, value in (
             ("m", self.m),
             ("sigma_A", self.sigma_A),
             ("epsilon_k_K", self.epsilon_k_K),
         ):
+            if value is None:
+                raise PCSAFTParameterError(
+                    f"PC-SAFT record for {self.name!r} is missing the required parameter {label!r}."
+                )
             if not np.isfinite(value) or value <= 0.0:
                 raise PCSAFTParameterError(
                     f"PC-SAFT parameter {label!r} for {self.name!r} must be finite and "
@@ -189,8 +272,15 @@ class PCSAFTParameters:
         """Build a parameter set from user-supplied records.
 
         Each entry is either a :class:`PCSAFTRecord` or a mapping with the keys
-        ``name``, ``m``, ``sigma_A``, ``epsilon_k_K`` and the optional
-        ``MW_g_mol`` / ``source`` / ``association``. Names are normalized with
+        ``name``, ``sigma_A``, ``epsilon_k_K``, the optional ``MW_g_mol`` /
+        ``source`` / ``association``, and **exactly one** of
+
+        - ``m`` - the segment number, as every packaged record gives it; or
+        - ``segments_per_g`` (mol/g) together with ``MW_g_mol`` (g/mol), the
+          polymer convention of ADR-0022, from which ``m = segments_per_g *
+          MW_g_mol`` is derived.
+
+        Giving both, or neither, raises. Names are normalized with
         ``chemthermo.data.normalize_name``; duplicates are rejected.
 
         ``association`` is either a :class:`PCSAFTAssociationRecord` or a
@@ -296,6 +386,9 @@ def _coerce_association(
 
 def _coerce_record(entry: PCSAFTRecord | Mapping[str, object]) -> PCSAFTRecord:
     if isinstance(entry, PCSAFTRecord):
+        # ``entry.m`` is already resolved (``__post_init__`` derived it from
+        # ``segments_per_g`` if that is how it was written), so the copy takes
+        # the segment number directly and must not re-derive it.
         return PCSAFTRecord(
             name=normalize_name(entry.name),
             m=entry.m,
@@ -309,7 +402,6 @@ def _coerce_record(entry: PCSAFTRecord | Mapping[str, object]) -> PCSAFTRecord:
         raise PCSAFTParameterError("PC-SAFT component entries must be objects.")
     try:
         name = normalize_name(str(entry["name"]))
-        m = float(entry["m"])  # type: ignore[arg-type]
         sigma_A = float(entry["sigma_A"])  # type: ignore[arg-type]
         epsilon_k_K = float(entry["epsilon_k_K"])  # type: ignore[arg-type]
     except KeyError as exc:
@@ -319,12 +411,20 @@ def _coerce_record(entry: PCSAFTRecord | Mapping[str, object]) -> PCSAFTRecord:
             "PC-SAFT component entry contains non-numeric parameters."
         ) from exc
 
+    raw_m = entry.get("m")
+    raw_segments = entry.get("segments_per_g")
     raw_mw = entry.get("MW_g_mol")
+    if raw_m is None and raw_segments is None:
+        raise PCSAFTParameterError(
+            f"PC-SAFT component entry for {name!r} gives neither 'm' nor 'segments_per_g'."
+        )
     try:
+        m = None if raw_m is None else float(raw_m)  # type: ignore[arg-type]
+        segments_per_g = None if raw_segments is None else float(raw_segments)  # type: ignore[arg-type]
         mw = None if raw_mw is None else float(raw_mw)  # type: ignore[arg-type]
     except (TypeError, ValueError) as exc:
         raise PCSAFTParameterError(
-            "PC-SAFT component entry contains a non-numeric 'MW_g_mol'."
+            "PC-SAFT component entry contains non-numeric parameters."
         ) from exc
 
     return PCSAFTRecord(
@@ -338,6 +438,7 @@ def _coerce_record(entry: PCSAFTRecord | Mapping[str, object]) -> PCSAFTRecord:
             entry.get("association"),  # type: ignore[arg-type]
             name,
         ),
+        segments_per_g=segments_per_g,
     )
 
 
