@@ -1442,13 +1442,17 @@ liquid-liquid 1.32x, every result hash identical). The harness is internal: it
 is not importable from `chemthermo` and is not part of the public API.
 
 `python -m chemthermo.bench robustness --out record.json` is the coverage
-instrument next to that speed one: it sweeps all six model families over fixed
-state and composition grids (2110 states) and writes a classified record -
+instrument next to that speed one: it sweeps all ten model families over fixed
+state and composition grids (2505 states) and writes a classified record -
 phase verdict or refusal class per state, with the exact state, message and
 invariant residuals - so the next solver slice is chosen from counts rather
 than recall. It found 36 refusals at `87f0820`, every one of them
-polyethylene / n-pentane, and **0 at `9adf390`** after ADR-0028 retired them.
-See `benchmarks/README.md`, ADR-0027 and ADR-0028.
+polyethylene / n-pentane, and **0 at `9adf390`** after ADR-0028 retired them;
+growing the grid to four more families (three-phase equation-of-state windows,
+the deprecated `gamma-phi` path, near-critical Peng-Robinson states,
+associating ternaries) found **14 more at `74820b8`**, none of them in the
+original 2110 states. See `benchmarks/README.md`, ADR-0027 (and its
+`robustness-map-coverage` amendment) and ADR-0028.
 
 ## Scope Policy
 

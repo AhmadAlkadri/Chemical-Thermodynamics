@@ -55,8 +55,9 @@ running them. What is marked:
   already checks, a further pressure or temperature on the same map. ADR-0028
   added 31 of these in one pass to hold the runtime budget - the table naming
   each one and what still covers it by default is in ledger Case P-17;
-- the full 2110-state robustness sweep of ADR-0027, whose 171-state `--quick`
-  subset runs the same code over all six families by default.
+- the full 2505-state robustness sweep of ADR-0027 (grown from 2110 states by
+  its `robustness-map-coverage` amendment), whose 224-state `--quick` subset
+  runs the same code over all ten families by default.
 
 ```bash
 pytest -q -m slow
@@ -142,20 +143,23 @@ python -m chemthermo.bench robustness --out benchmarks/robustness_<sha>.json \
                                       --summary-out benchmarks/robustness_<sha>.md
 ```
 
-2110 states, about 15 minutes. `--family NAME` runs one family (the sweep
-partitions and resumes), `--quick` runs the 171-state subset the test suite
-uses (~9 s), `--list` prints the grid. Each state ends in one bucket: a phase
+2505 states, about 37 minutes. `--family NAME` runs one family (the sweep
+partitions and resumes), `--quick` runs the 224-state subset the test suite
+uses (~14 s), `--list` prints the grid. Each state ends in one bucket: a phase
 verdict, `converged-invariant-violated`, or one of eight refusal classes.
 
 This measures **coverage, not correctness**: nothing in it is compared against
 a published number or another implementation. Use it to rank what to fix, not
 to claim something is right. See `benchmarks/README.md`, ADR-0027 and ledger
-Case R-MAP-1.
+Cases R-MAP-1 and R-MAP-2.
 
-At `9adf390` it refuses **nothing** (2110 of 2110 converge; 36 refused at
-`87f0820`, all of them polyethylene / n-pentane, and ADR-0028 retired them).
-Read that as "nothing in *this* grid refuses", not as a coverage claim - and
-note that regenerating the record at a new commit means a new file, so the
+At `74820b8` it refuses in the four families slice `robustness-map-coverage`
+added (2491 of 2505 converge, 14 refuse - 9 `multiphase-solver-failure` in
+`eos-three-phase`, 5 `rr-no-bracket` in the deprecated `gamma-phi-legacy`
+path); the original 2110-state grid still refuses nothing, unchanged field for
+field from `9adf390`. Read every count here as "nothing in *this* grid
+refuses" (or "this is what *this* grid refuses"), not as a coverage claim -
+and note that regenerating the record at a new commit means a new file, so the
 superseded JSON is pruned and its `.md` summary kept.
 
 ## Slice evidence
