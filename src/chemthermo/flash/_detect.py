@@ -28,6 +28,12 @@ from ..exceptions import ConvergenceError, ModelError
 from ..models import ActivityModel, EquationOfState
 from ._assemble import _single_phase_result, _two_phase_result
 from ._common import wilson_k
+from ._log_space import (
+    has_trace_component,
+    log_space_seed,
+    log_space_split,
+    seed_from_iterate,
+)
 from ._multiphase import (
     _ActivityPhaseSet,
     _EosPhaseSet,
@@ -80,6 +86,13 @@ _MODIFIED_RAOULT = "modified-raoult"
 _LABEL_COMPRESSIBILITY = "compressibility"
 _LABEL_WILSON_RANKING = "wilson-ranking"
 _LABEL_TIE_BREAK = "tie-break"
+
+#: ``diagnostics["k_seed"]`` values whose split is seeded from the
+#: tangent-plane stationary point, and whose two phases are therefore pinned to
+#: the branches that stationary point named (ADR-0019). ``"stability-log"`` is
+#: the ADR-0024 seed: the same stationary point, carried as logarithms because
+#: its K-values are not doubles.
+_STABILITY_SEEDS = ("stability", "stability-log")
 
 
 def _phase_label_method(
@@ -306,7 +319,7 @@ def _phi_phi_roots(
     ``("liquid", "vapor")`` pinning is used instead.
     """
     branches: tuple[str | None, str | None]
-    if seed_label != "stability":
+    if seed_label not in _STABILITY_SEEDS:
         branches = (_LIQUID, _VAPOR)
     elif incipient_phase == _VAPOR:
         branches = (feed_branch, incipient_branch)
@@ -391,18 +404,37 @@ def _flash_tp_tangent_plane(
             "trial composition; no phase split can be seeded."
         )
 
+    trial_w = np.array(trial, dtype=float)
     k_seed, incipient_phase = _stability_k_seed(
         mixture,
         temperature,
         pressure,
         z=z,
-        w=np.array(trial, dtype=float),
+        w=trial_w,
         tpd_min=float(stability.tpd_min),
     )
 
     seed_label = "stability"
+    log_seed: np.ndarray | None = None
     vapor_fraction, _f0, _f1 = _rachford_rice(z, k_seed)
-    if vapor_fraction is None:
+    if vapor_fraction is None and has_trace_component(trial_w, z > 0.0):
+        # ADR-0024 decision 2. Both conditions hold together only in the
+        # geometry this route exists for: a stationary point with a component
+        # below `TRACE_MOLE_FRACTION` *and* a K-set that brackets no vapor
+        # fraction at all, which is what an essentially pure polymer melt gives
+        # (validation Case P-14). Either condition alone would divert states
+        # that converge today - a trace component with a workable bracket is
+        # ordinary, and a collapsed bracket on an ordinary stationary point is
+        # what the Wilson fallback below is for - so the split is only rewritten
+        # where both are true and successive substitution has nowhere to start.
+        seed_label = "stability-log"
+        log_seed = log_space_seed(
+            z=z,
+            w=trial_w,
+            tpd_min=float(stability.tpd_min),
+            incipient_vapor=incipient_phase == _VAPOR,
+        )
+    elif vapor_fraction is None:
         # Documented fallback: the stationary point is a valid starting phase but
         # its K-values need not bracket a Rachford-Rice root in every geometry.
         seed_label = "wilson"
@@ -426,44 +458,84 @@ def _flash_tp_tangent_plane(
         seed_label=seed_label,
     )
 
-    split = _solve_k_loop(
-        mixture,
-        temperature,
-        pressure,
-        eos=eos,
-        activity_model=None,
-        mode=mode,
-        settings=settings,
-        z=z,
-        K=k_seed,
-        vapor_fraction=vapor_fraction,
-        # The full pre-ADR-0016 budget is spent on successive substitution
-        # before the second-order stage is allowed to touch anything, so every
-        # state that converged before this slice converges identically now.
-        # ``FlashSettings.ssi_iterations`` is deliberately *not* consulted here;
-        # see ADR-0016.
-        max_iter=settings.max_iter,
-        allow_unconverged=settings.second_order,
-        extended_rachford_rice=True,
-        roots_x=roots_x,
-        roots_y=roots_y,
-    )
-
-    x, y, beta = split.x, split.y, split.vapor_fraction
-    ln_f_x, ln_f_y = split.ln_f_x, split.ln_f_y
     stage_diagnostics: dict[str, float | int | str | bool] = {}
+    if log_seed is None:
+        # Either the stability seed bracketed a root or the Wilson fallback did;
+        # the case where neither does has already raised above.
+        assert vapor_fraction is not None
+        try:
+            split = _solve_k_loop(
+                mixture,
+                temperature,
+                pressure,
+                eos=eos,
+                activity_model=None,
+                mode=mode,
+                settings=settings,
+                z=z,
+                K=k_seed,
+                vapor_fraction=vapor_fraction,
+                # The full pre-ADR-0016 budget is spent on successive substitution
+                # before the second-order stage is allowed to touch anything, so every
+                # state that converged before this slice converges identically now.
+                # ``FlashSettings.ssi_iterations`` is deliberately *not* consulted here;
+                # see ADR-0016.
+                max_iter=settings.max_iter,
+                allow_unconverged=settings.second_order,
+                extended_rachford_rice=True,
+                roots_x=roots_x,
+                roots_y=roots_y,
+            )
+        except ModelError:
+            if not settings.second_order:
+                raise
+            # ADR-0024 decision 2, second trigger: successive substitution could
+            # not even form a K-value - the two phases' ``ln phi`` differ by more
+            # than the exponential's range, which is the Mw = 53 000 chain below
+            # the solvent's saturation pressure. There is no iterate to hand
+            # over, so the log-space stage starts from the stationary point
+            # instead. Only a state that raised before this slice reaches here.
+            log_seed = log_space_seed(
+                z=z,
+                w=trial_w,
+                tpd_min=float(stability.tpd_min),
+                incipient_vapor=incipient_phase == _VAPOR,
+            )
+            seed_label = "stability-log"
 
-    if not split.converged:
-        # Successive substitution ran out of budget (ADR-0016). The extra keys
-        # are added only on this branch: a converged first stage must produce
-        # the diagnostics mapping it produced before this slice, bit for bit.
-        x, y, beta, ln_f_x, ln_f_y, stage_diagnostics = _phi_phi_second_order(
+    if log_seed is not None:
+        split, stage_diagnostics = _phi_phi_log_space(
+            mixture,
             settings=settings,
             z=z,
-            split=split,
+            u0=log_seed,
             roots_x=roots_x,
             roots_y=roots_y,
+            seed="stability-w",
         )
+        x, y, beta = split.x, split.y, split.vapor_fraction
+        ln_f_x, ln_f_y = split.ln_f_x, split.ln_f_y
+    else:
+        x, y, beta = split.x, split.y, split.vapor_fraction
+        ln_f_x, ln_f_y = split.ln_f_x, split.ln_f_y
+
+        if not split.converged or not 0.0 < beta < 1.0:
+            # Successive substitution ran out of budget (ADR-0016), or it
+            # converged on the *trivial* solution, whose vapor fraction is
+            # outside [0, 1] and which the check below refuses. The second case
+            # is ADR-0024 decision 1: before this slice it raised here, so
+            # handing it to the second-order stage cannot move a number that
+            # was ever returned. The extra keys are added only on this branch: a
+            # converged first stage must produce the diagnostics mapping it
+            # produced before ADR-0016, bit for bit.
+            x, y, beta, ln_f_x, ln_f_y, stage_diagnostics = _phi_phi_second_order(
+                mixture,
+                settings=settings,
+                z=z,
+                split=split,
+                roots_x=roots_x,
+                roots_y=roots_y,
+            )
 
     if not 0.0 < beta < 1.0:
         raise ConvergenceError(
@@ -621,7 +693,118 @@ def _flash_tp_tangent_plane(
     )
 
 
+def _log_space_diagnostics(
+    mixture: Mixture,
+    *,
+    z: np.ndarray,
+    ln_x_ii: np.ndarray,
+    iterations: int,
+    residual: float,
+    seed: str,
+) -> dict[str, float | int | str | bool]:
+    """The ``log_space_*`` keys (ADR-0024 decision 3).
+
+    A phase composition that came out of the log-space stage may carry an exact
+    ``0.0`` where the model's ``ln phi`` difference exceeds the exponential's
+    range. The number itself is not lost - it is
+    ``exp(log_space_ln_x_min)`` for the component named in
+    ``log_space_ln_x_min_component`` - so the smallest log mole fraction of
+    phase II is reported here, whether or not it underflowed.
+
+    ``log_space_residual`` is reported for the same reason.
+    ``fugacity_residual`` is formed by
+    :func:`chemthermo.flash._verify._equilibrium_residual` over the components
+    present in **both** phases, so a component whose mole fraction underflowed
+    to ``0.0`` in one of them drops out of it; the stage's own residual is the
+    same quantity taken in log space over every component present in the feed,
+    and it is the number that says the polymer's equal-fugacity condition is
+    satisfied too.
+    """
+    active = z > 0.0
+    masked = np.where(active, ln_x_ii, math.inf)
+    position = int(np.argmin(masked))
+    with np.errstate(under="ignore"):
+        zeros = int(np.count_nonzero(active & (np.exp(masked) == 0.0)))
+    return {
+        "log_space_seed": seed,
+        "log_space_iterations": iterations,
+        "log_space_residual": float(residual),
+        "log_space_ln_x_min": float(masked[position]),
+        "log_space_ln_x_min_component": mixture.components[position].name,
+        "log_space_zero_fractions": zeros,
+    }
+
+
+def _phi_phi_log_space(
+    mixture: Mixture,
+    *,
+    settings: FlashSettings,
+    z: np.ndarray,
+    u0: np.ndarray,
+    roots_x: _PhaseRoot,
+    roots_y: _PhaseRoot,
+    seed: str,
+) -> tuple[_SplitSolution, dict[str, float | int | str | bool]]:
+    """Solve a phi-phi split entirely in log mole numbers (ADR-0024).
+
+    The successive-substitution loop is skipped: this route is taken only where
+    it has nowhere to start (see :func:`_flash_tp_tangent_plane`), so the split
+    is the log-space Newton stage alone, seeded directly in ``u``. The result is
+    packed into the same :class:`chemthermo.flash._split._SplitSolution` the
+    K-loop returns, so everything downstream - verification, naming, post-split
+    stability, assembly - is the code that was already there.
+
+    ``K = x^II / x^I`` is formed from the *logarithms* and may underflow to
+    ``0.0`` for a component whose mole fraction is not a double; ``k_min`` is
+    then an honest zero and the magnitude is in ``log_space_ln_x_min``.
+    """
+    refined = log_space_split(
+        z=z,
+        u0=u0,
+        terms_i=roots_x.ln_fugacity_terms,
+        terms_ii=roots_y.ln_fugacity_terms,
+        settings=settings,
+    )
+    if refined.residual > settings.tol:
+        raise ConvergenceError(
+            "flash_tp did not converge the phi-phi split in log mole numbers; "
+            f"equal-fugacity residual={refined.residual:.3e} after {refined.iterations} "
+            f"log-space Newton iterations from the {seed} seed."
+        )
+
+    active = z > 0.0
+    with np.errstate(over="ignore", under="ignore"):
+        ln_k = np.where(active, refined.ln_x_ii - np.log(np.where(active, refined.x_i, 1.0)), 0.0)
+        k_values = np.exp(ln_k)
+    split = _SplitSolution(
+        x=refined.x_i,
+        y=refined.x_ii,
+        vapor_fraction=refined.beta,
+        K=k_values,
+        ln_f_x=refined.ln_f_i,
+        ln_f_y=refined.ln_f_ii,
+        iterations=0,
+        max_delta=refined.max_delta_k,
+    )
+    diagnostics: dict[str, float | int | str | bool] = {
+        "ssi_iterations": 0,
+        "second_order_iterations": refined.iterations,
+        "converged_stage": "second-order-log",
+        "negative_flash_steps": 0,
+        **_log_space_diagnostics(
+            mixture,
+            z=z,
+            ln_x_ii=refined.ln_x_ii,
+            iterations=refined.iterations,
+            residual=refined.residual,
+            seed=seed,
+        ),
+    }
+    return split, diagnostics
+
+
 def _phi_phi_second_order(
+    mixture: Mixture,
     *,
     settings: FlashSettings,
     z: np.ndarray,
@@ -692,6 +875,37 @@ def _phi_phi_second_order(
             residual = _equilibrium_residual(x, y, ln_f_x, ln_f_y)
             converged_stage = "second-order"
 
+    log_space_diagnostics: dict[str, float | int | str | bool] = {}
+    if settings.second_order and residual > settings.tol:
+        # ADR-0024 decision 1, second entry point: the linear stage failed, so
+        # the same minimization is retried in log mole numbers from the best
+        # iterate it produced. Only a state that would otherwise raise below
+        # reaches this, so no converged number moves.
+        try:
+            log_refined = log_space_split(
+                z=z,
+                u0=seed_from_iterate(z=z, x_ii=y, beta=beta),
+                terms_i=terms_x,
+                terms_ii=terms_y,
+                settings=settings,
+            )
+        except ModelError:
+            log_refined = None
+        if log_refined is not None and log_refined.residual < residual:
+            x, y, beta = log_refined.x_i, log_refined.x_ii, log_refined.beta
+            ln_f_x, ln_f_y = log_refined.ln_f_i, log_refined.ln_f_ii
+            residual = log_refined.residual
+            converged_stage = "second-order-log"
+            log_space_diagnostics = _log_space_diagnostics(
+                mixture,
+                z=z,
+                ln_x_ii=log_refined.ln_x_ii,
+                iterations=log_refined.iterations,
+                residual=log_refined.residual,
+                seed="linear-iterate",
+            )
+            second_order_iterations += log_refined.iterations
+
     if residual > settings.tol:
         raise ConvergenceError(
             "flash_tp did not converge the phi-phi split; equal-fugacity residual="
@@ -705,6 +919,7 @@ def _phi_phi_second_order(
         "second_order_iterations": second_order_iterations,
         "converged_stage": converged_stage,
         "negative_flash_steps": split.negative_flash_steps,
+        **log_space_diagnostics,
     }
     return x, y, float(beta), ln_f_x, ln_f_y, diagnostics
 

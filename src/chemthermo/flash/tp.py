@@ -37,6 +37,16 @@ ADR-0010). The flow is
    allowed to leave ``[0, 1]`` - the "negative flash" of Whitson & Michelsen
    (1989) on the Leibovici-Neoschil window - and a second-order stage finishes
    the split when successive substitution does not; see ADR-0016.
+
+   Where the stationary point has a component below ``1e-30`` **and** its
+   K-values bracket no vapor fraction at all - a polymer/solvent
+   vapour-liquid state, where the minimizer is an essentially pure melt and
+   ``K`` spans ``1e+180`` - the loop has nowhere to start, and the split is
+   solved instead in **log mole numbers** from a seed built out of the same
+   stationary point (``k_seed = "stability-log"``, ADR-0024). The same
+   log-space stage also finishes a split the linear second-order stage could
+   not, and rescues one whose K-values were not even representable.
+   ``diagnostics["converged_stage"] == "second-order-log"`` records it.
 4. ``status == "inconclusive"``: a :class:`chemthermo.ConvergenceError` is
    raised. A stability search that could not converge must not silently produce
    a single-phase answer.
@@ -248,7 +258,15 @@ def flash_tp(
           and ``negative_flash_steps``. Those four keys are absent from a
           phi-phi result that converged in the first stage, deliberately: such
           a result carries the mapping it carried before ADR-0016, down to the
-          last bit. Use ``.get()`` for them. Gamma-gamma additionally reports
+          last bit. Use ``.get()`` for them. When the ADR-0024 **log-space**
+          stage ran (``converged_stage == "second-order-log"``) five more
+          appear: ``log_space_seed`` (``"stability-w"`` or
+          ``"linear-iterate"``), ``log_space_iterations``,
+          ``log_space_residual``, ``log_space_ln_x_min`` with
+          ``log_space_ln_x_min_component`` (the smallest log mole fraction of
+          the split's second phase and the component it belongs to), and
+          ``log_space_zero_fractions`` (how many of that phase's mole
+          fractions underflowed to an exact ``0.0``). Gamma-gamma additionally reports
           ``ssi_iterations``,
           ``second_order_iterations`` and ``converged_stage``. Modified-raoult
           reports ``incipient_phase``, ``k_min``, ``k_max``, the three stage
@@ -343,6 +361,21 @@ def flash_tp(
         ``["phase_ii_branch"]`` report the measured identity of each converged
         root, and are present **only** when that pair is not
         ``("liquid", "vapor")``; use ``.get()``.
+
+        **A mole fraction may be exactly zero (ADR-0024).** When the two
+        phases' ``ln phi`` differ by more than the exponential's range - a
+        53 000 g/mol polyethylene in n-pentane has a vapour-phase polymer mole
+        fraction of ``exp(-1315)`` - the composition carries ``0.0`` for that
+        component, because ``0.0`` is the nearest double there is. The number
+        is not lost: its logarithm is
+        ``diagnostics["log_space_ln_x_min"]``, with the component named in
+        ``diagnostics["log_space_ln_x_min_component"]``. Nothing else is
+        approximated by it - the *other* phase then holds every mole of that
+        component the feed had, so the material balance is exact rather than
+        nearly exact, and the equal-fugacity condition for that component is
+        verified in log space by the stage itself
+        (``diagnostics["log_space_residual"]``; ``fugacity_residual`` is taken
+        over the components present in both phases and so cannot see it).
 
         **Liquid-liquid phase names are roles, not identities - except on the
         phi-phi path.** On the ``gamma-gamma`` and ``modified-raoult`` paths
