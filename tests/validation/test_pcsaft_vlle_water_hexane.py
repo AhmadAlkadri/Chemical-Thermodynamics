@@ -410,3 +410,47 @@ def test_feos_chemical_potentials_are_equal_across_the_ternary_triangle() -> Non
     assert sorted(result.phases) == ["liquid1", "liquid2", "vapor"]
     assert result.diagnostics["phase_regime"] == "VLLE"
     assert _worst_potential_difference(TERNARY, TERNARY_T_K, ours) < POTENTIAL_TOL
+
+
+# ---------------------------------------------------------------------------
+# Case P-18: the states ADR-0029 repaired
+# ---------------------------------------------------------------------------
+#
+# Both are `multiphase-solver-failure` states of the robustness map at
+# `74820b8` that ADR-0029 turned into verified vapour-liquid answers, and both
+# are checked here the same way everything above is: FeOs's own chemical
+# potentials at chemthermo's converged phases and densities, with matched
+# universal constants. They are `slow`-marked as *repetitions* - the default
+# run already makes this comparison on the two liquids below `T3`, which is the
+# same measurement on the same binary - and the solver-side verification of
+# these states (an independent Newton, the Gibbs ordering, the mass balance)
+# lives in `tests/test_flash_eos_multiphase_robustness.py` and runs by default.
+
+
+#: The water-lean feed of Case P-18 (i): 4 states above `T3` that used to raise
+#: "a two-phase set converged to a non-positive phase fraction".
+WATER_LEAN_FEED = (0.05, 0.95)
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize("offset_K", [0.01, 1.0], ids=["T3+0.01", "T3+1.0"])
+@pytest.mark.usefixtures("matched_constants")
+def test_feos_chemical_potentials_agree_on_the_water_lean_band_above_t3(
+    three_phase_temperature, offset_K: float
+) -> None:
+    """Case P-18 (i): the hexane-rich liquid against the vapour, per FeOs."""
+    temperature = three_phase_temperature + offset_K
+    result, ours = _our_phases(BINARY, temperature, WATER_LEAN_FEED)
+    assert sorted(result.phases) == ["liquid", "vapor"]
+    assert result.diagnostics["phase_regime"] == "VLE"
+    assert float(ours["liquid"][0][0]) < 0.05
+    assert _worst_potential_difference(BINARY, temperature, ours) < POTENTIAL_TOL
+
+
+@pytest.mark.slow
+@pytest.mark.usefixtures("matched_constants")
+def test_feos_chemical_potentials_agree_at_the_hexane_rich_ternary_corner() -> None:
+    """Case P-18 (i), ternary: `(0.1, 0.1, 0.8)` at 333 K, two phases not three."""
+    result, ours = _our_phases(TERNARY, TERNARY_T_K, (0.1, 0.1, 0.8))
+    assert sorted(result.phases) == ["liquid", "vapor"]
+    assert _worst_potential_difference(TERNARY, TERNARY_T_K, ours) < POTENTIAL_TOL
