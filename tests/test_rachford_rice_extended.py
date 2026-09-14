@@ -298,3 +298,122 @@ def test_the_extended_solver_never_reports_bracketed_outside_the_unit_interval()
         assert window is not None
         assert window[0] < beta < window[1]
         assert np.all(1.0 + beta * (K - 1.0) > 0.0)
+
+
+# --------------------------------------------------------------------------
+# The underflowed-K cancellation (ADR-0026).
+# --------------------------------------------------------------------------
+
+
+#: The stability seed of polyethylene(53000) / n-pentane at 453 K and 3.0 MPa,
+#: 5 wt% polymer: a trace polymer feed against an essentially pure solvent
+#: incipient phase. Reproduced in
+#: ``tests/test_pcsaft_polymer.py::test_the_underflowed_k_is_the_stability_seed_at_3_mpa``
+#: from the model itself; kept here as plain numbers so this module stays a
+#: test of the *equation* and needs no equation of state.
+TRACE_Z = np.array([7.163935597e-05, 9.999283606e-01])
+TRACE_K = np.array([1.11871119e-18, 1.00132622e00])
+
+
+def test_the_naive_denominator_cancels_to_zero_at_beta_one() -> None:
+    """The measured cause, stated as floating-point arithmetic.
+
+    ``K - 1`` is an exact ``-1.0`` for any ``K`` below the spacing of doubles
+    at one, so ``1 + 1 * (K - 1)`` is an exact ``0.0`` - and the positivity
+    guard then reports "no admissible vapour fraction" for an equation that
+    brackets a root perfectly well.
+    """
+    assert TRACE_K[0] - 1.0 == -1.0
+    assert 1.0 + 1.0 * (TRACE_K[0] - 1.0) == 0.0
+    # The convex combination is the same quantity and does not cancel.
+    assert (1.0 - 1.0) + 1.0 * TRACE_K[0] == TRACE_K[0]
+
+    # f(0) and f(1) straddle zero, so a root exists in [0, 1].
+    f0 = float(np.sum(TRACE_Z * (TRACE_K - 1.0)))
+    f1 = float(np.sum(TRACE_Z * (TRACE_K - 1.0) / TRACE_K))
+    assert f0 > 0.0 > f1
+    assert f1 < -1e13
+
+    # And the default in-window solver - the one the phi-phi split consults
+    # before it decides how to seed itself - reports none.
+    assert _rachford_rice(TRACE_Z, TRACE_K)[0] is None
+
+
+def test_the_convex_denominator_finds_that_root_and_it_is_the_root() -> None:
+    """The repair is of the equation, not of the search.
+
+    The wider (negative-flash) window happens to find a root here too - it
+    never evaluates ``f`` at exactly ``beta = 1``, so the cancellation does not
+    reach it - but that is luck, and the caller that refused this state
+    (``chemthermo.flash._detect._flash_tp_tangent_plane``) asks the in-window
+    solver. What ``convex_denominators`` does is give that solver back the
+    ``f(1)`` it always had.
+    """
+    plain, plain_status = _extended_rachford_rice(TRACE_Z, TRACE_K)
+    assert plain is not None and plain_status == "bracketed"
+
+    beta, status = _extended_rachford_rice(TRACE_Z, TRACE_K, convex_denominators=True)
+    assert beta is not None
+    assert status == "bracketed"
+    assert 0.0 < beta < 1.0
+
+    # Independently written residual, in the cancellation-free form.
+    def f(v: float) -> float:
+        return float(np.sum(TRACE_Z * (TRACE_K - 1.0) / ((1.0 - v) + v * TRACE_K)))
+
+    assert abs(f(beta)) < 1e-12
+    # The closed form for a binary: clearing the two denominators of
+    # ``z_1 a_1 / t_1 + z_2 a_2 / t_2 = 0`` with ``a_i = K_i - 1`` and
+    # ``t_i = 1 + beta a_i`` leaves ``z_1 a_1 + z_2 a_2 + beta a_1 a_2 = 0``
+    # for a normalized feed, which is linear in beta.
+    z1, z2 = TRACE_Z
+    a1, a2 = TRACE_K - 1.0
+    closed = -(z1 * a1 + z2 * a2) / (a1 * a2)
+    assert beta == pytest.approx(closed, rel=1e-9)
+
+    # Both phase compositions are non-negative there.
+    t = (1.0 - beta) + beta * TRACE_K
+    assert np.all(t > 0.0)
+    assert np.all(TRACE_Z / t >= 0.0)
+
+
+def test_the_convex_form_is_off_by_default_and_moves_no_root_that_existed() -> None:
+    """Bit-identity: the same double wherever the naive denominator worked.
+
+    ``f(0)``'s denominator is an exact ``1.0`` either way and the bisection
+    only ever evaluates ``f`` strictly inside ``(0, 1)``, where the naive form
+    is admissible and is therefore what both spellings use. Asserted with
+    ``==`` on synthetic K-sets and on K-vectors from real flash iterations.
+    """
+    rng = np.random.default_rng(20260914)
+    compared = 0
+    for _ in range(400):
+        n = int(rng.integers(2, 5))
+        z = rng.random(n) + 1e-3
+        z = z / z.sum()
+        K = np.exp(rng.normal(0.0, 1.5, size=n))
+        plain, _f0, _f1 = _rachford_rice(z, K)
+        convex, _g0, _g1 = _rachford_rice(z, K, convex_denominators=True)
+        if plain is None:
+            continue
+        compared += 1
+        assert convex == plain
+        assert (
+            _extended_rachford_rice(z, K, convex_denominators=True)[0]
+            == (_extended_rachford_rice(z, K)[0])
+        )
+    assert compared >= 50, compared
+
+    for z, K in _iteration_k_vectors():
+        plain, _f0, _f1 = _rachford_rice(z, K)
+        if plain is None:
+            continue
+        assert _rachford_rice(z, K, convex_denominators=True)[0] == plain
+
+
+def test_the_convex_form_still_refuses_a_genuinely_rootless_k_set() -> None:
+    """It repairs a rounding artefact, not the single-phase verdict itself."""
+    z = np.array([0.4, 0.6])
+    for K in (np.array([0.3, 0.5]), np.array([2.0, 4.0])):
+        assert _rachford_rice(z, K, convex_denominators=True)[0] is None
+        assert _extended_rachford_rice(z, K, convex_denominators=True) == (None, "single-phase")
