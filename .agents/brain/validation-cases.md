@@ -3862,12 +3862,16 @@ compressibility.
 - **The fixture did not move.** `refactor_bit_identity_v3.json` (155 states)
   passes unchanged and was **not** regenerated. All nine ADR-0023 benchmark
   cases report **identical result hashes**.
-- **A remaining limitation, pinned rather than worked around.** `Mw = 53000` at
-  0.5 and 1 MPa still raises. The cause is upstream of this slice:
-  `stability_tp`'s deepest stationary point there is a shallow *vapour-side*
-  one (`tpd_min` = -1.05e-04 and -3.38e-04), so the melt is never found and the
-  stage is seeded 1300 orders of magnitude from the answer. That is a
-  **stability trial set** limitation for `m = 1393.9`.
+- ~~**A remaining limitation, pinned rather than worked around.** `Mw = 53000`
+  at 0.5 and 1 MPa still raises... a **stability trial set** limitation for
+  `m = 1393.9`.~~ **RESOLVED by ADR-0025 (Case P-15).** The diagnosis was half
+  right. It was upstream of this slice and it was in `stability_tp`, but not in
+  the *trial set*: three of its four trials were walking straight at the melt
+  and were held 752.2 short of it by a clamp on `ln W` at 700, the melt's
+  stationary point being at `ln W_polymer = 1452.21`. With the normalization
+  done in logarithms the melt is the minimizer (`tpd_min` -1452.21 / -1346.57)
+  and **this stage, unchanged, converges from it**. The reversal is pinned in
+  `tests/test_flash_log_space_stage.py::test_the_longest_chain_below_1_mpa_is_now_in_reach`.
 - **Nothing here is compared against measurement.** The parameters are the
   Case P-12 fixture, the `k_ij` was fitted elsewhere, and the polymer is
   modelled as monodisperse.
@@ -4064,3 +4068,216 @@ worth keeping:
   `tests/test_bench_harness.py` (7), plus the whole existing suite unchanged.
 - **Script:** `python -m chemthermo.bench --out record.json` and
   `python -m chemthermo.bench --compare before.json after.json`.
+
+---
+
+## Case P-15: The tangent-plane melt a clamp on `ln W` had made unreachable
+
+- **Source:** a **one-dimensional** equal-fugacity solve written independently
+  in the example (the vapour taken as *exactly* pure solvent, one unknown
+  carried as `ln x_solvent`, finite-difference Newton started a thousandth away
+  from `flash_tp`'s answer); **FeOs 0.10.1** chemical potentials at
+  chemthermo's converged phases and densities; and, for the stationary point
+  itself, Michelsen's own equations (5) and (7) re-derived from `PCSAFTEOS` in
+  the test and again in the example.
+- **Location:** `chemthermo/stability/tp.py` (`_normalize`, the four removed
+  `np.clip(..., -700, 700)`), `chemthermo/stability/results.py`,
+  `chemthermo/flash/_detect.py`, `chemthermo/flash/_log_space.py`; slice
+  `stability-log-space-sums` (ADR-0025). **No model equation, no split solver,
+  no trial set, no initial estimate, no convergence criterion and no tolerance
+  changed.**
+- **Parameters and provenance:** exactly Case P-13's and Case P-14's -
+  polyethylene from `tests/fixtures/pcsaft/martini2009_polymers.json`
+  (`m/M = 0.026300 mol/g`, so `m = 1393.9` at `Mw = 53 000`), n-pentane from
+  Gross & Sadowski (2001) Table 1, `k_ij = -0.006` except for the FeOs routes,
+  which run at `k_ij = 0` on both sides because feos 0.10.1 cannot be given
+  one from Python. Nothing here is compared against measurement.
+- **Assumptions:** monodisperse polymer; 453.0 K throughout; feed stated as a
+  polymer **mass** fraction (5 wt%, so
+  `z = (7.163935601491655e-05, 0.9999283606439852)`).
+
+### (i) The defect, measured before it was repaired
+
+`stability_tp`'s deterministic trial set was never the problem. Three of its
+four trials - `wilson-liquid` and both `pure-<name>` estimates - were walking
+at the melt and could not arrive, because the iteration clamped
+`ln W` to `[-700, 700]` and the melt's stationary point is at
+`ln W_polymer = 1452.21`.
+
+| P / MPa | `tpd_min` before | minimizing trial before | the three liquid trials before |
+| --- | --- | --- | --- |
+| 0.5 | -1.0518e-04 | `wilson-vapor`, 8 iterations | `second_order_no_progress` after **51** iterations at `w = (1, 3.67e-303)`, residual **752.2** |
+| 1.0 | -3.3766e-04 | `wilson-vapor`, 4 iterations | `second_order_no_progress` after **51** iterations at `w = (1, 6.77e-303)`, residual **646.6** |
+
+`752.2 = 1452.21 - 700` exactly: the residual the clamped trial reports *is*
+the distance the clamp was holding it back. `flash_tp` then raised
+`ConvergenceError` at both states (Case P-14, "a remaining limitation").
+
+### (ii) The stationary point, after
+
+| P / MPa | `tpd_min` | `ln W` = (polymer, solvent) | iterations | stationarity residual |
+| --- | --- | --- | --- | --- |
+| 0.5 | **-1452.20680935942** | `(1452.20680935942, 3.616782632957839)` | 3 SSI | 4.26e-14 |
+| 1.0 | **-1346.573440835703** | `(1346.5734, 4.2287)` | 3 SSI | 8.53e-14 |
+
+- **Expected outcome:** equation (5), `ln W_i + ln phi_i(w) - d_i = 0` on the
+  trial's own surface, and equation (7), `tpd = -ln(sum_i W_i)`.
+- **Achieved (re-derived from `PCSAFTEOS` in the example, not read from the
+  solver):** equation (5) to **4.3e-14** / 8.5e-14; equation (7) to **exactly
+  0.0** at both states.
+- `sum_W` itself is `inf` and `tm_at_stationary_point` is `-inf`; `ln_sum_W` is
+  1452.2068 / 1346.5734. The normalized `w` is `(1.0, 0.0)` - the solvent's
+  share of the melt is `exp(-1448.6)` - which is why `ln W` is reported
+  separately and is what the split stage is seeded from.
+- The minimizer is the melt (`phase_branch = "liquid"`, `feed_branch = "vapor"`)
+  and 3 of 4 trials engage the log-space route at both states.
+
+### (iii) The split it seeds
+
+| P / MPa | melt `x` (polymer, solvent) | melt, wt% solvent | `beta_vapor` | `ln y_polymer` | log-space iterations |
+| --- | --- | --- | --- | --- | --- |
+| 0.5 | `(0.021187890289570684, 0.9788121097104293)` | 5.916 | 0.996618853739762 | **-1507.9818790382** | 16 |
+| 1.0 | `(0.009098397632060337, 0.9909016023679396)` | 12.911 | 0.9921261568342015 | **-1452.6599876925** | 11 |
+
+- `k_seed = "stability-log"`, `converged_stage = "second-order-log"`,
+  `phase_label_method = "compressibility"` at both.
+- Residuals: `fugacity_residual` 1.30e-13 / 3.27e-14, `log_space_residual`
+  1.59e-12 / 4.55e-13, `mass_balance_residual` 1.11e-16 at both,
+  `delta_g_split_rt` **-1.0710e-01** / -1.0291e-01, both phases post-split
+  **stable**.
+- Compressibility identity (ADR-0017), from the public `pressure_Pa` routine:
+  vapour `kappa` 1.0680 / 1.1603, melt `kappa` 0.0010 / 0.0023, against the
+  0.5 threshold.
+
+### (iv) The independent one-dimensional solve
+
+- **Expected outcome:** the vapour is pure solvent to `exp(-1508)`, so the melt
+  must satisfy `ln phi_s^V(pure solvent vapour) = ln x_s + ln phi_s^L(x)`
+  exactly, in one unknown. Nothing of the flash or of the stability test is
+  used - only `density_roots` and `ln_fugacity_coefficients` at `(T, rho, x)`.
+- **Achieved:** `|x_solvent(flash) - x_solvent(1-D)|` = **1.20e-14** (0.5 MPa)
+  and **3.55e-15** (1.0 MPa), against an asserted 1e-10.
+- The polymer's *own* condition, the one neither the linear split nor the
+  clamped stability iteration could write down: `ln f_PE` = **-1591.0434549748**
+  (0.5 MPa) and **-1626.3242034592** (1.0 MPa), melt against vapour, closing to
+  **1.59e-12** and **1.14e-12**.
+
+### (v) FeOs at chemthermo's phases
+
+- **Expected outcome:** `mu_i^I / RT = mu_i^II / RT` at chemthermo's two
+  compositions and two densities, evaluated by an independent implementation.
+  The polymer's ideal term is `-inf` on both sides (`y_polymer` is an exact
+  `0.0`), so what is compared is the solvent's potential - the equation that
+  sets the answer.
+- **Achieved:** **1.105e-12** with FeOs's own universal constants substituted
+  in, **8.550e-08** as shipped (chemthermo packages the ten figures of Gross &
+  Sadowski 2001 as printed; FeOs hard-codes fourteen). Asserted 1e-08 on the
+  matched-constants figure.
+- FeOs's own `tp_flash` is **not** a reference here, for the reasons Case P-13
+  (iii) records; only its potentials are used.
+
+### (vi) What the repair is worth beyond the two pinned states
+
+Over the whole region where the feed is a vapour, 0.4 to 2.0 MPa:
+
+| P / MPa | before | after |
+| --- | --- | --- |
+| 0.40 | `ConvergenceError` | VLE, melt `x_solvent` 0.9728932929, `tpd_min` -1472.0588 |
+| 0.50 | `ConvergenceError` | VLE, 0.9788121097, -1452.2068 |
+| 0.75 | `ConvergenceError` | VLE, 0.9868285386, -1400.8038 |
+| 1.00 | `ConvergenceError` | VLE, 0.9909016024, -1346.5734 |
+| 1.50 | VLE, 0.9950537550 | VLE, 0.9950537550, -1226.8213 |
+| 2.00 | VLE, 0.9972263035 | VLE, 0.9972263035, -1081.7506 |
+
+The whole picture, from a 0.3-3.6 MPa sweep at 0.1 MPa steps run against this
+commit's parent and against this one, on **both** molar masses (68 states):
+
+| outcome | states |
+| --- | --- |
+| identical, bit for bit | **48**, including every one of the 34 `Mw = 16 400` states |
+| `ConvergenceError` -> a verified split | **13**: 0.4-1.4 MPa (vapour-liquid), 2.6 and 2.7 MPa (liquid-liquid) |
+| converged before, moved in the last bits | **7**: 1.5-2.1 MPa |
+| converged before, raises now | **0** |
+
+The two liquid-liquid repairs at 2.6 and 2.7 MPa come from the `ln W` hand-over
+rather than from the sum: their *verdict* is unchanged, but the minimizing
+trial reaches `ln W_polymer = -1187`, so the seed is now built from `ln W`
+instead of from a `w` that had rounded to zero.
+
+At 2.2-2.5 MPa the feed's own lowest-Gibbs branch is the liquid root, there is
+no melt stationary point distinct from it, and both the verdict and the split
+are **identical** to before (2.2 MPa: `tpd_min = -8.4453e-02`, melt
+`x_polymer = 0.0021352851683857058`, `beta = 0.9664497477547337`; 2.5 MPa:
+`-1.7459e-02`, `0.0012513825804704919`, `0.9427518353436072`). At 0.3 MPa and
+2.8-3.2 MPa `flash_tp` raised before and raises now - a pre-existing gap in the
+split stage's budget at a shallow near-critical verdict, untouched here.
+
+### Negative controls and what is *not* claimed
+
+- **Dormancy, measured one evaluation at a time.** The gate runs the
+  pre-ADR-0025 expressions wherever every `ln W_i` is inside `[-700, 700]`,
+  which is wherever the old `np.clip` returned its argument. Engagement count:
+  **0 of 624 trials over the 144-state Peng-Robinson stability grid** (144
+  states), **0 of 12** over the three `Mw = 16 400` states of Case P-14 (worst
+  `|ln W|` there = **444.2**, comfortably inside the window), and 0 on
+  Peng-Robinson methane/ethane at 240 K / 3 MPa, PC-SAFT water/n-hexane at
+  298.15 K / 1 atm, and an NRTL n-butanol/water liquid-liquid test.
+- **The fixture did not move.** `refactor_bit_identity_v3.json` (155 states)
+  passes **unchanged** and was **not** regenerated. All nine ADR-0023 benchmark
+  cases report **identical result hashes**.
+- **Seven states did move, and they are exactly the ones the gate permits.**
+  `Mw = 53 000` between 1.5 and 2.1 MPa had a clamped trial *and* still
+  produced an answer; they are now seeded from the melt instead of from a
+  shallow vapour-side point and converge on the same answer from a different
+  direction. Worst over the seven: `x_polymer` **3.48e-13** relative (2.0 MPa,
+  2.7736965292611865e-03 -> 2.7736965292621523e-03; at 1.5 MPa
+  0.004946244958517399 -> 0.004946244958516641, 1.53e-13) and `beta_vapor`
+  **9.23e-15**. The 2.0 MPa melt composition is pinned at `rel=1e-9` in
+  `tests/test_flash_log_space_stage.py` and still passes. **No state that
+  converged before raises now.**
+- **`ln W` versus the reconstruction it replaces.** The split seed used to be
+  built as `ln W = ln w - tpd`. Over the **47 unstable verdicts** of the
+  144-state Peng-Robinson grid the two agree to **5.4e-15**. Over *stable*
+  verdicts they differ by up to **4.44**, which is not new and not a defect -
+  `tpd_min` is measured to the lower envelope of the phase candidates while
+  `ln sum_W` is equation (7) on the surface the trial iterated on (ADR-0021) -
+  and a stable verdict seeds nothing. This is why `ln W` is handed over only
+  where the reconstruction has stopped working.
+- **The Newton stage at `|ln W| ~ 1e3` is untested.** Every state this slice
+  repairs converges in 3 successive substitutions, so the second-order stage is
+  never entered there. Its multiplicative `1e-6` step in `u` is scale-free by
+  the same argument ADR-0024 made for its own Hessian, but that is an argument,
+  not a measurement.
+- **`stable` is still not a global proof.** One family of stationary points
+  became reachable; nothing is claimed about stationary points no initial
+  estimate approaches.
+- **Nothing here is compared against measurement.** The parameters are the Case
+  P-12 fixture, the `k_ij` was fitted elsewhere, and the polymer is modelled as
+  monodisperse.
+- **Tolerance:** asserted 1e-08 on equations (5) and (7) at the stationary
+  point (achieved 8.5e-14 and 0.0); 1e-10 absolute on the melt's solvent mole
+  fraction against the 1-D solve (achieved 1.20e-14); 1e-12 on the mass balance
+  (achieved 1.11e-16); 1e-08 on the fugacity residual, the log-space residual
+  and the polymer's log fugacity (achieved 1.30e-13, 1.59e-12, 1.59e-12);
+  `dG < 0` and post-split stable at both states; 1e-08 on FeOs's chemical
+  potentials with matched constants (achieved 1.105e-12).
+- **Independent route:** Michelsen's equations re-derived from the model; the
+  one-dimensional equal-fugacity solve; FeOs's chemical potentials; and a
+  **synthetic two-branch equation of state** whose stationary point is known in
+  closed form (`ln W_i = ln z_i + ln phi_i^V - ln phi_i^L`,
+  `tpd = -logsumexp(ln W)`), which exercises the same code path at
+  `ln W = 1497.6` with no polymer and no PC-SAFT in sight.
+- **Suite time:** `pytest -q` **237.18 s (3:57) for 830 tests at `aa4a666` ->
+  250.95 s (4:10) for 852**, uncontended on the one machine; `pytest -q -m slow`
+  **694.93 s (11:34) for 34 -> 699.63 s (11:39) for 40**. 22 tests added, none
+  removed and one reversed in place; the six marked `slow` are all
+  *repetitions* - the 1 MPa half of a two-pressure statement whose 0.5 MPa half
+  runs by default, and four further pressures on the same 0.4-1.4 MPa band. The
+  new golden path costs about 4.5 s inside `tests/test_examples.py`. 4:10 is a
+  little over the ~4 min target and is stated rather than trimmed further, as
+  it was at the previous slice.
+- **Test path:** `tests/test_stability_log_space.py` (21 by default, 6 `slow`),
+  `tests/test_flash_log_space_stage.py` (the former pinned miss, reversed).
+- **Script:** `python examples/validation/22_stability_log_space.py` (routes 1,
+  2, 3 and 5 need no optional dependency; about 5 s; `--full` adds the
+  144-state Peng-Robinson stability grid and the 0.4-2 MPa scan, about 10 s).
