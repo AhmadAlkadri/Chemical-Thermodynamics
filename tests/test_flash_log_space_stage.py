@@ -43,12 +43,18 @@ from chemthermo.flash import _detect
 from chemthermo.flash._common import wilson_k
 from chemthermo.flash._log_space import (
     TRACE_MOLE_FRACTION,
+    _safeguarded_directions,
     has_trace_component,
     log_space_seed,
     log_space_split,
     seed_from_iterate,
 )
-from chemthermo.flash._split import _rachford_rice, _rachford_rice_window, _solve_k_loop
+from chemthermo.flash._split import (
+    _PhaseRoot,
+    _rachford_rice,
+    _rachford_rice_window,
+    _solve_k_loop,
+)
 from chemthermo.flash.settings import FlashSettings
 from chemthermo.parameters import PCSAFTParameters, PCSAFTRecord
 
@@ -530,3 +536,199 @@ def test_the_log_space_stage_is_dormant_on_ordinary_states(case: str) -> None:
     assert not [key for key in result.diagnostics if key.startswith("log_space_")]
     assert result.diagnostics.get("converged_stage") != "second-order-log"
     assert result.diagnostics["k_seed"] != "stability-log"
+
+
+# ---------------------------------------------------------------------------
+# The curvature safeguard (ADR-0026, validation Case P-16)
+# ---------------------------------------------------------------------------
+
+#: ``Mw = 53 000`` at 0.3 MPa: the one state where the ADR-0024 iteration
+#: parks next to the *trivial* solution instead of converging. The numbers are
+#: measured at HEAD 584c508 and reproduced by
+#: ``examples/validation/22_stability_log_space.py``.
+STALL_PRESSURE_PA = 3.0e5
+STALL_RESIDUAL = 3.900817e-05
+#: The answer the safeguarded stage reaches, confirmed by a one-dimensional
+#: equal-fugacity solve that shares no code with the flash (the melt's solvent
+#: mole fraction agrees to 1.4e-14).
+STALL_MELT_SOLVENT = 0.9631916542803276
+
+
+_STALL_CACHE: list[tuple[np.ndarray, np.ndarray, _PhaseRoot, _PhaseRoot]] = []
+
+
+def _stall_setup() -> tuple[np.ndarray, np.ndarray, _PhaseRoot, _PhaseRoot]:
+    """The seed and the two root holders of the 0.3 MPa state.
+
+    Cached: building it runs a stability test, and the two tests below want the
+    *same* seed, which is the point they are making.
+    """
+    if _STALL_CACHE:
+        return _STALL_CACHE[0]
+    mixture = _mixture(0.05, 53000.0)
+    eos = _eos(KIJ, 53000.0)
+    z = np.asarray(mixture.fractions, dtype=float)
+    stability = ct.stability_tp(
+        mixture, temperature_K=TEMPERATURE_K, pressure_Pa=STALL_PRESSURE_PA, eos=eos
+    )
+    assert stability.trial_composition is not None
+    w = np.asarray(stability.trial_composition, dtype=float)
+    ln_capital_w = _detect._stationary_point_ln_capital_w(stability)
+    _k, incipient = _detect._stability_k_seed(
+        mixture,
+        TEMPERATURE_K,
+        STALL_PRESSURE_PA,
+        z=z,
+        w=w,
+        tpd_min=float(stability.tpd_min),
+        ln_capital_w=ln_capital_w,
+    )
+    u0 = log_space_seed(
+        z=z,
+        w=w,
+        tpd_min=float(stability.tpd_min),
+        incipient_vapor=incipient == "vapor",
+        ln_capital_w=ln_capital_w,
+    )
+    roots_x, roots_y = _detect._phi_phi_roots(
+        eos,
+        mixture,
+        TEMPERATURE_K,
+        STALL_PRESSURE_PA,
+        feed_branch=stability.feed_branch,
+        incipient_branch=stability.phase_branch,
+        incipient_phase=incipient,
+        seed_label="stability-log",
+    )
+    _STALL_CACHE.append((z, u0, roots_x, roots_y))
+    return _STALL_CACHE[0]
+
+
+def test_the_unsafeguarded_stage_parks_next_to_the_trivial_solution() -> None:
+    """The defect, measured rather than described.
+
+    ``-r`` is a descent direction for ``g`` but its *length* is ``|r|``: once
+    the residual is small the step is small, whatever distance is left. Here
+    the Newton direction is rejected at every iterate (the Gibbs Hessian is
+    indefinite next to the trivial solution) and the stage spends its whole
+    budget with the two phases at the same composition.
+    """
+    z, u0, roots_x, roots_y = _stall_setup()
+    split = log_space_split(
+        z=z,
+        u0=u0,
+        terms_i=roots_x.ln_fugacity_terms,
+        terms_ii=roots_y.ln_fugacity_terms,
+        settings=FlashSettings(),
+    )
+    assert split.iterations == FlashSettings().second_order_max_iter
+    assert split.residual == pytest.approx(STALL_RESIDUAL, rel=1e-5)
+    assert split.residual > FlashSettings().tol
+    # Both phases are still within a few percent of the feed in the solvent,
+    # which is what "next to the trivial solution" means here: the polymer-rich
+    # phase holds 7.5e-05 polymer where the answer is 3.7e-02, five hundred
+    # times more, and the phase fraction is 0.042 where the answer is 0.998.
+    assert split.x_i[1] == pytest.approx(float(z[1]), rel=1e-3)
+    assert split.x_i[0] < 1e-4 < 1e-2 < 1.0 - STALL_MELT_SOLVENT
+    assert split.beta == pytest.approx(0.0417, rel=1e-2)
+
+
+def test_the_safeguard_converges_the_same_seed_from_the_same_place() -> None:
+    """Same seed, same model, same tolerance - only the direction rule changes."""
+    z, u0, roots_x, roots_y = _stall_setup()
+    split = log_space_split(
+        z=z,
+        u0=u0,
+        terms_i=roots_x.ln_fugacity_terms,
+        terms_ii=roots_y.ln_fugacity_terms,
+        settings=FlashSettings(),
+        curvature_safeguard=True,
+    )
+    assert split.residual < 1e-12
+    assert split.iterations <= 20
+    assert split.x_i[1] == pytest.approx(STALL_MELT_SOLVENT, rel=1e-12)
+    assert 0.0 < split.beta < 1.0
+    # The melt really is polymer-rich and the incipient phase really is not.
+    assert split.x_i[0] > 100.0 * float(z[0])
+    assert split.ln_x_ii[0] < -1000.0
+
+
+def test_the_safeguard_leaves_a_converging_state_on_the_same_answer() -> None:
+    """Continuity: where the default rule converges, the safeguard agrees.
+
+    It is a different sequence of iterates - it is allowed to be - so this is
+    an agreement to the stage's own tolerance, not a bit-identity claim. The
+    bit-identity claim is that the flag is *off* unless the default rule has
+    already failed, which `test_the_safeguard_is_reported_and_is_off_by_default`
+    pins on the flash.
+    """
+    mixture = _mixture()
+    eos = _eos()
+    z = np.asarray(mixture.fractions, dtype=float)
+    stability, w, incipient, roots_x, roots_y = _pinned_roots(1.0e6, mixture, eos)
+    u0 = log_space_seed(
+        z=z, w=w, tpd_min=float(stability.tpd_min), incipient_vapor=incipient == "vapor"
+    )
+    split = log_space_split(
+        z=z,
+        u0=u0,
+        terms_i=roots_x.ln_fugacity_terms,
+        terms_ii=roots_y.ln_fugacity_terms,
+        settings=FlashSettings(),
+        curvature_safeguard=True,
+    )
+    assert split.residual < 1e-11
+    assert split.x_i[1] == pytest.approx(MELT_SOLVENT_1MPA, rel=1e-12)
+    assert split.ln_x_ii[0] == pytest.approx(LN_Y_POLYMER_1MPA, rel=1e-12)
+
+
+def test_every_safeguarded_direction_descends_and_the_list_ends_with_ssi() -> None:
+    """The contract of :func:`_safeguarded_directions`, on a Jacobian by hand.
+
+    ``J`` below is the log-space Jacobian of a state whose Gibbs Hessian has
+    one negative eigenvalue - the shape measured at the 0.3 MPa stall - so the
+    Newton direction is *not* a descent direction and is dropped, while the
+    modified-Newton direction of the same Hessian is kept.
+    """
+    jacobian = np.array([[0.8058676, -0.7265849], [-3.549692e-06, -2.360102e-06]])
+    residual = np.array([-8.602786e-05, -3.898835e-05])
+    moles = np.array([2.031340e-07, 4.158566e-02])
+    gradient = moles * residual
+
+    hessian = 0.5 * (
+        (moles[:, None] * jacobian + np.diag(gradient))
+        + (moles[:, None] * jacobian + np.diag(gradient)).T
+    )
+    assert float(np.min(np.linalg.eigvalsh(hessian))) < 0.0  # indefinite
+
+    newton = np.linalg.solve(jacobian, -residual)
+    assert float(gradient @ newton) > 0.0  # not a descent direction
+
+    directions = _safeguarded_directions(jacobian=jacobian, residual=residual, moles=moles)
+    assert len(directions) >= 2
+    for direction, slope in directions:
+        assert slope < 0.0
+        assert slope == pytest.approx(float(gradient @ direction), rel=1e-12)
+        assert not np.allclose(direction, newton)
+    # The last one is always the successive-substitution step.
+    assert np.array_equal(directions[-1][0], -residual)
+
+    # Without a Jacobian there is only that step.
+    assert len(_safeguarded_directions(jacobian=None, residual=residual, moles=moles)) == 1
+
+
+def test_the_safeguard_is_off_on_a_state_that_never_needed_it() -> None:
+    """`flash_tp` says which rule produced the answer, and here it is the old one.
+
+    The other half of this statement - the flag reported `True`, on a state that
+    raised before ADR-0026 - is pinned with that state's answer in
+    `tests/test_pcsaft_polymer.py::test_the_0_3_mpa_vapour_liquid_split_the_stage_used_to_stall_on`.
+    """
+    result = ct.flash_tp(
+        _mixture(0.05, 53000.0),
+        temperature_K=TEMPERATURE_K,
+        pressure_Pa=2.0e6,
+        eos=_eos(KIJ, 53000.0),
+    )
+    assert result.diagnostics["converged_stage"] == "second-order-log"
+    assert result.diagnostics["log_space_curvature_safeguard"] is False

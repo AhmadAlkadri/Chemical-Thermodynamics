@@ -43,6 +43,7 @@ from ._multiphase import (
 )
 from ._second_order import _second_order_split
 from ._split import (
+    _extended_rachford_rice,
     _ln_gamma_function,
     _PhaseRoot,
     _rachford_rice,
@@ -447,9 +448,30 @@ def _flash_tp_tangent_plane(
     elif vapor_fraction is None:
         # Documented fallback: the stationary point is a valid starting phase but
         # its K-values need not bracket a Rachford-Rice root in every geometry.
-        seed_label = "wilson"
-        k_seed = wilson_k(mixture, temperature, pressure)
-        vapor_fraction, _f0, _f1 = _rachford_rice(z, k_seed)
+        wilson_seed = wilson_k(mixture, temperature, pressure)
+        vapor_fraction, _f0, _f1 = _rachford_rice(z, wilson_seed)
+        if vapor_fraction is not None:
+            seed_label = "wilson"
+            k_seed = wilson_seed
+        else:
+            # ADR-0026. Both K-sets have been reported rootless by the naive
+            # Rachford-Rice denominator, and for a trace component against a
+            # near-pure incipient phase that verdict is a rounding artefact
+            # rather than a fact about the equation: `K_i - 1` is an exact
+            # `-1` for a `K_i` under the spacing of doubles at one, so `f(1)`
+            # divides by an exact zero. The stationary point's own K-values are
+            # asked once more with the cancellation-free denominator, and on
+            # the wider (negative-flash) window as well - which is where a
+            # `K_max` barely above one puts the root. Only a state that raised
+            # here before this slice reaches this line.
+            vapor_fraction, _rr_status = _extended_rachford_rice(
+                z, k_seed, convex_denominators=True
+            )
+            # The K-values are still the stationary point's, so ``k_seed``
+            # stays ``"stability"`` and the split keeps the per-phase branch
+            # pinning that goes with it (ADR-0019); what changed is only how
+            # the bracket was found, and that is its own key.
+            base["rachford_rice_convex_denominators"] = True
         if vapor_fraction is None:
             raise ConvergenceError(
                 "Feed is unstable (tpd_min="
@@ -712,6 +734,7 @@ def _log_space_diagnostics(
     iterations: int,
     residual: float,
     seed: str,
+    curvature_safeguard: bool = False,
 ) -> dict[str, float | int | str | bool]:
     """The ``log_space_*`` keys (ADR-0024 decision 3).
 
@@ -738,6 +761,7 @@ def _log_space_diagnostics(
         zeros = int(np.count_nonzero(active & (np.exp(masked) == 0.0)))
     return {
         "log_space_seed": seed,
+        "log_space_curvature_safeguard": curvature_safeguard,
         "log_space_iterations": iterations,
         "log_space_residual": float(residual),
         "log_space_ln_x_min": float(masked[position]),
@@ -776,6 +800,24 @@ def _phi_phi_log_space(
         terms_ii=roots_y.ln_fugacity_terms,
         settings=settings,
     )
+    safeguarded = False
+    if refined.residual > settings.tol:
+        # ADR-0026. The stage spent its whole budget without converging, which
+        # before this slice was the end of the flash. The same minimization is
+        # retried from the same seed with the curvature safeguard, which is a
+        # second call and therefore cannot move a number the first call
+        # returned; the better of the two is kept.
+        retry = log_space_split(
+            z=z,
+            u0=u0,
+            terms_i=roots_x.ln_fugacity_terms,
+            terms_ii=roots_y.ln_fugacity_terms,
+            settings=settings,
+            curvature_safeguard=True,
+        )
+        if retry.residual < refined.residual:
+            refined = retry
+            safeguarded = True
     if refined.residual > settings.tol:
         raise ConvergenceError(
             "flash_tp did not converge the phi-phi split in log mole numbers; "
@@ -809,6 +851,7 @@ def _phi_phi_log_space(
             iterations=refined.iterations,
             residual=refined.residual,
             seed=seed,
+            curvature_safeguard=safeguarded,
         ),
     }
     return split, diagnostics
