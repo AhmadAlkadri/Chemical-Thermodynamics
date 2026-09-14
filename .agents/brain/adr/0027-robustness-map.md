@@ -173,3 +173,104 @@ maintainer.
 ## Supersedes (optional)
 None. Extends the ADR-0023 harness package with a second artefact; leaves the
 benchmark workload, its records and its acceptance rule untouched.
+
+## Amendment (slice `robustness-map-coverage`)
+
+Status: accepted
+Date: 2026-09-14
+
+### Context
+
+ADR-0028 retired every refusal the original 2110-state map found and, in doing
+so, discharged its own roadmap item 1 with an honest reading rather than a
+victory: "a map that refuses nothing is not a solved solver" (brain.md section
+10). The map's own structure said where it had stopped being hard - six of
+eight refusal classes empty, no three-phase equation-of-state window,
+`gamma-phi` not swept at all, the polymer family a single temperature at a
+single `k_ij` - and this amendment is that list, worked.
+
+### Decision
+
+Four families join the six of decision 1, all in the same internal module
+(`src/chemthermo/bench/robustness.py`), none touching a solver, model,
+parameter file or public API:
+
+| family | states | what it closes |
+| --- | ---: | --- |
+| `eos-three-phase` | 117 | "no three-phase EOS window is in the grid" - PC-SAFT water/n-hexane around `T3` (Case P-9), PC-SAFT and Peng-Robinson water/ethanol/n-hexane tie-triangles (Case P-10) |
+| `gamma-phi-legacy` | 30 | "`gamma-phi` is not swept at all" - the deprecated `flash_mode="gamma-phi"` path (ADR-0010), NRTL-packaged Methane/Ethane, over the CLI's own contract state and a small T/P grid |
+| `pr-near-critical` | 104 | near-critical Peng-Robinson states (a boundary located by bisecting `stability_tp`, not assumed) plus the CO2/n-decane and Methane/n-pentane windows that produced ADR-0016's and Case F-2's defects |
+| `pcsaft-associating-ternary` | 144 | the polymer family was "one temperature at a single `k_ij`" for association coverage too - a second associating ternary (water/1-propanol/n-hexane) and a finer feed grid on both, aimed at cloud points |
+
+Total grid: **2505 states** (2110 + 395), `--quick` **224 states** (171 + 53,
+~14.2 s against the 15 s budget). Each grid is documented at its definition in
+the module, the same way as the original six; nothing here changes how a state
+is classified (`classify_refusal`, `_REFUSAL_RULES`) - the four new families
+exercise rules that were already declared and already dormant
+(`multiphase-solver-failure`, `rr-no-bracket`), which is itself evidence for
+decision 2's claim that the rule list covers what occurs.
+
+One check is added to `_invariant_violations`: a three-phase answer's
+`delta_g_vs_two_phase_rt` (ADR-0020, present only on a result that entered the
+phase addition/removal search and returned three phases) must be negative,
+mirroring the existing `delta_g_split_rt < 0` check one level up. It is
+dormant on every family but `eos-three-phase` and the rare state elsewhere
+that lands on three phases by chance.
+
+### The `gamma-phi-legacy` family is read differently from the other nine
+
+`flash_mode="gamma-phi"` has had no stability test since ADR-0007 and stays on
+the pre-`flash-auto-phase-detection` Wilson heuristic by design (ADR-0008
+decision 4); `_invariant_violations`'s post-split check is conditioned on
+`diagnostics["post_split_checked"]`, which this path never sets
+(`_legacy.py`), so it is silently and correctly excluded rather than exempted
+by a family-specific carve-out. Its `rr-no-bracket` refusals are not a defect
+this slice diagnoses further: they are ADR-0016's own motivating example,
+reproduced on the one code path ADR-0016 deliberately left unrepaired ("the
+legacy `phase_detection="wilson-heuristic"` path is untouched... because
+reproducing pre-ADR-0008 behavior is that path's entire purpose").
+
+### What the new grids found
+
+**2491 of 2505 converge, 14 refuse, 0 converge and violate an invariant**, in
+2232.8 s (37:13); every one of the original 2110 states is unchanged, checked
+field by field against the committed `9adf390` record. All 14 refusals are in
+two of the four new families: `eos-three-phase` (9, `multiphase-solver-failure`
+- the ADR-0011/ADR-0020 phase addition/removal search either collapsing a
+converged set to a non-positive phase fraction or leaving the multiphase split
+short of `tol`) and `gamma-phi-legacy` (5, `rr-no-bracket` - the legacy Wilson
+heuristic's own documented failure mode, ADR-0016 decision 8, reproduced by
+hand-trace as a single-step `K` compression rather than ADR-0016's diverging
+oscillation). `pr-near-critical` and `pcsaft-associating-ternary` refuse
+**nothing** - 248 states between them, the latter finding 6 verified `VLLE`
+answers near a cloud point at no cost. One of the nine `eos-three-phase`
+refusals is not new: `(0.1, 0.1, 0.8)` at 333 K is the same feed Case P-10 (i)
+already recorded as a pre-existing, non-regression failure. See ledger Case
+R-MAP-2 for the ranked table, every example state and message, and the
+diagnosis of each class from evidence already in the record.
+
+### Consequences
+
+- `benchmarks/robustness_74820b8.json` / `.md` regenerated at the new grid
+  size; the superseded `9adf390` JSON pruned per the existing policy, its
+  `.md` kept.
+- `tests/test_robustness_map.py`'s `EXPECTED_QUICK_FAMILIES` gains four rows,
+  `PINNED_REFUSALS` gains the eight cheap refusals the quick subset contains
+  (one binary-scan collapse, two Peng-Robinson-ternary splits, five legacy
+  `rr-no-bracket` states), and two new tests pin the three-phase verdicts
+  Cases P-9 and P-10 already established independently (`T3 - 0.05 K -> LLE`,
+  `T3 + 0.05 K -> VLE`, two of the twelve 333 K tie-triangle feeds `-> VLLE`),
+  marked `slow` as repetitions of capability `test_flash_vlle_eos.py` already
+  covers by default or behind `slow`.
+- The brain roadmap is re-ranked again from this result; see brain.md section
+  9 and validation Case R-MAP-2.
+- **Cost.** A PC-SAFT ternary VLLE state costs 13-40 s (ADR-0020's own "~35 s"
+  measurement, reproduced here: the family's 117 states cost 651.6 s, and the
+  associating-ternary family's 144 states cost 670.6 s). The full sweep grew
+  from 893.1 s to 2232.8 s accordingly. The `--quick` subset avoids every such
+  state but one cheap single-phase pin per PC-SAFT-ternary system, which is
+  why the family's quick bucket counts are not representative of its
+  full-sweep verdict mix.
+
+## Superseded by (optional)
+None.

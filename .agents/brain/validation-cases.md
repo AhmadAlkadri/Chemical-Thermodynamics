@@ -33,7 +33,7 @@ case's own entry.
 | **V** | V-1..V-5 | Three-phase (VLLE) discovery: the ternary tie-triangle, stability misses fixed by fixed candidate surfaces, the binary refusal window, multiphase Rachford-Rice against Okuno et al. (2010), the ternary verdict map | `flash-vlle-phase-addition` (ADR-0011), `stability-candidate-surfaces` (ADR-0012) |
 | **P** | P-0..P-16 | PC-SAFT: residual Helmholtz/derivatives against teqp, density roots, flash/stability integration, split robustness re-measured on the PC-SAFT grid, phase identity, association against FeOs, per-phase density roots (LLE), EOS phase addition/removal (VLLE), fixed EOS stability surfaces, polymer components, the polymer liquid-liquid split, the polymer vapour-liquid split in log mole numbers, the log-space stability normalization, the curvature safeguard and the Rachford-Rice denominator that close the 0.3-3.6 MPa sweep | `pcsaft-residual-helmholtz` (ADR-0014), `pcsaft-density-roots-flash` (ADR-0015), `pcsaft-association` (ADR-0018), `flash-eos-per-phase-roots` (ADR-0019), `flash-phase-addition-eos` (ADR-0020), `stability-eos-root-surfaces` (ADR-0021), `pcsaft-polymer-solvent` (ADR-0022), `pcsaft-polymer-vle` (ADR-0024), `stability-log-space-sums` (ADR-0025), `flash-polymer-edge-cases` (ADR-0026) |
 | **B** | B-1 | The `chemthermo.bench` measurement harness and its acceptance rule (baseline + after + identical result hashes + measured ratio) | `perf-baseline-and-root-reuse` (ADR-0023) |
-| **R-MAP** | R-MAP-1 | The `chemthermo.bench robustness` coverage map: 2110 states over all six model families, classified into a phase verdict, an invariant violation or one of eight refusal classes, with the ranked classes and their diagnoses | `robustness-map` (ADR-0027) |
+| **R-MAP** | R-MAP-1, R-MAP-2 | The `chemthermo.bench robustness` coverage map: 2110 states over the original six model families (R-MAP-1), grown to 2505 states over ten families - EOS three-phase windows, the legacy `gamma-phi` path, near-critical Peng-Robinson states and associating ternaries (R-MAP-2) - classified into a phase verdict, an invariant violation or one of eight refusal classes, with the ranked classes and their diagnoses | `robustness-map` (ADR-0027), `robustness-map-coverage` (ADR-0027 amendment) |
 
 ---
 
@@ -5075,3 +5075,199 @@ residuals in every family are the same doubles as at `87f0820`.
 - **Script:** `python -m chemthermo.bench robustness --quick` (~10 s) and
   `python -m chemthermo.bench robustness --out record.json --summary-out record.md`
   (~15 min).
+
+---
+
+## Case R-MAP-2: Four new families, and the map is hard again
+
+- **Source:** none, for the same reason as Case R-MAP-1 - this is the
+  *coverage* case, not a thermodynamics one. What is measured is where
+  `flash_tp` refuses on four grids ADR-0027's own roadmap named as gaps, how it
+  refuses, and whether anything it returns breaks an invariant. Every
+  diagnosis below is read off evidence already in the record (the message, the
+  neighbouring states, a `post_split_stability=False` re-run, a hand-traced
+  K-loop), the same standard R-MAP-1 held itself to.
+- **Where:** ADR-0027's amendment (slice `robustness-map-coverage`); harness
+  `src/chemthermo/bench/robustness.py`; record
+  `benchmarks/robustness_74820b8.json`; summary
+  `benchmarks/robustness_74820b8.md`; `benchmarks/README.md`.
+- **Assumptions:** every state is `flash_tp` at default `FlashSettings`, as in
+  Case R-MAP-1, with one exception the `gamma-phi-legacy` family exists to
+  exercise: `flash_mode="gamma-phi"` uses the pre-`flash-auto-phase-detection`
+  Wilson heuristic and never runs a stability test (ADR-0007, ADR-0008
+  decision 4), so its `post_split_checked` diagnostics key is always `False`
+  and the post-split invariant of `_invariant_violations` is silently and
+  correctly dormant there - not exempted by a family-specific carve-out, just
+  never reached, and stated here because reading the family's table without
+  this note could look like an omission. Wall times are Apple M2 Max
+  (12 cores), macOS 26.6.2, arm64, CPython 3.11.6, numpy 2.4.2; the tree was
+  dirty at measurement (this slice's own harness and test changes were
+  uncommitted); every solver, model and parameter file was at `74820b8`.
+- **Components and units:** 395 new states over four families, added to the
+  2110 of Case R-MAP-1 for **2505 total**; each grid is fixed in the module
+  and documented at its definition (`EOS3P_*`, `GAMMA_PHI_LEGACY_*`,
+  `NEARCRIT_*`, `ASSOC3_*`). SI throughout.
+- **Values not cited:** `NEARCRIT_MEP_P0_PA` (8,076,427.99 Pa) and
+  `NEARCRIT_MP_P0_PA` (1,884,640.42 Pa) are **located, not published** - a
+  60-iteration bisection of `stability_tp`'s stable/unstable verdict at a
+  fixed anchor temperature, run once and cited as a constant the way
+  `EOS3P_T3_K` cites Case P-9's Newton solve. Nothing is compared against them.
+
+### (i) The map at `74820b8`
+
+| family | states | verdicts | refusal classes | invariant violations | worst mass balance | worst equilibrium residual | worst dG_split/RT | time / s |
+| --- | ---: | --- | --- | ---: | ---: | ---: | ---: | ---: |
+| `eos-three-phase` | 117 | LLE 46, LLL 8, VLE 22, VLLE 19, single-liquid 10, single-vapor 3 | multiphase-solver-failure 9 | 0 | 2.11e-12 | 2.80e-08 | -1.25e-04 | 651.6 |
+| `gamma-phi-legacy` | 30 | VLE 8, single-liquid 3, single-vapor 14 | rr-no-bracket 5 | 0 | 1.02e-13 | 0.00e+00 | - | 0.0 |
+| `pr-near-critical` | 104 | VLE 55, single-liquid 28, single-vapor 21 | - | 0 | 1.47e-13 | 3.33e-08 | -1.94e-07 | 2.1 |
+| `pcsaft-associating-ternary` | 144 | LLE 84, VLE 8, VLLE 6, single-liquid 30, single-vapor 16 | - | 0 | 1.74e-13 | 2.98e-09 | -1.30e-04 | 670.6 |
+
+**2491 of 2505 converge, 14 refuse, 0 converge and violate an invariant**, in
+2232.8 s (37:13) for the whole map (the original six families cost 893.1 s of
+that, matching Case R-MAP-1's own number to within this machine's noise; the
+four new families cost the remaining 1339.7 s, almost all of it two families
+of PC-SAFT-association three-phase states). `pcsaft-associating-ternary`'s 144
+states include **6 verified VLLE** answers - the family was built to sweep
+near a cloud point and found one - at no cost in refusals.
+
+**Every state of the original 2110 is unchanged.** Compared field by field
+against the committed `9adf390` record (`bucket`, `verdict`, `phases`,
+`phase_fractions`, `invariant_violations`, `converged_stage`,
+`phase_set_history`, `outcome`, `refusal_class`, `refusal_stage`): **0
+differences over all 2110 states**, wall time excepted. This slice touches no
+solver, model or parameter file, so that is the expected result, checked
+rather than assumed.
+
+### (ii) The refusal classes, ranked by count
+
+All 14 are `multiphase-solver-failure` (9) or `rr-no-bracket` (5); the counts
+are (class, stage, system):
+
+| # | class | stage | count | system | where |
+| --- | --- | --- | ---: | --- | --- |
+| 1 | `rr-no-bracket` | `phi-phi` | **5** | `gammaphi-methane-ethane` | 200 K/3 MPa, 220 K/1 MPa, 240 K/2 MPa, 260 K/4 and 5 MPa |
+| 2 | `multiphase-solver-failure` | `collapsed` | **4** | `eos3p-pcsaft-water-n-hexane-t3-scan` | `z_water = 0.05`, `T3 + 0.01` to `T3 + 1.0` K |
+| 2 | `multiphase-solver-failure` | `split` | **4** | `eos3p-pr-water-ethanol-n-hexane` | `(0.2, 0.6, 0.2)` at 280 and 300 K; `(0.4, 0.4, 0.2)` and `(0.5, 0.3, 0.2)` at 300 K |
+| 4 | `multiphase-solver-failure` | `collapsed` | **1** | `eos3p-pcsaft-water-ethanol-n-hexane` | `(0.1, 0.1, 0.8)`, 333 K |
+
+Six of the eight declared refusal classes are still empty over the full
+2505-state map (`stability-inconclusive`, `density-root-failure`,
+`post-split-third-phase`, `multiphase-solver-failure`'s wider siblings
+(`rachford-rice`, `search`, `feasible-region`), `model-error`,
+`other-refusal`). The two classes that do appear were both already declared by
+ADR-0027 and already exercised by the original grid on other states -
+`multiphase-solver-failure` by the ADR-0011/ADR-0020 search machinery, which
+this slice's `eos-three-phase` family is the first grid to stress hard, and
+`rr-no-bracket` by ADR-0016's own motivating example, reproduced here on the
+one code path ADR-0016 deliberately left unrepaired.
+
+**Class 1 - the legacy path loses its bracket within 0-2 substitutions, every
+time.** All five states are Methane/Ethane, NRTL (the packaged synthetic pair)
++ Peng-Robinson, `flash_mode="gamma-phi"`. Traced by hand at 200 K/3 MPa: the
+Wilson seed `K = (1.978, 0.0723)` brackets cleanly (`f(0) = 5.8e-12`,
+`f(1) = -6.17`), and the very first `K`-update from it -
+`K = gamma^L phi^L / phi^V = (1.826, 0.174)` - already has `f(0) = -1.4e-04`
+and `f(1) = -2.15`, both negative: the update has compressed the two `K`s
+toward 1 (the synthetic NRTL pair and this light-hydrocarbon system are close
+to ideal) far enough that the plain, non-extended Rachford-Rice this path is
+pinned to (ADR-0016 decision 8: "the legacy `wilson-heuristic` path is
+untouched... reproducing pre-ADR-0008 behavior is that path's entire purpose")
+has nothing left to bracket. The other four states are the same shape at a
+slower clock: 220/240/260 K lose the bracket on the first update as well
+(`K` collapsing from Wilson estimates of 9.5/7.0/4.9 down to 8.4/5.3/3.2 in one
+step), and 260 K/5 MPa survives two updates before losing it. This is not
+ADR-0016's CO2/n-decane oscillation (which grows without bound over many
+iterations) - it is a single-step compression, consistent with a near-ideal
+system's `K`s having much less room between 1 and their Wilson estimate than a
+CO2/n-decane pair does. **Not a defect in the sense the other two classes are**:
+this is the deprecated path's documented behaviour (ADR-0007, ADR-0008
+decision 4, ADR-0016 decision 8), reproduced rather than discovered, and the
+tangent-plane path (`phase_detection="tangent-plane"`, the default since
+ADR-0008) converges every one of these five states without incident - checked
+directly: `flash_tp` on the same state without `flash_mode="gamma-phi"`
+returns a verified two-phase split at all five.
+
+**Class 2 - a hexane-rich water/n-hexane feed above T3 that the
+phase-addition/removal search cannot resolve, an extent not previously
+measured.** PC-SAFT water/n-hexane, `z_water = 0.05`, 1 atm,
+`T = T3 + 0.01` through `T3 + 1.0` K (4 of the T3-scan's 9 offsets at this
+feed; `T = T3` and everything at or below it converges to a plain `LLE` pair
+with no search entered). With `FlashSettings(post_split_stability=False)` the
+direct two-liquid split converges fine (`beta_1 = 0.0280`, `dG_split/RT =
+-6.83e-03`) but is doubly unstable - `post_split_status = "unstable"` for
+*both* phases - so the search is entered exactly as it is at `z_water = 0.5`
+(Case P-9 (i)), where it resolves cleanly as `V -> LV -> LLV -> LL`. Here it
+does not resolve within its round budget: the feed's own stability test is
+emphatic (`tpd_min = -0.409`, `feed_branch = "liquid"`), so the diagnosis
+stops at "the search enters and does not settle" rather than a traced root
+cause, in the same spirit R-MAP-1 left its own class 1 - a defect's *extent*
+is evidence; its mechanism is a further slice's work, not assumed here.
+
+**Class 2 (cont'd) - the one ternary state here is not a new defect.** PC-SAFT
+water/ethanol/n-hexane, `(0.1, 0.1, 0.8)`, 333 K, is the *same* feed Case P-10
+(i) already recorded: "That feed also raised before this slice... It sits near
+the edge of the triangle where the water-rich liquid's amount is tiny." The
+wider grid here rediscovers it rather than finding something new - checked:
+with `post_split_stability=False` the direct two-liquid split is doubly
+unstable (`post_split_status = "unstable"`) exactly as at `z_water = 0.05`
+above, the same mechanism at a different system.
+
+**Class 3 - the Peng-Robinson three-liquid region moves or narrows between 280
+and 300 K, and one feed sits close enough to its edge to refuse at both.**
+Water/ethanol/n-hexane, `k_ij = 0`. At 280 K, 11 of 12 swept feeds return the
+verified `LLL` triangle of Case P-10 (ii) and one - `(0.2, 0.6, 0.2)`, 60 %
+ethanol - refuses with a residual of `1.836e-08`, **1.8 times** the `1e-8`
+acceptance, after the full 50-substitution-plus-1-second-order-iteration
+budget: caught mid-convergence, not diverging. At 300 K - a temperature Case
+P-10 (ii) never swept - the same feed's residual is `1.478e-04`
+(**14,780 times** `tol`), and two more feeds refuse alongside it
+(`(0.4, 0.4, 0.2)` at `2.04e-05`, `(0.5, 0.3, 0.2)` at `3.31e-06`), all three
+converging fine at 280 K. Read together: a feed on the edge of the region
+(`(0.2, 0.6, 0.2)`) is marginal at both temperatures and further from
+convergence at the higher one, consistent with the three-liquid region having
+moved or shrunk between 280 and 300 K rather than with a defect that appears
+abruptly. Not traced further than that - which edge, and by how much, needs a
+scan across temperature this slice did not run.
+
+### (iii) The invariants: nothing returned violates one, including the new one
+
+Checked on every one of the 2491 converged answers, by the same rules Case
+R-MAP-1 used, plus one this slice adds: a three-phase answer's
+`delta_g_vs_two_phase_rt` (present only where the phase addition/removal
+search ran and returned three phases) must be negative, mirroring the
+existing `delta_g_split_rt < 0` check. **0 violations, including 0 on the new
+check** - worst (least negative) `dG_split/RT` **-1.25e-04**
+(`eos-three-phase`), which is comfortably negative; every one of the 19 `VLLE`
+and 8 `LLL` answers in `eos-three-phase` and the 6 `VLLE` answers in
+`pcsaft-associating-ternary` passed it. Worst mass balance anywhere
+**2.11e-12** (`eos-three-phase`), worst equilibrium residual **3.33e-08**
+(`pr-near-critical`), both comfortably inside their `1e-10` / `1e-6`
+tolerances.
+
+### (iv) What this case does not establish
+
+The same five points as Case R-MAP-1 (v), plus: this is not a claim that
+`gamma-phi-legacy`'s five refusals are defects to fix - they are the
+deprecated path's documented, by-design behaviour, included so the map's
+`rr-no-bracket` class is non-vacuous rather than left empty by construction.
+
+- **Suite time:** `pytest -q` **894 passed, 91 deselected, 267.04 s (4:27)**,
+  on the same machine the map itself was measured on.
+  `pytest -q -m slow tests/test_robustness_map.py` **4 passed, 50 deselected,
+  2291.70 s (38:11)** - the full 2505-state sweep against this record's
+  totals (2232.8 s of that is the sweep itself, matching (i) above), plus the
+  three new tests pinning the three-phase verdicts named in "Test path" below.
+- **Independent route:** none, by design, matching Case R-MAP-1 - this case's
+  only independent argument is the state-by-state comparison against the
+  committed `9adf390` record (0 differences over 2110 states) and the
+  `post_split_stability=False` re-runs used to trace classes 2 and 3, both of
+  which share code with `flash_tp` itself and are therefore read as diagnostic
+  evidence, not as a second solver.
+- **Test path:** `tests/test_robustness_map.py` (`EXPECTED_QUICK_FAMILIES`
+  gains four rows, `PINNED_REFUSALS` gains the cheap refusals the quick subset
+  contains, and two `slow`-marked tests pin the three-phase verdicts Cases P-9
+  and P-10 already established independently - `T3 - 0.05 K -> LLE`,
+  `T3 + 0.05 K -> VLE`, two of the twelve 333 K tie-triangle feeds `-> VLLE`).
+- **Script:** `python -m chemthermo.bench robustness --quick` (~14 s) and
+  `python -m chemthermo.bench robustness --out record.json --summary-out record.md`
+  (~37 min); `--family NAME` runs one family; `--list` prints the grid.
