@@ -3287,9 +3287,12 @@ recorded in Case P-10; the binary window is Case P-9.
   shipped (the ten-figure table), the same comparisons are 2.496e-06,
   2.498e-06 and 2.491e-06 - the constants difference, not either solver, as in
   Cases P-6 to P-9.
-- **The two offsets the slice brief named**, both `z_water = 0.7`: at
-  `T3 + 0.05 K` the flash returns `liquid = (0.999936007302, ...)`,
-  `vapor = (0.213610914451, ...)`, `beta_vapor = 0.381440208422`, with
+- **The two offsets the slice brief named**, both `z_water = 0.7` (quoted to
+  twelve decimals from the example's own run; the last two digits move with
+  the `T3` the 4-equation Newton returns, which is why they are not pinned in
+  a test): at `T3 + 0.05 K` the flash returns
+  `liquid = (0.999936007302, ...)`, `vapor = (0.213610914456, ...)`,
+  `beta_vapor = 0.381440208422`, with
   `G(VL)/RT = -1.168271522770` against the two liquids' `-1.167622708774`
   (gap **6.488140e-04 RT**); at `T3 + 0.5 K`,
   `liquid = (0.999936310223, ...)`, `vapor = (0.218032446374, ...)`,
@@ -3367,7 +3370,8 @@ recorded in Case P-10; the binary window is Case P-9.
   the model for one root instead of two: `stability_tp` over the 188-state
   PC-SAFT grid **76.6 s -> 44.3 s** (-42 %), and the default test suite
   **244.2 s -> 231.7 s** before the new golden path is added; with it,
-  **247.3 s for 750 tests** against 244.2 s for 738.
+  **247.3 s for 750 tests** against 244.2 s for 738. `pytest -q -m slow` is
+  **827 s (13:47) for 22 tests**, against 855 s for 21.
 - **Pure-component starts on the vapour root: measured, then not added.**
   Running the `n` pure-component-dominant estimates on the vapour root as well
   was tried over all 334 states above: **0 verdict changes** and **not one
