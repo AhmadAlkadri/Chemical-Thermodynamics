@@ -510,7 +510,12 @@ class AssociationIsotherm:
     def _pair_terms(
         self, eta: np.ndarray, *, second: bool
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """Return ``(Delta, dDelta/deta, d2Delta/deta2)`` on a batch of ``eta``."""
+        """Return ``(Delta, dDelta/deta, d2Delta/deta2)`` on a batch of ``eta``.
+
+        The second derivative is :data:`_UNREQUESTED` (``nan``) when ``second``
+        is False: nothing reads it there, and on the 1599-point scan grid it
+        was a ``(points, sites, sites)`` allocation per call.
+        """
         column = eta[..., None, None]
         u = 1.0 - column
         g = 1.0 / u + self._b * column / u**2 + self._c * column**2 / u**3

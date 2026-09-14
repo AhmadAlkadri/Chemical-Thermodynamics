@@ -1333,6 +1333,26 @@ print(list_eos())      # ['pcsaft']
 `get_eos("pcsaft", components=[...], kij=..., parameters=...)` builds the
 model above through the registry.
 
+## Benchmarks
+
+`python -m chemthermo.bench --out record.json` (or `python tools/bench.py`)
+runs a fixed nine-case workload over the reference flash paths - Peng-Robinson
+flash, stability and a 24-state grid, NRTL `gamma-gamma`, modified-Raoult VLE
+and the 364 K VLLE feed, PC-SAFT vapour-liquid, associating liquid-liquid and
+the polymer split - and writes a record carrying, per case, the model, state,
+composition, phase count, convergence criteria, initialization, iteration
+counts, derivative mode, median wall time over timed repeats, peak allocation,
+the machine and Python/numpy versions it was measured on, and a hash of the
+accepted thermodynamic answer.
+`python -m chemthermo.bench --compare before.json after.json` prints the
+per-case speedup and **exits 1 if any result hash moved**, which is the whole
+acceptance rule for a performance change here: same answer, better clock. Two
+records are committed under `benchmarks/`, with `benchmarks/README.md`
+explaining how to read them; see ADR-0023 for the policy and for the three
+optimizations measured against them (Peng-Robinson flash 1.17x, PC-SAFT
+liquid-liquid 1.32x, every result hash identical). The harness is internal: it
+is not importable from `chemthermo` and is not part of the public API.
+
 ## Scope Policy
 
 VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capability class is categorically out of scope; implementation maturity may vary by module and release.

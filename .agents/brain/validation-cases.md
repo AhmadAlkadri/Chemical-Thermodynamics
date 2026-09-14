@@ -3692,3 +3692,172 @@ recorded in Case P-10; the binary window is Case P-9.
 - **Script:** `examples/basic/pcsaft_polymer_demo.py` (about 5 s; `--full` for
   the cloud-point bisection and the `Mw = 53000` chain) and
   `examples/validation/20_pcsaft_polymer_vs_feos.py`.
+
+---
+
+## Case B-1: The benchmark baseline, and three bit-identical optimizations
+
+- **Source:** none, and that is the point. This is not a thermodynamics case:
+  it is the *measurement* case. Nothing here is checked against a published
+  number; what is checked is that three performance changes moved the clock and
+  did not move a single result. The thermodynamic content of every case in the
+  workload is already pinned elsewhere in this ledger (F-4, P-8, P-13, L-1,
+  R-2, V-1), and the benchmark's `result_hash` is a cross-check on top of
+  those, not a substitute for them.
+- **Where:** ADR-0023; harness `src/chemthermo/bench/`; records
+  `benchmarks/baseline_3ce68df.json` and `benchmarks/after_2ca41bf.json`;
+  `benchmarks/README.md`.
+- **Assumptions:** wall times are a property of one machine at one moment. All
+  numbers below were measured on one Apple M2 Max (12 cores, macOS 26.6.2,
+  arm64), CPython 3.11.6, numpy 2.4.2, five timed repeats per case after one
+  untimed warm-up, the two records written **47 seconds apart** - the baseline
+  from a detached worktree at `3ce68df`, the after record from `2ca41bf`.
+- **Components and units:** the nine-case workload of
+  `chemthermo/bench/_cases.py`, SI throughout.
+
+### (i) What the profile said, before anything was changed
+
+Measured at `3ce68df` with `cProfile` and with targeted `timeit`:
+
+| observation | number |
+| --- | --- |
+| `pr-flash-ternary`, share of time in `PengRobinsonEOS.fugacity_coefficients` | 229 calls, ~55 % |
+| one `fugacity_coefficients` call | 34.8 us |
+| - of which `numpy.roots` | 16.9 us |
+| - of which `_mixture_parameters` | 10.5 us |
+| - of which the per-component `ln phi` loop and `exp` | 2.9 us |
+| - of which input validation | 0.8 us |
+| `pcsaft-lle-water-hexane`, share of time in `solve_density_roots` | 291 solves, ~95 % |
+| one water / n-hexane density solve at 298.15 K, 1 atm | 5.3 ms |
+| - of which the 1599-point scan | 1.28 ms (24 %) |
+| - of which ~19 single-point `pressure_and_slope` calls | 3.6 ms (68 %) |
+| one `derivatives(1 point, second=True)` | 189 us, of which 100 us association |
+
+And the number that resized the whole slice: over that flash, **291 density
+solves were made at 238 distinct `(T, P, x)`**. Broken down by call site: 154
+from `_select_surface` (a pinned trial iterating on one root, ADR-0021
+decision 3), 88 from the split's `_PhaseRoot`, 24 from
+`_select_density_root_surface`, 8 from `_select_min_gibbs`, 15 from
+`phase_identity`. The minimum-Gibbs double-solve the slice was scoped around is
+the last two rows: **16 avoidable solves of 291, about 5 %**. ADR-0021 had
+already removed the bulk of it. The corresponding Peng-Robinson figure is 229
+`fugacity_coefficients` calls of which 167 are pinned single-branch and 38 come
+from both-branch selectors - 19 avoidable, about 8 %.
+
+**What is therefore *not* claimed:** root reuse is not worth 2x on the PC-SAFT
+liquid-liquid flash. It is worth about 5 % there. The larger part of the
+measured 1.32x comes from optimizations B and C.
+
+### (ii) The three optimizations, and the evidence each is bit-identical
+
+**A - one root solve serves every branch** (`ln_fugacity_branches`). Identical
+by construction: the capability returns `ln phi` *before* the exponential, so
+`exp` of it is the same double `fugacity_coefficients` returns, on the same
+root, and `eos_branch_terms_all` re-applies the ADR-0022 guard unchanged.
+Checked with `==`, not a tolerance, over: the 16-state Case F-4 subset (32
+branch comparisons), six water / n-hexane liquid-liquid states, seven
+Peng-Robinson grid states at two `k_ij`, the single-root case (both labels must
+carry the *same* array, or ADR-0021 decision 4's degeneracy test stops
+recognising a one-root region), and the `Mw = 53000` polymer state where
+`exp(ln phi)` underflows and `phi is None` must survive the new route. Zero
+differences.
+
+**B - the Peng-Robinson companion matrix built directly.** `numpy.roots` on a
+monic cubic with a non-zero constant term *is* `eigvals(companion)`; the
+bookkeeping around it is skipped. **200 000 random `(A, B)` pairs** over
+`A in [1e-6, 1e2]`, `B in [1e-6, 1]`: `np.array_equal` on the eigenvalue array,
+**0 mismatches**. 14.7 us -> 8.6 us. The `c3 == 0.0` case, the only one
+`numpy.roots` deflates, is delegated back to it.
+
+**C - the density solver stops recomputing what it has.** Three changes, each a
+rearrangement of *when*: `a` (which the root solver never reads) is not
+computed when only the derivatives are wanted; the bracket's left-edge residual
+is carried in from the scan instead of re-evaluated; the refinement's own
+`(P, dP/drho)` at the root it returns is handed to the mechanical-stability
+filter instead of being recomputed. The second needed a check and got one - a
+single-point isotherm evaluation returns the same double the 1599-point grid
+evaluation put in that slot, verified over the whole grid for water / n-hexane
+at 298.15 K, methane / n-hexane at 300 K and CO2 / n-decane at 240 K
+(`np.array_equal`, 0 differences).
+
+### (iii) The measured ratios
+
+`python -m chemthermo.bench --compare benchmarks/baseline_3ce68df.json benchmarks/after_2ca41bf.json`,
+exit status 0:
+
+| case | before / s | after / s | ratio |
+| --- | ---: | ---: | ---: |
+| `pr-flash-ternary` | 0.015261 | 0.013040 | 1.17x |
+| `pr-stability-ternary` | 0.004649 | 0.003881 | 1.20x |
+| `pr-flash-grid-24` | 0.140889 | 0.117589 | 1.20x |
+| `pcsaft-vle-methane-hexane` | 0.240769 | 0.188477 | 1.28x |
+| `pcsaft-lle-water-hexane` | 1.626994 | 1.236466 | 1.32x |
+| `pcsaft-polymer-lle` | 0.962138 | 0.814358 | 1.18x |
+| `nrtl-lle-tessier-p1` *(control)* | 0.043876 | 0.043711 | 1.00x |
+| `modified-raoult-vle` *(control)* | 0.020264 | 0.019569 | 1.04x |
+| `vlle-364k` *(control)* | 0.099957 | 0.097971 | 1.02x |
+
+**All nine result hashes identical.** The three activity-model cases run none
+of the changed code and are the drift control; read the equation-of-state
+ratios against their 1.00-1.04x, not against an exact 1.00x. A repeat of the
+whole comparison in three alternating rounds at three repeats gave 1.14x, 1.17x,
+1.18x, 1.27x, 1.32x, 1.17x on the six equation-of-state cases and 0.98-0.99x on
+the three controls, so the ratios above are reproducible to about a point.
+
+Peak allocation (`tracemalloc`, one separate instrumented run) fell where the
+density solver stopped allocating an unused `a` and an unused second derivative:
+`pcsaft-lle-water-hexane` 0.86 -> 0.78 MiB, `pcsaft-vle-methane-hexane`
+0.52 -> 0.49 MiB, `pr-flash-grid-24` 0.04 -> 0.03 MiB.
+
+### (iv) Tried, measured, and rejected
+
+Recorded because each is the obvious next idea and each is wrong for a reason
+worth keeping:
+
+- **A Cardano closed-form cubic.** Much faster; does not reproduce these
+  doubles. Bit-identity is the gate.
+- **Vectorizing the Peng-Robinson per-component `ln phi` loop.** 3.0 us against
+  the loop's 1.4 us at n = 3: three numpy operations on a length-3 array cost
+  more than the loop.
+- **Replacing the association module's `np.einsum` with explicit
+  multiply-and-sum.** Not bit-identical for >= 3 sites (checked at 1, 2, 3, 4, 6
+  and 8 sites, against both a `.sum(-1)` and a `matmul` form; equal at 1 and 2,
+  different from 3 up), *and* slower at the sizes that occur (1.34 us against
+  1.00 us).
+- **Refining every bracket of one density solve in a single vectorized pass.**
+  `solve_site_fractions` tests convergence on `max |residual|` over the whole
+  batch, so batching two brackets would give one of them a different number of
+  Newton steps and move its last bits.
+- **Caching the identity matrix the site-fraction Newton allocates.**
+  Implemented, measured, reverted: no gain outside the noise.
+- **A last-solve cache on the model instance.** Would catch the 37 further
+  duplicate solves the branch capability cannot see (`phase_identity`, the
+  post-split re-evaluation). Rejected on design grounds, not measurement: both
+  model classes are frozen dataclasses and a stale cache key would be a wrong
+  answer rather than a slow one.
+
+- **Tolerance:** exact. `==` on every comparison above; no tolerance is used
+  anywhere in this case, which is what distinguishes a performance change from
+  a numerical one.
+- **Independent route:** the 155-state pinned fixture
+  `tests/fixtures/flash/refactor_bit_identity_v3.json`, **unchanged and not
+  regenerated**, is the independent check that the flash answers did not move;
+  the branch-by-branch `==` comparisons are the check that the model calls
+  underneath them did not either.
+- **Negative control:** the three activity-model workload cases, whose code
+  none of the three optimizations touches (1.00x / 1.04x / 1.02x); a model
+  implementing only the pre-ADR-0023 interface, which must go on being served
+  by the per-branch route (asserted by call count);
+  `tests/test_bench_harness.py`, which asserts `--compare` **fails** when a
+  result hash differs, so the acceptance rule cannot pass vacuously.
+- **Suite time:** `pytest -q` **263.80 s for 803 tests at `3ce68df` ->
+  224.17 s for 809 at `2ca41bf`** (-15 % while gaining six tests), both runs
+  uncontended on the one machine; `pytest -q -m slow` **691.22 s (11:31) for
+  28 tests**, against 856.2 s (14:16) for the same 28 at the previous slice (a
+  different session, so indicative rather than back to back). 13 tests added
+  across the slice (7 harness, 6 branch reuse), none removed, **none marked
+  `slow`**.
+- **Test path:** `tests/test_eos_branch_reuse.py` (6),
+  `tests/test_bench_harness.py` (7), plus the whole existing suite unchanged.
+- **Script:** `python -m chemthermo.bench --out record.json` and
+  `python -m chemthermo.bench --compare before.json after.json`.

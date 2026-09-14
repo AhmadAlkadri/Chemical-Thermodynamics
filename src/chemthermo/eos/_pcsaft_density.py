@@ -227,7 +227,12 @@ _UNREQUESTED = np.array([math.nan])
 
 
 class _EtaDerivatives(NamedTuple):
-    """``a(eta)`` and its first two ``eta`` derivatives at fixed ``(T, x)``."""
+    """``a(eta)`` and its first two ``eta`` derivatives at fixed ``(T, x)``.
+
+    ``a`` is :data:`_UNREQUESTED` (``nan``) when the caller asked for the
+    derivatives only, and ``a2`` is zero when the second derivative was not
+    asked for; see :meth:`PCSAFTIsotherm.derivatives`.
+    """
 
     a: np.ndarray
     a1: np.ndarray
