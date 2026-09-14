@@ -236,7 +236,23 @@ def _summary(record: Mapping[str, Any]) -> list[str]:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    """Command-line entry point; see ``python -m chemthermo.bench --help``."""
+    """Command-line entry point; see ``python -m chemthermo.bench --help``.
+
+    One subcommand exists, ``robustness`` (ADR-0027), and it is dispatched on
+    the first argument rather than through ``add_subparsers``. That is
+    deliberate: the timing CLI's flags (``--out``, ``--repeats``, ``--case``,
+    ``--list``, ``--compare``) were its whole contract before the subcommand
+    existed and are what ``benchmarks/README.md``, ``tools/bench.py`` and
+    ``tests/test_bench_harness.py`` call, so ``python -m chemthermo.bench
+    --out record.json`` has to keep meaning exactly what it meant. A word in
+    first position is unambiguous - no flag starts without a dash.
+    """
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if arguments and arguments[0] == "robustness":
+        from .robustness import main as robustness_main
+
+        return robustness_main(arguments[1:])
+
     parser = argparse.ArgumentParser(
         prog="python -m chemthermo.bench",
         description="Run the chemthermo benchmark workload, or compare two records.",
@@ -264,7 +280,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         default=None,
         help="compare two records instead of running; exits 1 if any result hash differs",
     )
-    args = parser.parse_args(argv)
+    args = parser.parse_args(arguments)
 
     if args.list:
         for case in CASES:
