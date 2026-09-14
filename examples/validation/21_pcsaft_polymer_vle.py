@@ -50,9 +50,13 @@ not read. They live in ``tests/fixtures/pcsaft/martini2009_polymers.json``, are
 never packaged, and nothing here is compared against measurement.
 
 ``--full`` adds the 25-point pressure scan from 0.3 to 12 MPa (the
-vapour-liquid / liquid-liquid / single-liquid verdict sequence) and the
-bisected vapour-liquid to liquid-liquid boundary. The default takes about ten
-seconds.
+vapour-liquid / liquid-liquid / single-liquid verdict sequence), the same scan
+for the ``Mw = 53 000`` chain - whose first point, 0.3 MPa, raised
+``ConvergenceError`` until ADR-0026 and is one of the six states validation
+Case P-16 retires - and the bisected vapour-liquid to liquid-liquid boundary.
+The long chain's scan also prints the one band that still refuses, near
+5.2 MPa, which refuses at HEAD 584c508 as well and is outside what ADR-0026
+measures. The default takes about ten seconds.
 
 Requires the optional ``feos`` dependency for route 4 only::
 
@@ -90,6 +94,9 @@ FIXTURE = REPO / "tests" / "fixtures" / "pcsaft" / "martini2009_polymers.json"
 
 TEMPERATURE_K = 453.0
 PE_MW_G_MOL = 16400.0
+#: The second molar mass of the `--full` verdict scan (ADR-0026, Case P-16):
+#: `m = 1393.9` segments, the chain whose 0.3 MPa state raised until this slice.
+PE_LONG_MW_G_MOL = 53000.0
 PENTANE_MW_G_MOL = 72.146
 HEXANE_MW_G_MOL = 86.177
 KIJ = -0.006
@@ -138,20 +145,20 @@ def polymer_row() -> dict:
 ROW = polymer_row()
 
 
-def polymer_record() -> PCSAFTRecord:
+def polymer_record(mw_g_mol: float = PE_MW_G_MOL) -> PCSAFTRecord:
     return PCSAFTRecord(
         name="Polyethylene",
         segments_per_g=ROW["segments_per_g"],
-        MW_g_mol=PE_MW_G_MOL,
+        MW_g_mol=mw_g_mol,
         sigma_A=ROW["sigma_A"],
         epsilon_k_K=ROW["epsilon_k_K"],
     )
 
 
-def binary_parameters() -> PCSAFTParameters:
+def binary_parameters(mw_g_mol: float = PE_MW_G_MOL) -> PCSAFTParameters:
     return PCSAFTParameters.from_records(
         [
-            polymer_record(),
+            polymer_record(mw_g_mol),
             PCSAFTRecord(
                 name="n-Pentane",
                 m=PENTANE[0],
@@ -175,22 +182,22 @@ def ternary_parameters() -> PCSAFTParameters:
     )
 
 
-def polymer_component() -> ct.Component:
+def polymer_component(mw_g_mol: float = PE_MW_G_MOL) -> ct.Component:
     return ct.Component.custom(
         "Polyethylene",
-        mw_kg_per_mol=PE_MW_G_MOL / 1000.0,
+        mw_kg_per_mol=mw_g_mol / 1000.0,
         formula="(C2H4)n",
         volatile=False,
         source="see tests/fixtures/pcsaft/martini2009_polymers.json",
     )
 
 
-def binary_mixture(weight_fraction: float = 0.05) -> ct.Mixture:
-    polymer = weight_fraction / PE_MW_G_MOL
+def binary_mixture(weight_fraction: float = 0.05, mw_g_mol: float = PE_MW_G_MOL) -> ct.Mixture:
+    polymer = weight_fraction / mw_g_mol
     solvent = (1.0 - weight_fraction) / PENTANE_MW_G_MOL
     total = polymer + solvent
     return ct.Mixture.from_components(
-        [polymer_component(), ct.Component.from_database("n-Pentane")],
+        [polymer_component(mw_g_mol), ct.Component.from_database("n-Pentane")],
         [polymer / total, solvent / total],
         normalize=True,
     )
@@ -210,8 +217,8 @@ def ternary_mixture() -> ct.Mixture:
     )
 
 
-def binary_eos(kij: float = KIJ) -> PCSAFTEOS:
-    return PCSAFTEOS(parameters=binary_parameters(), kij=kij)
+def binary_eos(kij: float = KIJ, mw_g_mol: float = PE_MW_G_MOL) -> PCSAFTEOS:
+    return PCSAFTEOS(parameters=binary_parameters(mw_g_mol), kij=kij)
 
 
 def ln_y_polymer(result: ct.FlashResult, phase_name: str) -> float:
@@ -554,16 +561,27 @@ def the_ternary() -> None:
 # ---------------------------------------------------------------------------
 
 
-def the_pressure_scan() -> None:
-    section("6. (--full) 25 pressures from 0.3 to 12 MPa: the verdict sequence")
-    mixture = binary_mixture()
-    eos = binary_eos()
+def the_pressure_scan(mw_g_mol: float = PE_MW_G_MOL, *, strict: bool = True) -> list[float]:
+    section(
+        f"6. (--full) 25 pressures from 0.3 to 12 MPa, Mw = {mw_g_mol:.0f}: the verdict sequence"
+    )
+    mixture = binary_mixture(mw_g_mol=mw_g_mol)
+    eos = binary_eos(mw_g_mol=mw_g_mol)
     print(f"  {'P/MPa':>7} {'verdict':>17} {'stage':>19} {'x_C5 (PE-rich)':>16} {'dG/RT':>11}")
     verdicts: list[str] = []
+    refusals: list[float] = []
     for pressure_Pa in np.linspace(0.3e6, 12.0e6, 25):
-        result = ct.flash_tp(
-            mixture, temperature_K=TEMPERATURE_K, pressure_Pa=float(pressure_Pa), eos=eos
-        )
+        try:
+            result = ct.flash_tp(
+                mixture, temperature_K=TEMPERATURE_K, pressure_Pa=float(pressure_Pa), eos=eos
+            )
+        except ct.ConvergenceError as exc:
+            # Printed, not asserted on: see `the_long_chain_scan` for which
+            # band of this scan ADR-0026 does *not* claim.
+            refusals.append(float(pressure_Pa))
+            print(f"  {pressure_Pa / 1e6:7.3f} {'REFUSED':>17}  {str(exc)[:44]}")
+            verdicts.append("REFUSED")
+            continue
         regime = str(result.diagnostics["phase_regime"])
         verdicts.append(regime)
         if len(result.phases) == 1:
@@ -582,9 +600,47 @@ def the_pressure_scan() -> None:
         if index == 0 or regime != verdicts[index - 1]
     ]
     print(f"\n  verdict sequence: {' -> '.join(ordered)}")
+    if strict:
+        record_check(
+            f"Mw = {mw_g_mol:.0f}: the verdict sequence is VLE -> LLE -> single-phase,"
+            " with no failures",
+            ordered == ["VLE", "LLE", "single-phase"],
+        )
+    return refusals
+
+
+def the_long_chain_scan() -> None:
+    """The same scan for ``Mw = 53 000``, and what is still open above it.
+
+    Its first point, 0.3 MPa, raised ``ConvergenceError`` until ADR-0026 and is
+    one of the six states validation Case P-16 retires; the deep verification
+    of all six is in ``examples/validation/22_stability_log_space.py``. What
+    this section adds is the *boundary of the claim*: ADR-0026 is measured over
+    0.3-3.6 MPa, and a narrow band around 5.2 MPa on this chain still refuses -
+    at HEAD 584c508 as well, by the same message and the same residual, so it
+    is neither caused nor repaired by that slice. It is printed here rather
+    than hidden, and asserted on only where the claim reaches.
+    """
+    refusals = the_pressure_scan(PE_LONG_MW_G_MOL, strict=False)
+    print(
+        f"\n  refusals on this scan: {[round(p / 1e6, 3) for p in refusals]} MPa"
+        if refusals
+        else "\n  refusals on this scan: none"
+    )
     record_check(
-        "the verdict sequence is VLE -> LLE -> single-phase, with no failures",
-        ordered == ["VLE", "LLE", "single-phase"],
+        f"Mw = {PE_LONG_MW_G_MOL:.0f}: nothing refuses at or below 3.6 MPa, the band"
+        " ADR-0026 measures",
+        not [pressure for pressure in refusals if pressure <= 3.6e6],
+    )
+    record_check(
+        f"Mw = {PE_LONG_MW_G_MOL:.0f}: the one band that still refuses is the known one"
+        " near 5.2 MPa",
+        all(5.0e6 < pressure < 5.4e6 for pressure in refusals),
+    )
+    print(
+        "  (a narrow band near 5.2 MPa on this chain refuses at HEAD 584c508 too, with the\n"
+        "   same message and residual; it is a separate open item - see ADR-0026 'What\n"
+        "   remains' and the roadmap in .agents/brain/brain.md)"
     )
 
 
@@ -654,9 +710,12 @@ def main() -> None:
     the_ternary()
     if args.full:
         the_pressure_scan()
+        the_long_chain_scan()
         the_boundary()
     else:
-        print("\n  (pass --full for the 25-point pressure scan and the bisected VL/LL boundary)")
+        print(
+            "\n  (pass --full for the two 25-point pressure scans and the bisected VL/LL boundary)"
+        )
 
     print("\n" + "=" * 78)
     if failures:
