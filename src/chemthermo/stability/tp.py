@@ -240,6 +240,7 @@ from typing import Literal, Mapping
 
 import numpy as np
 
+from .._eos_memo import scoped as _scoped_eos_memo
 from ..core import Mixture
 from ..exceptions import CompositionError, ModelError
 from ..models import ActivityModel, EquationOfState
@@ -270,6 +271,7 @@ VAPOR_CANDIDATES = ("none", "ideal")
 __all__ = ["stability_tp"]
 
 
+@_scoped_eos_memo
 def stability_tp(
     mixture: Mixture,
     *,

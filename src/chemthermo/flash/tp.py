@@ -160,6 +160,7 @@ from __future__ import annotations
 
 import numpy as np
 
+from .._eos_memo import scoped as _scoped_eos_memo
 from ..core import Mixture
 from ..exceptions import CompositionError, ModelError
 from ..models import ActivityModel, EquationOfState
@@ -181,6 +182,7 @@ from .settings import FlashSettings
 FLASH_MODES = ("phi-phi", "gamma-phi", "gamma-gamma", "modified-raoult")
 
 
+@_scoped_eos_memo
 def flash_tp(
     mixture: Mixture,
     *,
