@@ -708,11 +708,20 @@ def test_the_window_scan_never_raises(binary_reference, z_water: float) -> None:
     assert len(verdicts) == 41
     assert set(verdicts) == {"LLE", "VLE"}
     assert verdicts[0] == "LLE" and verdicts[-1] == "VLE"
-    # One switch, and the grid point it lands on brackets T3 within one step.
     switches = [i for i in range(1, 41) if verdicts[i] != verdicts[i - 1]]
     assert len(switches) == 1
-    boundary = float(np.linspace(t3 - 1.0, t3 + 1.0, 41)[switches[0]])
-    assert abs(boundary - t3) <= 0.05
+    # The one switch straddles `T3`: the last `LLE` grid point is at or below
+    # it and the first `VLE` one at or above it. Asserted as a bracket rather
+    # than as `|boundary - T3| <= 0.05`, because the grid step *is* 0.05 K and
+    # that comparison fails on the last bit whenever the switch lands on the
+    # point above `T3` (it does at `z = 0.7`). The sub-microkelvin statement is
+    # the bisection test below, and Case P-11.
+    grid = np.linspace(t3 - 1.0, t3 + 1.0, 41)
+    last_lle = float(grid[switches[0] - 1])
+    first_vle = float(grid[switches[0]])
+    assert last_lle <= t3 + 1e-9
+    assert first_vle >= t3 - 1e-9
+    assert first_vle - last_lle == pytest.approx(2.0 / 40.0)
 
 
 @pytest.mark.slow
