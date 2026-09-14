@@ -119,6 +119,24 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
     so on the page. **Default stops before the 1 MPa section** (about 5 s);
     `--full` runs it. Needs no optional dependency. See ADR-0018, ADR-0019 and
     validation Cases P-6, P-7 and P-8.
+- `examples/basic/pcsaft_polymer_demo.py`
+  - **A polymer as a PC-SAFT component** (ADR-0022), the golden path for that
+    slice. Polyethylene / n-pentane at 453 K: the segments-per-mass record
+    (`segments_per_g = 0.0263` mol/g times `Mw = 16400` g/mol gives
+    `m = 431.32`, against 2.6896 for the solvent - 160 : 1), a custom
+    non-volatile `Component` with **no critical constants at all**, the pure
+    melt's single density root over 1-30 MPa, the stability verdict switching
+    once with pressure and once with temperature (the LCST-type direction: this
+    system demixes on heating), the verified liquid-liquid split at 8 MPa with
+    its three residuals, and the effect of `k_ij`. **The polymer parameters are
+    a cited test fixture, not packaged data**: as tabulated by Martini et al.
+    (2009) citing a paywalled Gross & Sadowski (2002) table that was not read,
+    with no second open source found; the polymer is modelled as monodisperse;
+    nothing is compared against measurement, and the script says all of this
+    before printing anything. About 5 s by default; `--full` bisects the cloud
+    point and runs the `Mw = 53000` chain, where `exp(ln phi)` underflows and
+    ADR-0022's log-space route carries the flash. Needs no optional dependency.
+    See validation Cases P-12 and P-13.
 - `examples/basic/flash_tp_pcsaft_lle_demo.py`
   - **Liquid-liquid equilibrium from an equation of state** (ADR-0019), the
     golden path for that slice. Water / n-hexane at 298.15 K: the stability
@@ -334,6 +352,22 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
     the two 41-point scans with the verdict boundary bisected to 1e-06 K, and
     the per-surface trial statistics over the 144-state Peng-Robinson grid
     (several minutes).
+- `examples/validation/20_pcsaft_polymer_vs_feos.py`
+  - **Polymer/solvent PC-SAFT against FeOs** (ADR-0022, validation Cases P-12
+    and P-13), with PASS/FAIL per check. Four routes: FeOs's own `A^res/RT`,
+    `Z` and `ln phi` at eleven states on chemthermo's own density roots (agreed
+    to 5.0e-12 with matched universal constants, 1.4e-06 as shipped); an
+    equal-fugacity Newton written in the script that reproduces the 8 MPa tie
+    line to 1.7e-15; FeOs's chemical potentials at chemthermo's converged
+    phases (4.5e-13 matched, 4.1e-08 as shipped); and FeOs's own `tp_flash` at
+    the one pressure where it converges on this system. Two facts about the
+    reference are printed rather than hidden - FeOs's flash **raises** here at
+    5 and 8 MPa and returns a degenerate pair at 3 MPa, and `k_ij` cannot be
+    given to FeOs's PC-SAFT in feos 0.10.1, so every FeOs comparison runs at
+    `k_ij = 0` on both sides. The Newton route runs without `feos` (the script
+    says so and still exits 0). About 4 s by default; `--full` adds the
+    FeOs-flash survey across 3-15 MPa, the `Mw = 53000` chain and the bisected
+    cloud point (about 20 s).
 - `examples/validation/*.py`
   - Optional validation sweeps against `thermo` (requires `pip install -e ".[validation]"`).
   - CSV output is disabled by default; pass `--outdir <dir>` or set `CHEMTHERMO_OUTDIR`.
