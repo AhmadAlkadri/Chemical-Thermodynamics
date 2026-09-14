@@ -203,6 +203,26 @@ a cap on ``|delta u|`` and a backtracking line search on ``max_i |g_i|``. It is
 entered only after ``settings.ssi_iterations`` substitutions have failed to meet
 ``settings.tol``, so trials that converge quickly are untouched by it.
 
+Where the handover is too early (ADR-0028)
+------------------------------------------
+"After a few substitutions" is a heuristic, and the robustness map of ADR-0027
+found the two states where it costs the analysis its verdict: a 15 wt%
+polyethylene / n-pentane feed at 10.5 and 10.8 MPa, just inside the pressure at
+which the non-trivial stationary point merges with the trivial one. There every
+trial reaches ``second_order_no_progress`` - the Newton line search finds *no*
+admissible step, at a residual of 0.685 and 1.746 - from a 50-substitution
+iterate that was still travelling, and the whole analysis is ``inconclusive``,
+which is the one verdict a flash cannot use.
+
+Neither stage is at fault. Successive substitution on its own never converges
+there either (3000 substitutions leave a residual of 53); the same unchanged
+Newton stage finishes in seven iterations when it is handed the iterate at
+substitution 300 instead of 50. So the analysis is re-run once, from the same
+trial compositions, with ``ssi_iterations`` raised to ``max_iter`` - and only
+when the first pass ended inconclusive, which makes the retry dormant on every
+verdict this module has ever returned. It is reported as
+``diagnostics["substitution_budget_retry"]``. See validation Case P-17.
+
 Limits of the test
 ------------------
 A negative tangent-plane distance is a *proof* of instability. The converse is
@@ -215,7 +235,8 @@ reaches can hide an instability.
 from __future__ import annotations
 
 import math
-from typing import Literal
+from dataclasses import replace
+from typing import Literal, Mapping
 
 import numpy as np
 
@@ -383,9 +404,8 @@ def stability_tp(
     d = np.full(z.shape, -np.inf, dtype=float)
     d[active] = np.log(z[active]) + ln_f_feed[active]
 
-    trials: list[StabilityTrial] = []
-    for estimate in evaluator.initial_estimates(z, active):
-        trials.append(
+    def run_all(active_settings: StabilitySettings) -> tuple[StabilityTrial, ...]:
+        return tuple(
             _run_trial(
                 label=estimate.label,
                 w0=estimate.composition,
@@ -394,20 +414,76 @@ def stability_tp(
                 d=d,
                 active=active,
                 evaluator=evaluator,
-                settings=settings,
+                settings=active_settings,
             )
+            for estimate in evaluator.initial_estimates(z, active)
         )
 
-    return _summarize(
+    result = _summarize(
         z=z,
         temperature=temperature,
         pressure=pressure,
         feed_branch=feed_branch,
-        trials=tuple(trials),
+        trials=run_all(settings),
         settings=settings,
         n_active=n_active,
         evaluator=evaluator,
     )
+    if result.status != "inconclusive":
+        return result
+
+    retry = _substitution_budget_retry(settings)
+    if retry is None:
+        return result
+    # ADR-0028. Every trial ran out of iterations without reaching a
+    # stationary point, which is the one outcome `flash_tp` cannot use at all:
+    # it can neither split the feed nor call it one phase. The whole analysis
+    # is therefore re-run once, from the very same trial compositions, with
+    # successive substitution given its full `max_iter` budget before the
+    # second-order stage takes over instead of `ssi_iterations` of it.
+    #
+    # Why that and not a change to the Newton stage: the two states this was
+    # measured on (validation Case P-17) stall in the Newton stage at a
+    # residual of 0.685 and 1.746 with `second_order_no_progress`, i.e. with no
+    # admissible step at all, from a substitution iterate that was still
+    # travelling. Substitution alone never converges there either - it is the
+    # *handover* that is early, not either stage that is broken - and 300
+    # substitutions put the iterate where the same unchanged Newton stage
+    # finishes in seven. Nothing here is reached unless the first pass already
+    # left the caller with an inconclusive verdict, so no verdict, no
+    # `tpd_min`, no stationary point and no diagnostic that this function has
+    # ever returned can move.
+    retried = _summarize(
+        z=z,
+        temperature=temperature,
+        pressure=pressure,
+        feed_branch=feed_branch,
+        trials=run_all(retry),
+        settings=retry,
+        n_active=n_active,
+        evaluator=evaluator,
+        extra_diagnostics={
+            "substitution_budget_retry": True,
+            "substitution_budget_retry_from": settings.ssi_iterations,
+        },
+    )
+    if retried.status == "inconclusive":
+        return result
+    return retried
+
+
+def _substitution_budget_retry(settings: StabilitySettings) -> StabilitySettings | None:
+    """The ADR-0028 retry settings, or ``None`` when there is nothing to retry.
+
+    The only field that moves is ``ssi_iterations``, and it moves to
+    ``max_iter`` - the budget successive substitution already has when the
+    second-order stage is switched off. No tolerance, no step bound and no
+    iteration ceiling changes, so the retry can only reach a stationary point
+    the first pass would have reached with more substitutions.
+    """
+    if not settings.second_order or settings.ssi_iterations >= settings.max_iter:
+        return None
+    return replace(settings, ssi_iterations=settings.max_iter)
 
 
 def _terms(evaluator: _TangentPlaneEvaluator, w: np.ndarray, surface: str | None) -> _SurfaceTerms:
@@ -924,8 +1000,14 @@ def _summarize(
     settings: StabilitySettings,
     n_active: int,
     evaluator: _TangentPlaneEvaluator,
+    extra_diagnostics: Mapping[str, float | int | str | bool] | None = None,
 ) -> StabilityResult:
-    """Reduce per-trial outcomes to a verdict and the minimizing trial."""
+    """Reduce per-trial outcomes to a verdict and the minimizing trial.
+
+    ``extra_diagnostics`` is written only by the ADR-0028 retry, which is
+    itself reached only from an inconclusive first pass, so a result assembled
+    without it carries the keys it carried before ADR-0028 and no others.
+    """
     converged = [trial for trial in trials if trial.converged]
     non_trivial = [trial for trial in converged if not trial.trivial and math.isfinite(trial.tpd)]
 
@@ -973,6 +1055,7 @@ def _summarize(
         "ssi_iterations_budget": settings.ssi_iterations,
         "second_order_trial_count": sum(1 for trial in trials if trial.second_order_iterations > 0),
         **evaluator.diagnostics,
+        **(extra_diagnostics or {}),
     }
 
     surface_counts: dict[str, int] = {}
