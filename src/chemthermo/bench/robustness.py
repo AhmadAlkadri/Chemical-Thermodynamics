@@ -1549,8 +1549,10 @@ QUICK_SAMPLING: Mapping[str, tuple[int, int, int | None, tuple[int, ...]]] = {
     "polymer-pe53000-pentane": (39, 73, 2, (0, 106)),
     "polymer-pe16400-pentane-hexane": (4, 1, 1, ()),
     "polymer-pe53000-pentane-hexane": (4, 1, 1, ()),
-    # index 40 = z_water=0.05, T3+1 K: multiphase-solver-failure / collapsed
-    # (a converged two-phase set with a non-positive phase fraction).
+    # index 40 = z_water=0.05, T3+1 K. This was multiphase-solver-failure /
+    # collapsed until ADR-0029 and is a verified VLE answer since (Case P-18
+    # (i)); it is kept in the quick subset as the cheap regression guard on
+    # the reversible-removal rule that repaired it.
     "eos3p-pcsaft-water-n-hexane-t3-scan": (0, 1, 0, (40,)),
     # index 13 = feed (0.1, 0.8, 0.1), 333 K: cheap single-phase state (~0.4 s);
     # the VLLE vertices themselves cost 13-40 s each (ADR-0020) and are left to
@@ -1558,9 +1560,12 @@ QUICK_SAMPLING: Mapping[str, tuple[int, int, int | None, tuple[int, ...]]] = {
     "eos3p-pcsaft-water-ethanol-n-hexane": (0, 1, 0, (13,)),
     # Every state of this system shares one pressure and one of two
     # temperatures, so a stride sample risks two feeds landing on the same
-    # (T, P) - ambiguous for the (system, T, P) refusal pin below. Pinned
-    # only: index 4 = feed (0.2, 0.6, 0.2), 280 K (multiphase-solver-failure /
-    # split); index 18 = feed (0.4, 0.4, 0.2), 300 K (same class).
+    # (T, P) - ambiguous for the (system, T, P) pins in
+    # `tests/test_robustness_map.py`. Pinned only: index 4 = feed
+    # (0.2, 0.6, 0.2), 280 K; index 18 = feed (0.4, 0.4, 0.2), 300 K. Both were
+    # multiphase-solver-failure / split until ADR-0029 and are verified
+    # three-liquid answers since (Case P-18 (ii)); they stay here as the cheap
+    # (~0.1 s each) regression guard on the multiphase log-space stage.
     "eos3p-pr-water-ethanol-n-hexane": (0, 1, 0, (4, 18)),
     "nearcrit-methane-ethane-propane": (0, 10, 4, ()),
     "nearcrit-methane-n-pentane": (0, 10, 4, ()),

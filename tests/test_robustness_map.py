@@ -18,11 +18,12 @@ can answer, which is exactly what this file exists to notice.
 state and class, with a test that **expects the failure**. If a later slice
 fixes one of them, this file fails - deliberately. The fix is to move the state
 out of :data:`PINNED_REFUSALS` and into the record, not to loosen the test.
-The six original families are still empty since ADR-0028 - the full sweep of
-*that* grid refuses nothing (ledger Cases R-MAP-1, P-17) - but slice
-``robustness-map-coverage`` (ADR-0027 amendment) adds four families that were
-named as coverage gaps in ADR-0027's own roadmap, and two of them refuse:
-see ledger Case R-MAP-2.
+Since slice ``flash-eos-multiphase-robustness`` (ADR-0029, ledger Case P-18)
+the only refusals left anywhere in the grid are the **five** the deprecated
+``gamma-phi`` path has by design (ADR-0016 decision 8): the nine
+``multiphase-solver-failure`` states of ``eos-three-phase`` that slice
+``robustness-map-coverage`` found now converge to verified answers, and their
+former pins were deleted from this file in the same commit that repaired them.
 
 **The three-phase verdicts.** A handful of states the ledger already pins by
 an independent solve (Case P-9: the water/n-hexane three-phase temperature
@@ -79,7 +80,9 @@ EXPECTED_QUICK_FAMILIES: dict[str, tuple[int, int, int, int]] = {
     "modified-raoult": (20, 20, 0, 0),
     "gamma-gamma": (8, 8, 0, 0),
     "polymer": (9, 9, 0, 0),
-    "eos-three-phase": (4, 1, 3, 0),
+    # 3 refused before ADR-0029; the three states are still sampled here (they
+    # are the family's three pinned indices) and now converge.
+    "eos-three-phase": (4, 4, 0, 0),
     "gamma-phi-legacy": (30, 25, 5, 0),
     "pr-near-critical": (17, 17, 0, 0),
     "pcsaft-associating-ternary": (2, 2, 0, 0),
@@ -88,44 +91,18 @@ EXPECTED_QUICK_FAMILIES: dict[str, tuple[int, int, int, int]] = {
 #: Every refusal the quick subset contains, pinned. Each entry is
 #: ``(system, T / K, P / Pa, refusal class, refusal stage)``.
 #:
-#: The six original families are still empty since ADR-0028 - the three
-#: polyethylene / n-pentane states pinned here at ``87f0820`` now converge to
-#: verified two-phase results (ledger Cases R-MAP-1 and P-17), and nothing in
-#: those six families refuses in the quick subset either. Slice
-#: ``robustness-map-coverage`` (ADR-0027 amendment) adds four new families and
-#: finds real refusals in two of them - see ledger Case R-MAP-2 for the
-#: diagnosis of each.
+#: Nine of the fourteen refusals at ``74820b8`` were the ``eos-three-phase``
+#: ``multiphase-solver-failure`` band; ADR-0029 repaired all nine and their
+#: pins are gone (ledger Case P-18). What is left is the deprecated
+#: ``gamma-phi`` path's five ``rr-no-bracket`` states, which are by design.
 PINNED_REFUSALS: tuple[tuple[str, float, float, str, str], ...] = (
-    # eos-three-phase: z_water = 0.05, T3 + 1 K. A converged two-phase set
-    # with a non-positive phase fraction, one step past the phase-addition
-    # search's usual add-then-remove repair (Case R-MAP-2).
-    (
-        "eos3p-pcsaft-water-n-hexane-t3-scan",
-        335.807826336,
-        101325.0,
-        "multiphase-solver-failure",
-        "collapsed",
-    ),
-    # eos-three-phase: the Peng-Robinson water/ethanol/n-hexane ternary,
-    # feed (0.2, 0.6, 0.2), at both swept temperatures. The multiphase split
-    # itself does not converge (Case R-MAP-2), not the search around it.
-    (
-        "eos3p-pr-water-ethanol-n-hexane",
-        280.0,
-        101325.0,
-        "multiphase-solver-failure",
-        "split",
-    ),
-    (
-        "eos3p-pr-water-ethanol-n-hexane",
-        300.0,
-        101325.0,
-        "multiphase-solver-failure",
-        "split",
-    ),
     # gamma-phi-legacy: the deprecated path's own known failure mode
     # (ADR-0008/ADR-0016 fixed this on the tangent-plane path; the legacy
-    # Wilson-heuristic path is deliberately unchanged and still has it).
+    # Wilson-heuristic path is deliberately unchanged and still has it). These
+    # five are **by design** and are not a defect queue: ADR-0016 decision 8
+    # records the choice, and the default tangent-plane path converges every
+    # one of these five states. They are pinned so that a change to them is
+    # noticed, not so that a later slice removes them.
     ("gammaphi-methane-ethane", 200.0, 3.0e6, "rr-no-bracket", "phi-phi"),
     ("gammaphi-methane-ethane", 220.0, 1.0e6, "rr-no-bracket", "phi-phi"),
     ("gammaphi-methane-ethane", 240.0, 2.0e6, "rr-no-bracket", "phi-phi"),
@@ -217,6 +194,16 @@ _MESSAGES: tuple[tuple[str, type[Exception], str, str], ...] = (
     (
         "The multiphase split did not converge; equal-fugacity residual=1.836e-08 after "
         "50 successive-substitution and 1 second-order iterations.",
+        ct.ConvergenceError,
+        "multiphase-solver-failure",
+        "split",
+    ),
+    (
+        # The same raise site once the ADR-0029 log-space stage has also run
+        # and not helped; the class and stage must not move because of it.
+        "The multiphase split did not converge; equal-fugacity residual=1.836e-08 after "
+        "50 successive-substitution and 1 second-order iterations and 100 log-space "
+        "Newton iterations (ADR-0029).",
         ct.ConvergenceError,
         "multiphase-solver-failure",
         "split",
