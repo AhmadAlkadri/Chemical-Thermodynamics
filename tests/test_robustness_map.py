@@ -67,7 +67,7 @@ from chemthermo.eos import PCSAFTEOS
 #: The committed full sweep this module checks the code against. Regenerating
 #: it at a new commit means a new file (``benchmarks/README.md``), so the name
 #: lives in one place.
-COMMITTED_RECORD = Path(__file__).resolve().parents[1] / "benchmarks" / "robustness_74820b8.json"
+COMMITTED_RECORD = Path(__file__).resolve().parents[1] / "benchmarks" / "robustness_64831bd.json"
 
 #: Total states in the ``--quick`` subset.
 EXPECTED_QUICK_STATES = 224
