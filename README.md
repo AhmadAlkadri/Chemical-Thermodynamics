@@ -615,10 +615,12 @@ Notes and limits:
   on that surface, and still reports its tangent-plane distance with the
   lowest-Gibbs candidate at the converged composition - the distance is to the
   envelope, not to one sheet. `StabilityTrial.surface` says what a trial
-  iterated on, `StabilityTrial.phase_branch` where it stopped. Cubic
-  compressibility roots are deliberately *not* pinned: a missing root is the
-  same model failing to exist at that composition, so minimum-Gibbs root
-  selection at every iterate stays the rule there. Over a grid of 75-76 feeds
+  iterated on, `StabilityTrial.phase_branch` where it stopped. **The density
+  roots of an equation of state are pinned the same way** (ADR-0021): the
+  vapour-like Wilson start iterates on the vapour root, the liquid-like and
+  pure-component starts on the liquid root, and where the model has a single
+  admissible root - both `phase` labels name it - the trial walks that one and
+  records the fact in `StabilityTrial.surface_fallback`. Over a grid of 75-76 feeds
   per temperature at 363 / 364 / 365 K, the phase-count verdict now agrees with
   an independent lowest-Gibbs classifier at **every** feed (validation Case
   V-5, `python examples/validation/12_vlle_verdict_map.py`).

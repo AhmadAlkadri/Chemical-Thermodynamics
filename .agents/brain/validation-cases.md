@@ -3069,7 +3069,7 @@ recorded in Case P-10; the binary window is Case P-9.
   scratch measurement). The shipped test bisects a `+/- 1e-03 K` bracket ten
   times and asserts agreement to 1e-05 K.
 
-### (iv) The scan across the window, and one honest miss
+### (iv) The scan across the window, and one honest miss - **retired by ADR-0021**
 
 - **Expected outcome:** no `ConvergenceError` anywhere in `[T3 - 1 K, T3 + 1 K]`,
   and a verdict that switches once.
@@ -3077,19 +3077,33 @@ recorded in Case P-10; the binary window is Case P-9.
   **82 states, zero `ConvergenceError`**. At `z_water = 0.3`: 20 `LLE` then 21
   `VLE`, exactly one switch, at `T3`. A third scan at `z_water = 0.5` (scratch,
   not shipped) gives the same shape.
-- **The miss, measured and pinned.** At `z_water = 0.7` the verdict is `LLE`
-  at all 41 temperatures, including above `T3` where it should be `VLE`. At
-  335 K the returned two-liquid pair has `G/RT = -1.1618107137` against the
-  vapour-liquid pair's `-1.1643059308`: the answer is **metastable by
-  2.495e-03 RT**. The cause is the *stability* test, not the search: all four
-  deterministic trials from the hexane-rich liquid `(0.02273, 0.97727)`
-  converge to the trivial solution or to its partner
-  (`tpd_min = -3.007e-09`, verdict `"stable"`), while the vapour stationary
-  point at `y = (0.21500, 0.78500)` has `tpd = -6.530e-03`. That is
+- **The miss, as measured on the `flash-phase-addition-eos` slice.** At
+  `z_water = 0.7` the verdict was `LLE` at all 41 temperatures, including above
+  `T3` where it should be `VLE`. At 335 K the returned two-liquid pair has
+  `G/RT = -1.1618107137` against the vapour-liquid pair's `-1.1643059308`: the
+  answer was **metastable by 2.495e-03 RT**. The cause was the *stability*
+  test, not the search: all four deterministic trials from the hexane-rich
+  liquid `(0.02273, 0.97727)` converged to the trivial solution or to its
+  partner (`tpd_min = -3.007e-09`, verdict `"stable"`), while the vapour
+  stationary point at `y = (0.21500, 0.78500)` has `tpd = -6.530e-03`. That was
   `_EOSTangentPlane`'s trial set, which ADR-0012 deliberately left with
-  per-iterate minimum-Gibbs root selection and no fixed surfaces, and it is the
+  per-iterate minimum-Gibbs root selection and no fixed surfaces, and it was the
   invariant "a phase count is never better than the stability test that
   produced it" made concrete again.
+- **AMENDMENT (slice `stability-eos-root-surfaces`, ADR-0021): the miss is
+  gone.** With each equation-of-state trial pinned to one density root, the
+  `wilson-vapor` trial stays on the vapour root and reaches that stationary
+  point in 7 iterations (`tpd = -6.5237494612e-03` at
+  `w = (0.213559327395, 0.786440672605)`, `phase_branch = "vapor"`,
+  `minimizing_trial_surface = "vapor"`), the hexane-rich liquid is reported
+  `"unstable"`, and `flash_tp` returns the vapour-liquid pair. Both 41-point
+  scans now switch `LLE -> VLE` **exactly once**, with **zero
+  `ConvergenceError`** (`z_water = 0.3`: 20 `LLE` then 21 `VLE`;
+  `z_water = 0.7`: 21 then 20). Bisecting each verdict boundary to 1e-06 K puts
+  it **2.09e-07 K below** `T3` at `z_water = 0.3` and **2.68e-07 K above** it at
+  `z_water = 0.7`. See **Case P-11** for the full evidence, and note that
+  `tests/test_flash_vlle_eos.py::test_the_window_scan_never_raises` no longer
+  pins the miss - it pins the switch, at both feeds.
 
 ### Negative controls
 
@@ -3225,3 +3239,173 @@ recorded in Case P-10; the binary window is Case P-9.
   (`slow`, skipped without `feos`).
 - **Script:** `examples/basic/flash_tp_pcsaft_vlle_demo.py --full`,
   `examples/validation/18_pcsaft_vlle_water_hexane.py --full`.
+
+## Case P-11: Fixed density-root surfaces in the equation-of-state stability trials
+
+- **Source:** the two independent 4-equation and 2-equation Newtons of Case
+  P-9, re-run here; reduced Gibbs energies from the public
+  `EquationOfState.fugacity_coefficients`; **FeOs 0.10.1** chemical potentials
+  at chemthermo's converged phases; and, for the "nothing moved" half, a
+  state-by-state diff of this repository against itself at HEAD `58190f5`
+  (144-state Peng-Robinson grid, 188-state PC-SAFT Case F-4 grid, a 1144-state
+  Peng-Robinson flash scan, and the 155-state bit-identity fixture).
+- **Location:** `chemthermo/stability/_evaluator.py` and
+  `chemthermo/stability/tp.py`; slice `stability-eos-root-surfaces`
+  (ADR-0021). Nothing in `chemthermo/flash/`, `chemthermo/eos/` or
+  `chemthermo/models/` changed.
+- **Assumptions:** `k_ij = 0` throughout; packaged parameters; 2B association
+  for water. Nothing here is compared against measurement.
+- **Components / units:** water / n-hexane at 101,325 Pa (PC-SAFT) and the
+  light-hydrocarbon grids of Cases F-1 and F-4 (Peng-Robinson, PC-SAFT).
+  Temperatures in K, pressures in Pa, distances in units of RT.
+
+### (i) The defect, and the repair
+
+- **Expected outcome:** the hexane-rich liquid of Case P-9 (iv) is unstable
+  towards a vapour, and `flash_tp` returns the lower-Gibbs pair.
+- **Achieved, at the state Case P-9 (iv) pinned** (335 K, 1 atm,
+  `w = (0.02273, 0.97727)`): `status = "unstable"`,
+  `tpd_min = -6.5237494612e-03` at `w = (0.213559327395, 0.786440672605)`,
+  `feed_branch = "liquid"`, `phase_branch = "vapor"`,
+  `minimizing_trial = "wilson-vapor"`, `minimizing_trial_surface = "vapor"`,
+  7 iterations. The other three trials are what the whole answer used to be:
+  `wilson-liquid` and `pure-n-Hexane` trivial, `pure-Water` on a
+  `tpd = +6.26e-05` liquid-surface point.
+- **The flash that follows**, `z_water = 0.7`, 335 K:
+  `phases = {"liquid", "vapor"}`, `phase_regime = "VLE"`,
+  `liquid = (0.999936102393, 6.3897607e-05)`,
+  `vapor = (0.214999486349, 0.785000513651)`,
+  `beta_vapor = 0.382115060327`, `phase_set_history = "L -> LL -> LLV -> LV"`.
+  Reduced Gibbs energies, from the public interface and the lever rule:
+  `G(VL)/RT = -1.164305930752` against the two-liquid pair's
+  `-1.161810713699`, a gap of **2.495217e-03 RT** - the ledger's own P-9 (iv)
+  number, reproduced from the other side.
+- **Against FeOs** at chemthermo's converged phases and densities, with FeOs's
+  fourteen-figure universal constants substituted and the flash re-run on them:
+  `max_i |mu_i^L - mu_i^V| / RT` = **9.04e-12** at 335 K, **3.62e-11** at
+  `T3 + 0.05 K` and **2.75e-11** at `T3 + 0.5 K`, against an asserted 1e-08. As
+  shipped (the ten-figure table), the same comparisons are 2.496e-06,
+  2.498e-06 and 2.491e-06 - the constants difference, not either solver, as in
+  Cases P-6 to P-9.
+- **The two offsets the slice brief named**, both `z_water = 0.7`: at
+  `T3 + 0.05 K` the flash returns `liquid = (0.999936007302, ...)`,
+  `vapor = (0.213610914451, ...)`, `beta_vapor = 0.381440208422`, with
+  `G(VL)/RT = -1.168271522770` against the two liquids' `-1.167622708774`
+  (gap **6.488140e-04 RT**); at `T3 + 0.5 K`,
+  `liquid = (0.999936310223, ...)`, `vapor = (0.218032446374, ...)`,
+  `beta_vapor = 0.383597426858`, `G(VL)/RT = -1.155747388671` against
+  `-1.149246614657` (gap **6.500774e-03 RT**).
+- **The scans:** 41 temperatures per feed across `[T3 - 1 K, T3 + 1 K]`,
+  **82 states, zero `ConvergenceError`**, **exactly one verdict switch per
+  feed** (`z_water = 0.3`: 20 `LLE` then 21 `VLE`; `z_water = 0.7`: 21 then
+  20). Bisecting the whole `[T3 - 1 K, T3 + 1 K]` window 25 times (resolution
+  6e-08 K, scratch measurement) puts the switch **2.09e-07 K below** the
+  independent `T3 = 334.807826336 K` at `z_water = 0.3` and **2.68e-07 K
+  above** it at `z_water = 0.7`. The shipped example bisects a 2e-03 K bracket
+  to 1e-06 K instead - 11 flashes per feed rather than 25, each one a
+  phase-addition search - and therefore reports `|T3 - boundary| = 4.88e-07 K`
+  at both feeds, which is that bisection's half-width and not a different
+  answer.
+
+### (ii) What did not move
+
+- **The 144-state Peng-Robinson stability grid** (Cases F-1 / F-5 geometry):
+  **0 verdict changes** (47 unstable / 97 stable, before and after), **0
+  branch-label changes**, worst `|delta tpd_min|` where both runs found a
+  stationary point **1.78e-15**, worst `|delta w|` **7.27e-12**.
+- **The 188-state PC-SAFT grid** (Case F-4): **0 verdict changes** (123
+  unstable / 65 stable), **0 branch-label changes**, worst
+  `|delta tpd_min|` **1.24e-12**, worst `|delta w|` **2.22e-15**.
+- **A 1144-state Peng-Robinson `flash_tp` scan** (8 databank mixtures,
+  T 150-450 K in 11 steps, P 1e5-3.2e7 Pa in 13 geometric steps - the shape of
+  Case F-1's wider scan): **0 verdict changes**, **0 `ConvergenceError` before
+  and after**, worst `|delta composition|` **1.11e-15**, phase fractions
+  **identical**.
+- **The one thing that does change, and why it cannot change a verdict.** On
+  18 of the 144 Peng-Robinson grid states, 38 of the 188 PC-SAFT ones and 118
+  of the 1144 scan states, `tpd_min` moves from `0.0` - the value the summary
+  reports when *no* non-trivial stationary point was reachable - to a
+  **positive** number (smallest seen, 0.0968 on the 1144-state scan). A
+  vapour-root-pinned trial now reaches a real stationary point that lies
+  *above* the tangent plane. A positive `tpd_min` decides nothing: every one of
+  those states is single-phase and `"stable"` before and after.
+- **The bit-identity fixture, audited state by state before regeneration**
+  (`refactor_bit_identity_v2.json` -> `v3.json`, 155 states): **122
+  bit-identical**; **18** changed `diagnostics["tpd_min"]` from `0.0` to a
+  positive number and *nothing else*; **15** changed only in the last bits of
+  iterative quantities - worst composition move **1.11e-16** (one ulp), worst
+  diagnostics move **5.33e-15** (on `max_delta_k`), against an audited
+  tolerance of 1e-09. **No state changed its phase names, its phase set, any
+  composition or any phase fraction beyond those last bits, and no state gained
+  or lost a diagnostics key.** `v1` and `v2` are kept, unreferenced, for
+  history.
+
+### (iii) Trial statistics, and two decisions they settled
+
+- **Who finds the minimizer.** Over the 144-state Peng-Robinson grid the
+  minimizing trial runs on the **vapour** root on 32 states and the **liquid**
+  root on 45 (by label: `wilson-vapor` 32, `wilson-liquid` 18,
+  `pure-<name>` 27). Over the 188-state PC-SAFT grid: vapour 132, liquid 48
+  (`wilson-vapor` 132, `pure-Methane` 29, `wilson-liquid` 13,
+  `pure-n-Hexane` 6). Neither surface is decorative.
+- **How often the fallback fires.** Measured once with an instrumented
+  both-branches build (not what ships; see ADR-0021 decision 4): **3889
+  single-root evaluations against 4378 trial iterations** on the Peng-Robinson
+  grid and **14975 against 16898** on the PC-SAFT one. The two counters have
+  different denominators (the second-order stage evaluates the model several
+  times per iteration), so this is a ratio of about nine in ten and not an
+  exact percentage. The single-root case is the common one, so The fixed surface therefore changes the
+  iteration at about one evaluation in nine, and that ninth is where
+  P-9 (iv) lived. What *ships* counts the same condition where the solver
+  compares the branches anyway - the trial's stopping point - so on the
+  Peng-Robinson grid 448 of 624 trials and on the PC-SAFT grid 589 of 752 stop
+  in a one-root region.
+- **Iteration counts.** Total trial iterations rose from 4080 to 4378 (+7.3 %)
+  on the Peng-Robinson grid and from 16291 to 16898 (+3.7 %) on the PC-SAFT
+  one - trials that used to collapse onto the feed now walk to a real
+  stationary point. Wall time went the other way, because a pinned trial asks
+  the model for one root instead of two: `stability_tp` over the 188-state
+  PC-SAFT grid **76.6 s -> 44.3 s** (-42 %), and the default test suite
+  **244.2 s -> 231.7 s** before the new golden path is added; with it,
+  **247.3 s for 750 tests** against 244.2 s for 738.
+- **Pure-component starts on the vapour root: measured, then not added.**
+  Running the `n` pure-component-dominant estimates on the vapour root as well
+  was tried over all 334 states above: **0 verdict changes** and **not one
+  state whose `tpd_min` fell by more than 2.51e-13** (they are the nominal
+  minimizer on 41 states only by tying to the last bits with a trial that
+  already found the same point). The trial count therefore stays `n + 2`.
+
+### Negative controls and what is *not* claimed
+
+- The ternary water / ethanol / n-hexane feed `z = (0.1, 0.1, 0.8)` at 333 K,
+  which Case P-10 recorded as raising, **still raises** the same
+  `ConvergenceError` ("a two-phase set converged to a non-positive phase
+  fraction") in 5.6 s. It is a multiphase-solver failure at the edge of the
+  tie triangle, not a stability miss, and this slice does not touch it.
+- `stability_tp`'s honesty note is unchanged. Fixing the surfaces enlarges the
+  set of reachable stationary points; it does not turn a local search into a
+  global proof.
+- Nothing here is compared against measurement, and `k_ij = 0` between water
+  and a hydrocarbon is not a serious parameterization.
+
+- **Tolerance:** asserted 1e-12 absolute on the pinned `tpd_min` and minimizing
+  composition (achieved exactly, the numbers are pinned); 1e-09 on every
+  previously validated composition, fraction and `tpd_min` (achieved
+  <= 7.27e-12 on compositions, <= 1.24e-12 on `tpd_min`, 0.0 on phase
+  fractions over the 1144-state scan); 1e-08 on FeOs's chemical potentials with
+  matched constants (achieved <= 3.62e-11); 1e-06 K on the bisected verdict
+  boundary against the independent `T3` (achieved <= 2.68e-07 K).
+- **Independent route:** the 4-equation and 2-equation Newtons of Case P-9,
+  written again in the example; the lever rule; reduced Gibbs energies from the
+  public fugacity-coefficient interface; FeOs's chemical potentials; and the
+  repository at HEAD `58190f5` as its own before-state.
+- **Negative control:** the 1144-state Peng-Robinson scan and the 155-state
+  bit-identity fixture, which must *not* move - and do not.
+- **Test path:** `tests/test_stability_eos_surfaces.py` (11 by default, 1
+  `slow`), `tests/test_flash_refactor_bit_identity.py` (v3),
+  `tests/test_flash_vlle_eos.py::test_the_window_scan_never_raises` (`slow`),
+  `tests/test_stability_candidates.py`, `tests/test_stability_tp.py`
+  (pinned Peng-Robinson numbers, unchanged).
+- **Script:** `examples/validation/19_eos_stability_surfaces.py` (about 5 s;
+  `--full` for both offsets, the matched-constants comparison, the two
+  41-point scans, the bisected boundary and the Peng-Robinson grid).

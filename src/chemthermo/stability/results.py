@@ -56,7 +56,8 @@ class StabilityTrial:
             trial's stopping point - and not at every iterate, so this flag
             answers "did this trial *stop* in a one-root region", not "did it
             ever meet one". ADR-0021 decision 4 says why, and records how often
-            the condition holds over the validation grids (89 % of iterates).
+            the condition holds over the validation grids (about nine
+            evaluations in ten).
         surface_fallback_count: How many model evaluations inside this trial set
             it (0 when ``surface_fallback`` is False). Evaluations, not
             iterations.
