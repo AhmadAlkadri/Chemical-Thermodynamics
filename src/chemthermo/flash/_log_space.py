@@ -41,6 +41,34 @@ give the same Newton direction in exact arithmetic; only one of them survives
 in doubles. Descent is still measured on ``g`` through
 ``(n r) . du``, and a direction that is not a descent direction is replaced by
 ``-r``, which is a successive substitution step in log space.
+
+**The curvature safeguard (ADR-0026).** That last sentence is the stage's one
+weak point, and three states of the ``Mw = 53 000`` polyethylene / n-pentane
+system measure it (validation Case P-16). ``-r`` is a descent direction for
+``g`` always, but its *length* is ``|r|``: once the residual is small the step
+is small, whatever the distance left to travel. Where the Newton direction is
+rejected iterate after iterate the stage therefore crawls - at 0.3 MPa it
+spends its whole budget moving ``ln n`` of the solvent by ``4e-3`` while the
+answer is ``3.2`` away, parked next to the *trivial* solution (both phases at
+the feed composition), whose Gibbs Hessian is indefinite: eigenvalues
+``-1.3e-04`` and ``+4.0e+06`` in the mole numbers. An indefinite Hessian is
+precisely when the Newton direction is not a descent direction, so the
+rejection is correct and the replacement is the problem.
+
+:func:`log_space_split` therefore takes a ``curvature_safeguard`` flag.
+``False`` - the default, and every state that converged before ADR-0026 - is
+the iteration described above, character for character. ``True`` replaces the
+single ``-r`` fallback with an ordered list of directions, the first of which
+is admissible: the Newton direction while it descends ``g``; then the
+*modified-Newton* direction of the true Gibbs Hessian
+``H = diag(n) J + diag(n r)``, whose eigenvalues are replaced by their
+magnitudes (floored), which is Gill & Murray's modification and is a descent
+direction by construction with Newton's scaling rather than ``|r|``'s; then
+``-r`` as before. Along the way a negative curvature direction of ``H`` is
+followed *downhill* instead of being discarded, which is how the iteration
+leaves the trivial solution. The flag is set only after the unsafeguarded
+stage has already failed to reach ``FlashSettings.tol``, so it cannot move a
+number that was ever returned.
 """
 
 from __future__ import annotations
@@ -61,6 +89,11 @@ _HESSIAN_STEP = 1e-6
 _MIN_LINE_SEARCH_SCALE = 1e-14
 #: Armijo constant on the two-phase Gibbs energy.
 _ARMIJO_C = 1e-4
+#: Relative floor on the Gibbs Hessian's eigenvalue magnitudes in the
+#: curvature-safeguarded direction (ADR-0026). It only has to keep the inverse
+#: finite: a direction that is too long is shortened by the line search, and
+#: one that is too short is retried from the next iterate.
+_CURVATURE_EIGENVALUE_FLOOR = 1e-12
 #: Phase-II mole fraction of the log-space seed (:func:`log_space_seed`). Any
 #: value in ``(0, 1)`` gives an admissible seed - see that function - and the
 #: stage is a descent method from wherever it starts; a half-and-half split is
@@ -300,6 +333,66 @@ def seed_from_iterate(*, z: np.ndarray, x_ii: np.ndarray, beta: float) -> np.nda
     return np.where(active, np.minimum(seed, ceiling), -math.inf)
 
 
+def _safeguarded_directions(
+    *,
+    jacobian: np.ndarray | None,
+    residual: np.ndarray,
+    moles: np.ndarray,
+) -> list[tuple[np.ndarray, float]]:
+    """Descent directions for ``g``, best first (ADR-0026).
+
+    The gradient is ``dg/du = n r``. The list is tried in order and the first
+    direction the line search accepts wins:
+
+    1. the Newton direction on ``r = 0``, while it descends ``g``. Near the
+       solution the Gibbs Hessian is positive definite and this is the stage's
+       ordinary step, so a state that converges through Newton steps converges
+       through exactly the same ones here;
+    2. the **modified**-Newton direction of the Gibbs Hessian itself,
+       ``H = diag(n) J + diag(n r)`` (``J = dr/du`` already carries the second
+       ``diag(n)``). Its eigenvalues are replaced by their magnitudes, floored
+       relative to the largest - Gill & Murray's modification: where ``H`` is
+       positive definite this is Newton's own step, and where it is not, a
+       negative-curvature eigenvector is followed *downhill* rather than
+       uphill. It is a descent direction by construction and, unlike ``-r``,
+       its length is set by the curvature rather than by how small the residual
+       happens to be;
+    3. ``-r``, the log-space successive-substitution step, which is always a
+       descent direction and is the pre-ADR-0026 fallback.
+
+    A direction whose slope is not negative is dropped rather than repaired:
+    the list always ends with one that is.
+    """
+    gradient = moles * residual
+    candidates: list[tuple[np.ndarray, float]] = []
+
+    def add(direction: np.ndarray) -> None:
+        if not np.all(np.isfinite(direction)):
+            return
+        slope = float(gradient @ direction)
+        if slope < 0.0:
+            candidates.append((direction, slope))
+
+    if jacobian is not None:
+        try:
+            add(np.linalg.solve(jacobian, -residual))
+        except np.linalg.LinAlgError:  # pragma: no cover - a singular Jacobian
+            pass
+        with np.errstate(over="ignore", under="ignore"):
+            hessian = moles[:, None] * jacobian + np.diag(gradient)
+        if np.all(np.isfinite(hessian)):
+            symmetric = 0.5 * (hessian + hessian.T)
+            eigenvalues, vectors = np.linalg.eigh(symmetric)
+            magnitudes = np.abs(eigenvalues)
+            floor = _CURVATURE_EIGENVALUE_FLOOR * float(np.max(magnitudes))
+            if floor > 0.0:
+                with np.errstate(over="ignore", under="ignore"):
+                    add(-(vectors @ ((vectors.T @ gradient) / np.maximum(magnitudes, floor))))
+
+    candidates.append((-residual, float(gradient @ -residual)))
+    return candidates
+
+
 def log_space_split(
     *,
     z: np.ndarray,
@@ -307,6 +400,7 @@ def log_space_split(
     terms_i: Callable[[np.ndarray], np.ndarray],
     terms_ii: Callable[[np.ndarray], np.ndarray],
     settings: FlashSettings,
+    curvature_safeguard: bool = False,
 ) -> LogSpaceSplit:
     """Damped Newton on the two-phase split in ``u = ln n`` (ADR-0024).
 
@@ -324,6 +418,11 @@ def log_space_split(
         terms_ii: Phase II's terms. Called with a composition that may contain
             exact zeros.
         settings: ``second_order_tol`` and ``second_order_max_iter``.
+        curvature_safeguard: Use the ADR-0026 direction list instead of the
+            single ``-r`` fallback where the Newton direction does not descend
+            ``g``. ``False`` (the default) is the ADR-0024 iteration, character
+            for character; the callers set it only on a retry, after the
+            default iteration has already failed to reach ``settings.tol``.
 
     Returns:
         The converged (or best) split. The caller decides whether
@@ -402,49 +501,65 @@ def log_space_split(
                 break
             jacobian[:, column] = (forward - backward) / (2.0 * _HESSIAN_STEP)
 
-        # ``-r`` is the log-space successive-substitution step and is the
-        # documented fallback whenever the Newton direction is unavailable or
-        # is not a descent direction for ``g``.
-        direction = -current.residual
-        if usable:
-            try:
-                newton = np.linalg.solve(jacobian, -current.residual)
-            except np.linalg.LinAlgError:
-                newton = np.linalg.solve(
-                    jacobian + 1e-12 * identity, -current.residual
-                )  # pragma: no cover - a singular finite-difference Jacobian
-            if np.all(np.isfinite(newton)):
-                direction = newton
-
-        gradient = current.moles[index] * current.residual
-        slope = float(gradient @ direction)
-        if slope >= 0.0:
+        if curvature_safeguard:
+            # ADR-0026. Reached only after the loop above has already spent its
+            # budget without meeting `FlashSettings.tol`, so no converged
+            # number can move.
+            directions = _safeguarded_directions(
+                jacobian=jacobian if usable else None,
+                residual=current.residual,
+                moles=current.moles[index],
+            )
+        else:
+            # ``-r`` is the log-space successive-substitution step and is the
+            # documented fallback whenever the Newton direction is unavailable or
+            # is not a descent direction for ``g``.
             direction = -current.residual
-            slope = float(gradient @ direction)
+            if usable:
+                try:
+                    newton = np.linalg.solve(jacobian, -current.residual)
+                except np.linalg.LinAlgError:
+                    newton = np.linalg.solve(
+                        jacobian + 1e-12 * identity, -current.residual
+                    )  # pragma: no cover - a singular finite-difference Jacobian
+                if np.all(np.isfinite(newton)):
+                    direction = newton
 
-        scale = 1.0
+            gradient = current.moles[index] * current.residual
+            slope = float(gradient @ direction)
+            if slope >= 0.0:
+                direction = -current.residual
+                slope = float(gradient @ direction)
+            directions = [(direction, slope)]
+
         accepted = False
-        while scale >= _MIN_LINE_SEARCH_SCALE:
-            candidate = u.copy()
-            candidate[index] = u[index] + scale * direction
-            try:
-                trial = evaluate(candidate)
-            except (ValueError, ModelError):
+        for direction, slope in directions:
+            scale = 1.0
+            while scale >= _MIN_LINE_SEARCH_SCALE:
+                candidate = u.copy()
+                candidate[index] = u[index] + scale * direction
+                try:
+                    trial = evaluate(candidate)
+                except (ValueError, ModelError):
+                    scale *= 0.5
+                    continue
+                trial_residual = float(np.max(np.abs(trial.residual)))
+                if (
+                    trial.energy < current.energy + _ARMIJO_C * scale * slope
+                    or trial_residual < residual
+                ):
+                    with np.errstate(over="ignore", under="ignore"):
+                        max_delta_k = float(
+                            np.max(np.abs(np.exp(trial.ln_k) - np.exp(current.ln_k)))
+                        )
+                    u = candidate
+                    current = trial
+                    residual = trial_residual
+                    accepted = True
+                    break
                 scale *= 0.5
-                continue
-            trial_residual = float(np.max(np.abs(trial.residual)))
-            if (
-                trial.energy < current.energy + _ARMIJO_C * scale * slope
-                or trial_residual < residual
-            ):
-                with np.errstate(over="ignore", under="ignore"):
-                    max_delta_k = float(np.max(np.abs(np.exp(trial.ln_k) - np.exp(current.ln_k))))
-                u = candidate
-                current = trial
-                residual = trial_residual
-                accepted = True
+            if accepted:
                 break
-            scale *= 0.5
 
         if not accepted:
             break

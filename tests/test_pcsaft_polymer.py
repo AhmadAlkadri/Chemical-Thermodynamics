@@ -37,6 +37,8 @@ import pytest
 
 import chemthermo as ct
 from chemthermo.eos import PCSAFTEOS
+from chemthermo.flash import _detect
+from chemthermo.flash._split import _rachford_rice
 from chemthermo.models.base import KAPPA_LIQUID_THRESHOLD
 from chemthermo.parameters import PCSAFTParameters, PCSAFTRecord
 
@@ -790,6 +792,161 @@ def test_the_ternary_converges_at_3_mpa() -> None:
     assert float(diagnostics["fugacity_residual"]) < 1e-8
     assert float(diagnostics["delta_g_split_rt"]) < 0.0
     assert diagnostics["post_split_status"] == "stable"
+
+
+# ---------------------------------------------------------------------------
+# The last six refusals of the Mw = 53 000 chain (validation Case P-16,
+# ADR-0026)
+#
+# A 0.3-3.6 MPa sweep at 0.1 MPa steps over both molar masses - 68 states - had
+# exactly six states raising `ConvergenceError` at HEAD 584c508, all of them on
+# the Mw = 53 000 chain, and for two different reasons:
+#
+#   0.3 MPa        the log-space stage parked next to the trivial solution and
+#   2.8, 2.9 MPa   spent its budget (residual 3.9e-05 / 1.1e-08 / 6.0e+00);
+#                  repaired by the ADR-0026 curvature safeguard.
+#   3.0-3.2 MPa    "neither the stability-seeded nor the Wilson K-values
+#                  bracket a Rachford-Rice root", because `K_polymer` is under
+#                  the spacing of doubles at one and `1 + (K - 1)` cancels to
+#                  an exact zero at `beta = 1`; repaired by the ADR-0026
+#                  convex denominator.
+#
+# Every number below is reproduced by a solve that shares no code with
+# `flash_tp`: the 0.3 MPa melt by the one-dimensional equal-fugacity solve of
+# Case P-14, the five liquid-liquid tie lines by a two-equation Newton, both in
+# `examples/validation/22_stability_log_space.py`.
+# ---------------------------------------------------------------------------
+
+
+#: ``pressure -> (polymer-rich x_polymer, polymer-lean ln x_polymer, phase
+#: fraction of the polymer-rich phase)`` for the five liquid-liquid states.
+P16_LLE_STATES = {
+    2.8e6: (9.231250339583601e-04, -93.81711157873, 0.07760525755403569),
+    2.9e6: (9.084501098780754e-04, -90.20777508681, 0.07885887759376387),
+    3.0e6: (8.940738921079231e-04, -86.82803360271, 0.08012688509001775),
+    3.1e6: (8.799780999223999e-04, -83.65315387491, 0.08141038512348653),
+    3.2e6: (8.661464766005232e-04, -80.66231922913, 0.08271043980469528),
+}
+
+
+def test_the_0_3_mpa_vapour_liquid_split_the_stage_used_to_stall_on() -> None:
+    """Case P-16 (i): the shallowest state of the vapour-liquid region.
+
+    Before ADR-0026 the log-space stage spent all 100 iterations here moving
+    ``ln n`` of the solvent by 4e-03 while the answer was 3.2 away, and
+    ``flash_tp`` raised with a residual of 3.9e-05. The melt's solvent content
+    below is reproduced to 1.4e-14 by an independent one-dimensional
+    equal-fugacity solve.
+    """
+    mixture = _mixture(0.05, 53000.0)
+    eos = _eos(KIJ, 53000.0)
+    result = ct.flash_tp(mixture, temperature_K=TEMPERATURE_K, pressure_Pa=3.0e5, eos=eos)
+    diagnostics = result.diagnostics
+
+    assert sorted(result.phases) == ["liquid", "vapor"]
+    assert diagnostics["phase_regime"] == "VLE"
+    assert diagnostics["k_seed"] == "stability-log"
+    assert diagnostics["converged_stage"] == "second-order-log"
+    assert diagnostics["log_space_curvature_safeguard"] is True
+
+    assert result.phases["liquid"].composition.fractions == pytest.approx(
+        (0.036808345719672377, 0.9631916542803276), rel=1e-12
+    )
+    assert result.phases["vapor"].composition.fractions[0] == 0.0
+    assert float(diagnostics["log_space_ln_x_min"]) == pytest.approx(-1528.39130415, rel=1e-9)
+    assert result.vapor_fraction == pytest.approx(0.9980537197579997, rel=1e-12)
+
+    assert float(diagnostics["mass_balance_residual"]) < 1e-12
+    assert float(diagnostics["fugacity_residual"]) < 1e-8
+    assert float(diagnostics["log_space_residual"]) < 1e-12
+    assert float(diagnostics["delta_g_split_rt"]) < 0.0
+    assert diagnostics["post_split_status"] == "stable"
+
+
+@pytest.mark.parametrize(
+    "pressure_Pa",
+    [
+        2.8e6,
+        # `slow`: the same statement at four further pressures on the same tie
+        # line, one of which (3.0 MPa) runs by default just below.
+        pytest.param(2.9e6, marks=pytest.mark.slow),
+        3.0e6,
+        pytest.param(3.1e6, marks=pytest.mark.slow),
+        pytest.param(3.2e6, marks=pytest.mark.slow),
+    ],
+)
+def test_the_liquid_liquid_states_between_2_8_and_3_2_mpa(pressure_Pa: float) -> None:
+    """Case P-16 (ii) and (iii): the two remaining refusals, both repaired.
+
+    2.8 and 2.9 MPa reach the answer through the curvature safeguard; 3.0 to
+    3.2 MPa reach it through the successive-substitution loop, because the
+    stability seed's K-values bracket a Rachford-Rice root once the
+    denominator stops cancelling. The two routes meet in the middle: the
+    polymer-rich composition is smooth in pressure across the boundary between
+    them, and so is the polymer-lean one, which runs from ``exp(-93.8)`` to
+    ``exp(-80.7)`` over the five states.
+    """
+    mixture = _mixture(0.05, 53000.0)
+    eos = _eos(KIJ, 53000.0)
+    result = ct.flash_tp(mixture, temperature_K=TEMPERATURE_K, pressure_Pa=pressure_Pa, eos=eos)
+    diagnostics = result.diagnostics
+    rich_x, lean_ln_x, rich_fraction = P16_LLE_STATES[pressure_Pa]
+
+    assert sorted(result.phases) == ["liquid1", "liquid2"]
+    assert diagnostics["phase_regime"] == "LLE"
+    assert result.vapor_fraction is None
+
+    polymer_rich, solvent_rich = _phase_by_polymer(result)
+    assert result.phases[polymer_rich].composition.fractions[0] == pytest.approx(rich_x, rel=1e-11)
+    assert result.phase_fractions[polymer_rich] == pytest.approx(rich_fraction, rel=1e-11)
+    lean = result.phases[solvent_rich].composition.fractions[0]
+    assert math.log(lean) == pytest.approx(lean_ln_x, rel=1e-9)
+
+    assert float(diagnostics["mass_balance_residual"]) < 1e-12
+    assert float(diagnostics["fugacity_residual"]) < 1e-8
+    assert float(diagnostics["delta_g_split_rt"]) < 0.0
+    assert diagnostics["post_split_status"] == "stable"
+
+    if pressure_Pa < 3.0e6:
+        assert diagnostics["k_seed"] == "stability-log"
+        assert diagnostics["converged_stage"] == "second-order-log"
+        assert diagnostics["log_space_curvature_safeguard"] is True
+    else:
+        assert diagnostics["k_seed"] == "stability"
+        assert diagnostics["converged_stage"] == "second-order"
+        assert diagnostics["rachford_rice_convex_denominators"] is True
+
+
+def test_the_underflowed_k_is_the_stability_seed_at_3_mpa() -> None:
+    """Where ``tests/test_rachford_rice_extended.py``'s ``TRACE_K`` comes from.
+
+    That module pins the equation with plain numbers so it needs no equation of
+    state; this is the state those numbers are a snapshot of, recomputed from
+    the model. The polymer's K is 1.1e-18, which is under the spacing of
+    doubles at one - and that, not the physics, is what made the split refuse.
+    """
+    mixture = _mixture(0.05, 53000.0)
+    eos = _eos(KIJ, 53000.0)
+    z = np.asarray(mixture.fractions, dtype=float)
+    stability = ct.stability_tp(mixture, temperature_K=TEMPERATURE_K, pressure_Pa=3.0e6, eos=eos)
+    assert stability.status == "unstable"
+    assert stability.trial_composition is not None
+
+    k_seed, incipient = _detect._stability_k_seed(
+        mixture,
+        TEMPERATURE_K,
+        3.0e6,
+        z=z,
+        w=np.asarray(stability.trial_composition, dtype=float),
+        tpd_min=float(stability.tpd_min),
+        ln_capital_w=_detect._stationary_point_ln_capital_w(stability),
+    )
+    assert incipient == "vapor"
+    assert k_seed[0] == pytest.approx(1.11871119e-18, rel=1e-6)
+    assert k_seed[1] == pytest.approx(1.00132622e00, rel=1e-8)
+    assert k_seed[0] - 1.0 == -1.0  # the cancellation, in one line
+    assert _rachford_rice(z, k_seed)[0] is None
+    assert _rachford_rice(z, k_seed, convex_denominators=True)[0] is not None
 
 
 def test_a_record_without_a_molar_mass_cannot_use_the_mass_based_parameter() -> None:
