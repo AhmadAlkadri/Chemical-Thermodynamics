@@ -149,23 +149,23 @@ ADR-0027 before using it to justify anything.
 
 | file | what it is |
 | --- | --- |
-| `robustness_74820b8.json` | the full 2505-state sweep at `74820b8` |
-| `robustness_74820b8.md` | its summary table |
+| `robustness_64831bd.json` | the full 2505-state sweep at `64831bd` |
+| `robustness_64831bd.md` | its summary table |
+| `robustness_74820b8.md` | the summary of the superseded `74820b8` sweep, the *before* measurement for ADR-0029 |
 | `robustness_9adf390.md` | the summary of the superseded `9adf390` (2110-state) sweep |
 | `robustness_87f0820.md` | the summary of the superseded `87f0820` sweep |
 
-At `74820b8`: **2491 of 2505 states converge, 14 refuse, 0 converge and
-violate an invariant**, in 2232.8 s (37:13). Every one of the 2091 states of
-the original six families that converged at `9adf390` is unchanged (`9adf390`
-itself found 2110 of 2110 converging, 0 refusing); the 14 refusals are all in
-the four families slice `robustness-map-coverage` added - 9
-`multiphase-solver-failure` (`eos-three-phase`) and 5 `rr-no-bracket`
-(`gamma-phi-legacy`) - which is the map being hard again, on purpose. See
-ledger Case R-MAP-2 for the ranked table and the diagnosis of each.
+At `64831bd`: **2500 of 2505 states converge, 5 refuse, 0 converge and violate an invariant**. The 9 `multiphase-solver-failure` states
+`eos-three-phase` refused at `74820b8` are repaired (ADR-0029, ledger Case
+P-18), so what is left is the deprecated `gamma-phi-legacy` path's 5
+`rr-no-bracket` states, which are by design (ADR-0016 decision 8) and are
+pinned as such rather than as a defect queue. Every state that converged at
+`74820b8` is unchanged, checked field by field.
 
-`robustness_9adf390.json` was pruned when `74820b8` superseded it, per the
-policy in the paragraph above; its `.md` summary is kept, because the counts in
-it are what ADR-0027, ADR-0028 and Cases R-MAP-1 / P-17 quote.
+`robustness_74820b8.json` and `robustness_9adf390.json` were pruned when their
+successors superseded them, per the pruning policy at the end of this section;
+their `.md` summaries are kept, because the counts in them are what ADR-0027,
+ADR-0028, ADR-0029 and Cases R-MAP-1 / R-MAP-2 / P-17 quote.
 
 Adding a system or a state to `chemthermo/bench/robustness.py` is a normal
 change - unlike the timing workload above, this grid is *meant* to grow -
