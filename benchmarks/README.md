@@ -122,17 +122,22 @@ python -m chemthermo.bench robustness --out benchmarks/robustness_<sha>.json \
 
 | flag | meaning |
 | --- | --- |
-| `--family NAME` | run one of `pr-phi-phi`, `pcsaft`, `pcsaft-associating`, `modified-raoult`, `gamma-gamma`, `polymer` - the sweep partitions and resumes |
-| `--quick` | the 171-state cost-bounded subset across all six families (~9 s), which is what `tests/test_robustness_map.py` runs |
+| `--family NAME` | run one of `pr-phi-phi`, `pcsaft`, `pcsaft-associating`, `modified-raoult`, `gamma-gamma`, `polymer`, `eos-three-phase`, `gamma-phi-legacy`, `pr-near-critical`, `pcsaft-associating-ternary` - the sweep partitions and resumes |
+| `--quick` | the 224-state cost-bounded subset across all ten families (~14 s), which is what `tests/test_robustness_map.py` runs |
 | `--list` | the grid: every system, its state count and its quick count |
 | `--out` / `--summary-out` | the JSON record / the Markdown summary table |
 | `--quiet` | no per-system progress line |
 
-It flashes 2110 fixed states and puts each one in exactly **one** bucket: a
+It flashes 2505 fixed states and puts each one in exactly **one** bucket: a
 phase verdict (`single-liquid`, `single-vapor`, `VLE`, `LLE`, `VLLE`, `LLL`),
 `converged-invariant-violated`, or one of eight refusal classes read off the
 exception type and message. The exact state, the exact message and the
-invariant residuals are recorded per state.
+invariant residuals are recorded per state. Four families -
+`eos-three-phase`, `gamma-phi-legacy`, `pr-near-critical` and
+`pcsaft-associating-ternary` - were added by slice `robustness-map-coverage`
+(ADR-0027 amendment) to close the gaps ADR-0027's own roadmap named: no
+three-phase equation-of-state window, `gamma-phi` unswept, no near-critical
+Peng-Robinson coverage, and one associating ternary out of the packaged four.
 
 **It is not a correctness check** - nothing here is compared against a
 published number or another implementation; `.agents/brain/validation-cases.md`
@@ -144,21 +149,23 @@ ADR-0027 before using it to justify anything.
 
 | file | what it is |
 | --- | --- |
-| `robustness_9adf390.json` | the full 2110-state sweep at `9adf390` |
-| `robustness_9adf390.md` | its summary table |
+| `robustness_74820b8.json` | the full 2505-state sweep at `74820b8` |
+| `robustness_74820b8.md` | its summary table |
+| `robustness_9adf390.md` | the summary of the superseded `9adf390` (2110-state) sweep |
 | `robustness_87f0820.md` | the summary of the superseded `87f0820` sweep |
 
-At `9adf390`: **2110 of 2110 states converge, 0 refuse, 0 converge and violate
-an invariant**, in 893.1 s. At `87f0820` it was 2074 converging and **36
-refusing**, all of them polyethylene / n-pentane; ADR-0028 retired all 36 and
-the two records were compared state by state - every one of the 2074 that
-converged before is **identical on every field this record carries**, wall time
-excepted. See ledger Cases R-MAP-1 (the map, and the diagnoses it ranked) and
-P-17 (the repairs, each against an independent solve).
+At `74820b8`: **2491 of 2505 states converge, 14 refuse, 0 converge and
+violate an invariant**, in 2232.8 s (37:13). Every one of the 2091 states of
+the original six families that converged at `9adf390` is unchanged (`9adf390`
+itself found 2110 of 2110 converging, 0 refusing); the 14 refusals are all in
+the four families slice `robustness-map-coverage` added - 9
+`multiphase-solver-failure` (`eos-three-phase`) and 5 `rr-no-bracket`
+(`gamma-phi-legacy`) - which is the map being hard again, on purpose. See
+ledger Case R-MAP-2 for the ranked table and the diagnosis of each.
 
-`robustness_87f0820.json` was pruned when `9adf390` superseded it, per the
+`robustness_9adf390.json` was pruned when `74820b8` superseded it, per the
 policy in the paragraph above; its `.md` summary is kept, because the counts in
-it are what ADR-0027 and Case R-MAP-1 quote.
+it are what ADR-0027, ADR-0028 and Cases R-MAP-1 / P-17 quote.
 
 Adding a system or a state to `chemthermo/bench/robustness.py` is a normal
 change - unlike the timing workload above, this grid is *meant* to grow -
