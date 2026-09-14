@@ -153,14 +153,15 @@ a published number or another implementation. Use it to rank what to fix, not
 to claim something is right. See `benchmarks/README.md`, ADR-0027 and ledger
 Cases R-MAP-1 and R-MAP-2.
 
-At `74820b8` it refuses in the four families slice `robustness-map-coverage`
-added (2491 of 2505 converge, 14 refuse - 9 `multiphase-solver-failure` in
-`eos-three-phase`, 5 `rr-no-bracket` in the deprecated `gamma-phi-legacy`
-path); the original 2110-state grid still refuses nothing, unchanged field for
-field from `9adf390`. Read every count here as "nothing in *this* grid
-refuses" (or "this is what *this* grid refuses"), not as a coverage claim -
-and note that regenerating the record at a new commit means a new file, so the
-superseded JSON is pruned and its `.md` summary kept.
+At `64831bd` it refuses **5** of 2505 states, all of them the deprecated
+`gamma-phi-legacy` path's `rr-no-bracket` behaviour, which is by design
+(ADR-0016 decision 8). The nine `multiphase-solver-failure` states the map
+found at `74820b8` in `eos-three-phase` were repaired by ADR-0029; the
+original 2110-state grid still refuses nothing, unchanged field for field from
+`9adf390`. Read every count here as "nothing in *this* grid refuses" (or "this
+is what *this* grid refuses"), not as a coverage claim - and note that
+regenerating the record at a new commit means a new file, so the superseded
+JSON is pruned and its `.md` summary kept.
 
 ## Slice evidence
 

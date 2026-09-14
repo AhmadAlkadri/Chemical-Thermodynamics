@@ -253,7 +253,9 @@ diagnosis of each class from evidence already in the record.
 
 - `benchmarks/robustness_74820b8.json` / `.md` regenerated at the new grid
   size; the superseded `9adf390` JSON pruned per the existing policy, its
-  `.md` kept.
+  `.md` kept. (The `74820b8` JSON was itself pruned in turn when ADR-0029's
+  sweep superseded it; its `.md` is kept, and is the *before* measurement for
+  that ADR.)
 - `tests/test_robustness_map.py`'s `EXPECTED_QUICK_FAMILIES` gains four rows,
   `PINNED_REFUSALS` gains the eight cheap refusals the quick subset contains
   (one binary-scan collapse, two Peng-Robinson-ternary splits, five legacy

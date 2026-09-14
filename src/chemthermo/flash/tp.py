@@ -73,9 +73,14 @@ re-solved with the multiphase Rachford-Rice of
 zero or below is removed again. Each phase carries its own tangent-plane
 surface - a phase candidate for the activity path, a pinned density root
 (:class:`chemthermo.flash._split._PhaseRoot`, ADR-0019) for an equation of
-state - so a vapour and two liquids sit on three independent roots. The search
-is bounded by ``FlashSettings.max_phases`` (default 3) and the sets it visited
-are reported in ``diagnostics["phase_set_history"]``. ``max_phases=2``
+state - so a vapour and two liquids sit on three independent roots. A removal
+is a *choice* among the phases the solve names, and since ADR-0029 it can be
+taken back: a two-phase set that converges to a non-positive fraction sends the
+search back to the set before the removal, to take the next candidate. The
+search is bounded by ``FlashSettings.max_phases`` (default 3) and the sets it
+visited are reported in ``diagnostics["phase_set_history"]`` - where two
+different two-phase sets print the same compact label, because that label names
+the phase types and the history is a route. ``max_phases=2``
 reproduces the pre-search behavior, which raises
 :class:`chemthermo.ConvergenceError`; so does the ``gamma-gamma`` path at any
 ``max_phases``, because no activity-only state in this repository exercises a
@@ -227,10 +232,14 @@ def flash_tp(
           ``converged``, ``termination_reason``, ``phase_count``,
           ``phase_state``, ``phase_regime``.
         - Results that went through the phase addition/removal search
-          (``modified-raoult`` only, and only when a converged phase set failed
-          its post-split test) add ``phase_set_history``, ``phases_added``,
-          ``phases_removed``, ``rachford_rice_iterations`` and, when the search
-          started from a converged two-phase set, ``delta_g_vs_two_phase_rt``.
+          (``modified-raoult`` and, since ADR-0020, phi-phi - and only when a
+          converged phase set failed its post-split test) add
+          ``phase_set_history``, ``phases_added``, ``phases_removed``,
+          ``rachford_rice_iterations`` and, when the search started from a
+          converged two-phase set, ``delta_g_vs_two_phase_rt``; plus - **only
+          when the ADR-0029 multiphase log-space stage actually ran** -
+          ``log_space_iterations``, with ``converged_stage ==
+          "second-order-log"`` where that stage is what met the tolerance.
           Those keys are **absent** from every other result, deliberately: the
           two-phase numbers of the earlier slices are unchanged down to the
           last bit, diagnostics included.

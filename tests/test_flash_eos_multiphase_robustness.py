@@ -11,12 +11,14 @@ repaired state is a *verified* answer rather than merely a returned one.
 `T3 + 0.01` through `T3 + 1.0 K`, plus the PC-SAFT ternary feed
 `(0.1, 0.1, 0.8)` at 333 K. The feed is unstable, the two-liquid split is
 post-split unstable on both phases, a vapour is added, and the three-phase set
-has no Rachford-Rice solution at all (Gibbs' phase rule: a binary at fixed
-pressure has three phases at one temperature only). The recession direction
-then names the **hexane-rich** liquid as the phase leaving, the water-rich pair
-that remains negative-flashes, and the search - which could not take a removal
-back - raised. ADR-0029 makes removal reversible: the pair the *other* removal
-leaves is the vapour-liquid answer, and it is post-split stable.
+turns out not to contain this feed - on the binary because Gibbs' phase rule
+forbids three phases away from `T3` at all (the Rachford-Rice feasible region
+recedes), on the ternary because the feed sits outside a finite three-phase
+region (a converged negative flash). Either signal names the **hexane-rich**
+liquid as the phase leaving, the water-rich pair that remains negative-flashes,
+and the search - which could not take a removal back - raised. ADR-0029 makes
+removal reversible: the pair the *other* removal leaves is the vapour-liquid
+answer, and it is post-split stable.
 
 **(ii) A second-order stage that cannot form its Hessian** - 4 states, refusal
 stage `split`. Peng-Robinson (`k_ij = 0`) water / ethanol / n-hexane at 1 atm,
@@ -395,10 +397,11 @@ def test_the_water_lean_band_above_t3_returns_a_verified_vapor_liquid_state(
 def test_the_hexane_rich_ternary_corner_returns_a_verified_vapor_liquid_state() -> None:
     """PC-SAFT (0.1, 0.1, 0.8) at 333 K: Case P-10 (i)'s pre-existing failure.
 
-    The same shape as the binary band - the LLV set has no Rachford-Rice
-    solution, the first removal is the wrong one - on a ternary feed at the
-    tie-triangle's hexane-rich edge, where the equilibrium is two phases rather
-    than three.
+    The same shape as the binary band with the removal signal spelled the other
+    way: the three-phase region is finite here but this feed is outside it, so
+    the `LLV` solve returns a converged **negative flash** rather than a
+    receding feasible region. Either way the first removal is the wrong one,
+    and the equilibrium at this tie-triangle edge is two phases, not three.
     """
     eos = PCSAFTEOS()
     feed = (0.1, 0.1, 0.8)
