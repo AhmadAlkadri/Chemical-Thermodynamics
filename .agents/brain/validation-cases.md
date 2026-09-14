@@ -4567,6 +4567,15 @@ doubles as before the slice.
 - **Where:** ADR-0027; harness `src/chemthermo/bench/robustness.py`; record
   `benchmarks/robustness_87f0820.json`; summary
   `benchmarks/robustness_87f0820.md`; `benchmarks/README.md`.
+- **AMENDED by ADR-0028 (Case P-17).** All **36** refusals below are retired:
+  the map at `9adf390` is **2110 of 2110 converging, 0 refusing, 0 violating an
+  invariant**. Every diagnosis in section (ii) held - including the lever-rule
+  number `4.074164e-04` of class 2, which the repaired solver reproduces as
+  `4.074163e-04` - and the two classes recorded there as "not diagnosed
+  further" turned out to be one defect with class 2. The `87f0820` JSON record
+  was pruned when `9adf390` superseded it (`benchmarks/README.md`); its `.md`
+  summary is kept, and every count quoted in this case is that summary's, so
+  nothing below has been rewritten.
 - **Assumptions:** every state is `flash_tp` at default `FlashSettings`
   (`max_phases=3`, `phase_detection="tangent-plane"`, `post_split_stability=True`).
   Wall times are a property of one machine at one moment - Apple M2 Max
@@ -4751,3 +4760,293 @@ adjudicating it needs a reference and a `kij`, and is not this case.
 - **Script:** `python -m chemthermo.bench robustness --quick` (~9 s) and
   `python -m chemthermo.bench robustness --out record.json --summary-out record.md`
   (~15 min); `--family NAME` runs one family; `--list` prints the grid.
+
+---
+
+## Case P-17: The map's 36 refusals, retired and each one checked
+
+- **Source:** three solvers that share no code with `flash_tp`. For the
+  vapour-liquid states, the **one-dimensional** equal-fugacity solve of Case
+  P-14 (the vapour taken as exactly pure solvent, one unknown carried as
+  `ln x_solvent`, finite-difference Newton). For the liquid-liquid states, the
+  **two-equation Newton** of Case P-16 on the two equal-fugacity conditions in
+  logarithms, in which the feed never appears, so it knows nothing about
+  Rachford-Rice, the phase count, the stability test or the split. For the two
+  stability states, a **trial-free scan of equation (2)** over a grid of trial
+  compositions, built from `density_roots` and `ln_fugacity_coefficients`
+  alone. Plus the **lever rule** on each converged tie line, and **FeOs 0.10.1**
+  chemical potentials at chemthermo's converged phases and densities.
+- **Location:** `chemthermo/flash/_log_space.py`
+  (`lever_rule_phase_fraction`, `stability_seed_ladder`,
+  `log_space_seed(phase_fraction=...)`), `chemthermo/flash/_detect.py`
+  (`_walk_stability_seed_ladder`, and the two gates that call it),
+  `chemthermo/stability/tp.py` (`_substitution_budget_retry` and the
+  inconclusive-only retry in `stability_tp`); slice
+  `flash-polymer-robustness` (ADR-0028). **No model equation, no tolerance, no
+  step rule, no acceptance test, no default setting and no public signature
+  changed.**
+- **Parameters and provenance:** exactly Cases P-13 to P-16's - polyethylene
+  from `tests/fixtures/pcsaft/martini2009_polymers.json`
+  (`m/M = 0.026300 mol/g`, so `m = 431.32` at `Mw = 16 400` and `m = 1393.9` at
+  `Mw = 53 000`), n-pentane from Gross & Sadowski (2001) Table 1,
+  `k_ij = -0.006` except on the FeOs route, which runs at `k_ij = 0` on both
+  sides because feos 0.10.1 cannot be given one from Python. Nothing here is
+  compared against measurement.
+- **Assumptions:** monodisperse polymer; 453.0 K throughout; feeds stated as
+  polymer **mass** fractions (1, 5 and 15 wt%, the robustness map's grid).
+
+### (i) The three defects, measured before anything was changed
+
+The 36 refusals of Case R-MAP-1, traced state by state at `87f0820`:
+
+| class | states | what the trace says |
+| --- | ---: | --- |
+| `split-non-convergence` / `phi-phi` | 27 | successive substitution **diverges** (`max_delta_k` = 1.54e+89 at 3.6 MPa, 5.46e+105 at 5.1 MPa, 2.69e+128 at 8.7 MPa) and both following stages continue from what it left |
+| `beta-outside-window` (4) + `log-space` (3) | 7 | the log-space stage converges on, or crawls next to, the **trivial** solution, because its seed's phase fraction is 0.5 and the melt holds 4.07e-04 of the feed |
+| `stability-inconclusive` | 2 | every trial ends `second_order_no_progress` at residual 0.685 / 1.746, from a substitution iterate handed over at iteration 50 while it was still travelling |
+
+**Class 1, at 3.6 MPa in full.** The K-loop hands
+`_phi_phi_second_order` a pair at `x = (6.45e-90, 1.0)` and
+`y = (0.99255, 0.00745)` with `beta = 0.99999` - phase-II mole numbers
+`beta * y` exceeding the feed by four orders of magnitude, i.e. not a split.
+The linear stage pulls `beta` back to `6.9e-06` (correctly - its box is
+`0 < n_i < z_i`) and minimizes from there; the ADR-0024 log-space retry that
+follows is seeded from the *same* iterate through `seed_from_iterate`. Both
+fail; the state raises at `3.897e-05`. The stationary point at that same state
+is `w = (5.61e-09, 1.0)`, `tpd_min = -3.889e-05` - already in the caller's hand
+and passed to neither stage.
+
+Measured from the stationary point instead, at the three traced pressures:
+
+| seed / rule | 3.6 MPa | 5.1 MPa | 8.7 MPa |
+| --- | --- | --- | --- |
+| linear iterate (shipped) | 3.90e-05, 100 it | 1.83e-05, 100 it | 1.03e-06, 45 it |
+| stationary point, ADR-0024 rule | 2.05e-03, 100 it | 5.95e-04, 100 it | 2.06e-05, 100 it |
+| stationary point + ADR-0026 safeguard | **4.55e-13, 11 it** | **9.09e-13, 10 it** | **5.55e-15, 13 it** |
+
+The 15 wt% half of the band needs less: from the stationary point the
+*unsafeguarded* stage converges in 5 to 8 iterations at all fourteen of its
+pressures. So the 27 states are two sub-classes of one defect and the seed
+alone settles half of them.
+
+**Class 2, at 0.3 MPa on the `Mw = 16 400` chain.** The stage **converges**, to
+`8.283e-13`, on `x^I = x^II = z` with `beta` an exact `0.0` - the trivial
+solution, whose residual is identically zero and which is therefore an
+attractor of the stage's "accept a step that lowers the residual" clause.
+`_flash_tp_tangent_plane` refuses it, correctly, against a `tpd_min` of
+`-455.03`. The seed's phase fraction is what puts it on that side:
+
+| seed `beta` | outcome at 0.3 MPa |
+| --- | --- |
+| 0.0001 | trivial solution, 17 it |
+| 0.01 | trivial solution, 16 it |
+| **0.5 (shipped)** | **trivial solution, 17 it, with or without the safeguard** |
+| 0.9 | trivial solution, 15 it |
+| 0.99 | **7.21e-13, 8 it**, `beta = 0.9995926` |
+| 0.999 | 3.30e-13, 8 it, same answer |
+| 0.9999 | 4.55e-13, 6 it, same answer |
+
+`1 - 0.9995926 = 4.074163e-04` is the melt fraction, and Case R-MAP-1 had
+already derived `4.074164e-04` for it from the lever rule on the 5 wt% tie
+line, before any of this converged. That agreement is the reason the diagnosis
+was believed before the fix was written.
+
+**Class 4, the stability stall.** Four things changed one at a time, at
+10.5 and 10.8 MPa:
+
+| what was changed | 10.5 MPa | 10.8 MPa |
+| --- | --- | --- |
+| nothing (shipped) | inconclusive, residual 0.685, 65 it | inconclusive, 1.746, 62 it |
+| `second_order_max_iter` 100 -> 1000 | unchanged | unchanged |
+| `second_order_max_step` 4.0 -> 0.5 | unchanged (0.685, 63 it) | unchanged (1.746, 64 it) |
+| substitution only, `max_iter` 300 | residual **53.4**, `w -> (6.9e-27, 1)` | residual **36.2** |
+| substitution only, `max_iter` 3000 | residual **53.4**, identical | residual **36.2** |
+| `ssi_iterations` 50 -> 300, same Newton stage | **stable**, 3 of 4 trials converge at iteration 307 | **stable**, same |
+
+So it is not the Jacobian, not the step cap, not the iteration ceiling, and not
+"substitution is slow" - on its own substitution walks away. It is the
+handover point.
+
+### (ii) The 34 splits, after, each against an independent solve
+
+Every previously refusing split state, at `k_ij = -0.006`, 453 K, with the
+independent route run at each one (the 1-D solve for the seven vapour-liquid
+states, the two-equation Newton for the twenty-seven liquid-liquid ones):
+
+| quantity, over all 34 | worst |
+| --- | --- |
+| mass-balance residual | **1.11e-16** (asserted < 1e-12) |
+| equal-fugacity residual reported | **3.18e-12** (asserted < 1e-08) |
+| relative difference against the independent solve | **2.65e-12** |
+| lever rule on the converged tie line, absolute | **2.22e-16** |
+| `dG_split/RT`, least negative | **-7.01e-05** (all negative) |
+| post-split stability verdict | `stable` at all 34 |
+
+Two cross-checks inside that table are worth naming, because neither can be
+produced by a shared code path:
+
+- **The 1 wt% state lands on the tie line a 5 wt% feed already pinned.**
+  `Mw = 53 000`, 0.3 MPa: the newly converging 1 wt% feed gives a melt at
+  `x_polymer = 0.036808345719631735`, and Case P-16's 5 wt% state - pinned
+  since ADR-0026, verified there against the 1-D solve - gives
+  `0.036808345719672377`. Relative difference **1.1e-12**, from two different
+  ladder entries.
+- **1 wt% and 15 wt% meet at every shared pressure.** 3.9 MPa:
+  `7.75657320184093e-04` against `7.756573201846113e-04` (6.7e-13); 8.1 MPa:
+  `3.647955115718861e-04` against `3.647955115724242e-04` (1.5e-12). The 1 wt%
+  states reach those through the safeguarded ladder entry and the 15 wt%
+  states through the unsafeguarded one.
+
+Pinned answers, for the record (melt or polymer-rich composition, its phase
+fraction, and the lean phase's `ln x_polymer`):
+
+| state | rich `x_polymer` | rich fraction | lean `ln x_polymer` | route |
+| --- | --- | --- | --- | --- |
+| 16400, 1 wt%, 0.3 MPa | 0.10906250886173996 | 4.0741633069e-04 | -472.8766 | lever-rule seed |
+| 16400, 1 wt%, 1.2 MPa | 0.022154085500088714 | 2.0056728217e-03 | -443.2920 | lever-rule seed |
+| 53000, 1 wt%, 0.3 MPa | 0.036808345719631735 | 3.7355015626e-04 | -1528.3913 | lever-rule seed |
+| 53000, 1 wt%, 3.6 MPa | 8.131909284340129e-04 | 1.6908407133e-02 | -70.2204 | stationary point + safeguard |
+| 16400, 5 wt%, 7.5 MPa | 1.129717115748221e-03 | 2.0129111537e-01 | -12.1850 | stationary point + safeguard |
+| 53000, 15 wt%, 8.1 MPa | 3.647955115724242e-04 | 6.5834614796e-01 | -20.7155 | stationary point, unsafeguarded |
+
+**FeOs at `k_ij = 0`, matched constants.** Three of the states, flashed at
+`k_ij = 0` (where they still come out of the ladder) and handed to FeOs as
+composition and density only: worst `|mu_i^I - mu_i^II| / RT` = **4.3e-12**
+over the three, against an asserted `1e-07`. `k_ij = 0` is not a choice: feos
+0.10.1 raises `RuntimeError: missing field k_ij` for every serialization tried
+(Case P-12's note).
+
+### (iii) The two stability states, after
+
+Both return `stable`, on the trivial solution, with
+`diagnostics["substitution_budget_retry"] = True` and three of four trials
+converging at residuals `1.59e-12` and `1.14e-12`; `flash_tp` returns a single
+liquid. Four independent reasons that verdict is the right one:
+
+- **10.2 MPa below** is `stable` at `tpd_min = +2.290e-04` on a non-trivial
+  stationary point, and **11.1 MPa above** is `stable` on the trivial one. The
+  two states sit exactly where the non-trivial stationary point merges into
+  the trivial one, and the merged branch is what the retry finds.
+- **A trial-free scan of equation (2)** over 220 trial compositions spanning
+  twelve decades of polymer content finds **no negative tangent-plane
+  distance**: minimum `+8.03e-09` at 10.5 MPa and `+8.75e-09` at 10.8 MPa,
+  both at the feed composition itself. The same scan gives `+6.49e-09`,
+  `+7.27e-09` and `+9.45e-09` at 9.9, 10.2 and 11.1 MPa, so the sequence is
+  monotone through the window and the two states are not special in it.
+- The stationary point the stalled trials were heading for moves smoothly with
+  pressure (`w_polymer` = 8.9e-07, 4.2e-06, 1.53e-05, 1.78e-05, 2.40e-04 at
+  9.9, 10.2, 10.5, 10.8, 11.1 MPa, the last being the feed), which is the
+  merge, not a discontinuity.
+- The retry's own arithmetic is the shipped one: `stationarity_met` at
+  `1.59e-12`, not a loosened tolerance.
+
+### (iv) The map, re-run, and the dormancy claim
+
+`python -m chemthermo.bench robustness` at `9adf390`, 893.1 s:
+
+| family | states | verdicts | refusals | invariant violations |
+| --- | ---: | --- | ---: | ---: |
+| `pr-phi-phi` | 1270 | VLE 319, single-liquid 406, single-vapor 545 | 0 | 0 |
+| `pcsaft` | 204 | VLE 132, single-liquid 72 | 0 | 0 |
+| `pcsaft-associating` | 260 | LLE 145, VLE 5, single-liquid 89, single-vapor 21 | 0 | 0 |
+| `modified-raoult` | 108 | LLE 48, VLE 28, VLLE 4, single-liquid 13, single-vapor 15 | 0 | 0 |
+| `gamma-gamma` | 16 | LLE 15, single-liquid 1 | 0 | 0 |
+| `polymer` | 252 | LLE 140, VLE 50, single-liquid 62 | 0 | 0 |
+
+**2110 of 2110 converge, 0 refuse, 0 converge and violate an invariant.** The
+`polymer` family's verdict counts move by exactly the 36: LLE 113 -> 140 (+27),
+VLE 43 -> 50 (+7), single-liquid 60 -> 62 (+2), which is class 1, classes 2+3
+and class 4 in that order.
+
+**Dormancy, measured rather than argued.** The two records were compared state
+by state, on every field the record carries - bucket, verdict, phase names,
+phase fractions, `converged_stage`, `phase_set_history`, and each of the five
+residuals (`composition_sum`, `mass_balance`, `phase_fraction_sum`,
+`equilibrium`, `delta_g_split_rt`) - with `!=`, wall time excluded:
+**0 differences across all 2074 previously converged states.** The worst
+residuals in every family are the same doubles as at `87f0820`.
+
+### Negative controls and what is *not* claimed
+
+- **Every gate is on a failure path.** `_phi_phi_second_order` walks the ladder
+  only above `FlashSettings.tol`, i.e. on the line that raises;
+  `_phi_phi_log_space` walks it from entry 3 only above `tol` **or** outside
+  `(0, 1)`, both of which ended the flash before; `stability_tp` retries only
+  on `inconclusive`. A converged answer cannot reach any of them, which is why
+  the 2074-state comparison above is a confirmation rather than the argument.
+- **When nothing in the ladder works, nothing is adopted.** The caller keeps
+  the exact state it had and raises the message it raised before, so a state
+  that still refuses refuses identically. (No state in the map does, but the
+  code path is the one that would.)
+- **The fixture did not move.** `refactor_bit_identity_v3.json` (155 states)
+  passes unchanged and was **not** regenerated. All nine ADR-0023 benchmark
+  cases report **identical result hashes** against `after_2ca41bf.json`.
+- **`_phi_phi_second_order`'s gate was deliberately left narrower than
+  `_phi_phi_log_space`'s.** Adding "or a phase fraction outside (0, 1)" there
+  too is symmetric and no measured state exercises it; a synthetic test
+  (`tests/test_flash_phi_phi_second_order.py::test_a_converged_vapor_fraction_outside_the_unit_interval_raises`)
+  showed what shipping it would do - it turns that injected collapsed split
+  into a real two-phase answer and the `beta`-outside-window guard stops being
+  reachable from that entry point. Not shipped (ADR-0002).
+- **The ladder is three entries because three defects were measured.** It is
+  not claimed to be complete, and a fourth geometry may need a fourth entry.
+- **Nothing here is a statement about polyethylene.** The polymer parameters
+  are one open secondary source citing a paywalled table that was not read, the
+  polymer is monodisperse, and no number in this case is compared against
+  measurement.
+- **Cost.** A refused state used to be cheap. The two stability states are now
+  the 4th and 5th slowest in the whole map (8.77 s and 8.44 s, against the
+  16.63 s associating-PC-SAFT leader) because they run two full trial sets, and
+  the `polymer` family's wall time rises 311.9 s -> 352.1 s (+12.9 %) for
+  36 more answers. The other five families move by less than 3 %, which on this
+  machine is noise.
+- **Suite time:** `pytest -q` **262.09 s (4:22) for 891 tests at `3ab783a` ->
+  258.35 s (4:18) for 881**, measured on the one machine, the baseline in a
+  detached worktree at `3ab783a` with `PYTHONPATH` pointing at its own `src`
+  (the editable install otherwise resolves to the working tree). 23 tests
+  added, none removed; 969 collected against 948. **31 parameters moved into
+  `slow`**, 11 of them this slice's own and 20 pre-existing, and every one is a
+  *repetition* of something the default run still does:
+
+  | where | newly `slow` | what still runs by default |
+  | --- | ---: | --- |
+  | `test_flash_phi_phi_second_order` previously-failing states (Case F-4) | 2 | 240 K / 1 MPa, which is also the state the independent Newton comparison uses |
+  | `test_modified_raoult_vs_thermo` bubble/dew against `thermo` | 1 | the other feed, all four boundaries |
+  | `test_pcsaft_lle_vs_feos` (two tests) | 2 | the high-pressure state of each |
+  | `test_pcsaft_flash_vs_teqp` 300 K tie line | 4 | 3 of 7 pressures: both ends and one middle |
+  | `test_pcsaft_vs_teqp` coarse saturation remark | 1 | the `pure_VLE_T` comparison at the same state |
+  | `test_vlle_water_propanol_butanol` (two tests x 3 T) | 6 | the first feed inside each tie triangle |
+  | `test_flash_modified_raoult` bubble / dew scalar equations | 2 | the other composition of each |
+  | `test_pcsaft_flash` two-phase verification | 2 | 2 of 4 feeds on the same isotherm |
+  | this slice's Case P-17 block | 10 | one state per repair route, plus both dormancy states |
+  | this slice's FeOs Case P-17 states | 1 | one state per ladder entry |
+
+  None of them is the only test of a capability. This slice's own additions
+  cost **32.6 s** in the default run before the trim and **17.3 s** after: the
+  two stability states are 8.7 s each because the retry runs the whole analysis
+  twice, so `stability_tp` is asserted by default and `flash_tp`'s
+  single-liquid answer - a third analysis - is `slow`.
+
+  `pytest -q -m slow tests/test_robustness_map.py` passes in **925.30 s
+  (15:25)** - the full 2110-state sweep against the committed record's totals,
+  verdict counts and refusal-class counts (879.98 s at the previous slice, on
+  36 fewer answers). The `slow` sets of every module this slice touched pass
+  too: `tests/test_pcsaft_polymer.py`, `tests/test_flash_log_space_stage.py`,
+  `tests/test_flash_phi_phi_second_order.py`,
+  `tests/test_flash_modified_raoult.py` and `tests/test_pcsaft_flash.py`
+  together in **99.85 s** for 26 tests, and `tests/validation/` in **166.73 s**
+  for 45.
+- **Independent route:** the one-dimensional equal-fugacity solve; the
+  two-equation tie-line Newton in which the feed does not appear; a trial-free
+  scan of equation (2); the lever rule on every converged tie line; FeOs's
+  chemical potentials; and the tie line of a 5 wt% feed pinned by an earlier
+  slice, met by a 1 wt% feed here.
+- **Test path:** `tests/test_pcsaft_polymer.py` (the Case P-17 block: one state
+  per repair route by default, the rest `slow`), `tests/test_flash_log_space_stage.py`
+  (the lever-rule bound, the seed's box, the ladder's contract),
+  `tests/validation/test_pcsaft_polymer_vs_feos.py` (three states against FeOs),
+  `tests/test_robustness_map.py` (the empty `PINNED_REFUSALS`, and the full
+  sweep behind `slow`).
+- **Script:** `python -m chemthermo.bench robustness --quick` (~10 s) and
+  `python -m chemthermo.bench robustness --out record.json --summary-out record.md`
+  (~15 min).
