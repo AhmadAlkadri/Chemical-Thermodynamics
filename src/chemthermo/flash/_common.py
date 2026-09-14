@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from typing import NamedTuple, Sequence
+from typing import Mapping, NamedTuple, Sequence
 
 import numpy as np
 
@@ -144,6 +144,167 @@ def eos_branch_terms(
         raise ModelError("inconsistent fugacity coefficient shape")
     if np.all(np.isfinite(values)) and np.all(values > 0.0):
         return EosBranchTerms(phi=values, ln_phi=np.log(values))
+
+    try:
+        logarithms = eos.log_fugacity_coefficients(
+            mixture=mixture,
+            temperature_K=temperature,
+            pressure_Pa=pressure,
+            composition=composition.tolist(),
+            phase=phase,
+        )
+    except Exception as exc:  # noqa: BLE001 - a branch may be absent here
+        raise ModelError(str(exc)) from exc
+    if logarithms is None:
+        raise ModelError("non-finite or non-positive fugacity coefficients")
+
+    ln_phi = as_float_array(logarithms)
+    if ln_phi.shape != composition.shape:
+        raise ModelError("inconsistent fugacity coefficient shape")
+    if not np.all(np.isfinite(ln_phi)):
+        raise ModelError("non-finite log fugacity coefficients")
+    return EosBranchTerms(phi=None, ln_phi=ln_phi)
+
+
+class EosBranches(NamedTuple):
+    """Every named branch of an equation of state at one composition.
+
+    Attributes:
+        terms: The branches that are usable here, keyed by phase label.
+        failures: The reason each unusable branch is unusable, keyed by phase
+            label. Every label the caller asked for appears in exactly one of
+            the two mappings.
+    """
+
+    terms: Mapping[str, EosBranchTerms]
+    failures: Mapping[str, str]
+
+
+def eos_branch_terms_all(
+    eos: EquationOfState,
+    *,
+    mixture: Mixture,
+    temperature: float,
+    pressure: float,
+    composition: np.ndarray,
+    phases: Sequence[str],
+) -> EosBranches:
+    """Every branch in ``phases`` at one composition, from one root solve where possible.
+
+    This is :func:`eos_branch_terms` for a caller that needs **all** the
+    branches - the minimum-Gibbs rule of ADR-0005, the lowest-Gibbs fallback of
+    ADR-0019, the root-count measurement of ADR-0021 - and it exists for one
+    reason: asking the model twice makes it solve for its density roots twice,
+    and the second solve reproduces the first exactly (ADR-0023).
+
+    When the model implements
+    :meth:`~chemthermo.models.EquationOfState.ln_fugacity_branches` and answers
+    for every requested label, the branches come out of that single solve and
+    the ADR-0022 guard is re-applied here, unchanged: ``exp`` of the model's
+    own ``ln phi`` **is** the ``phi`` the per-branch call returns, so
+    ``np.log`` of it is the same double the per-branch call produced, and the
+    logarithmic route is taken in exactly the states it was taken in before.
+
+    Everything else falls back to one :func:`eos_branch_terms` call per label:
+    a model without the capability, a model that raised, and a model that
+    answered for only some of the requested labels. The fallback is total
+    rather than partial so that a refusal carries the per-branch error message
+    the caller has always seen, rather than a paraphrase of it.
+    """
+    branches = _branches_from_capability(
+        eos,
+        mixture=mixture,
+        temperature=temperature,
+        pressure=pressure,
+        composition=composition,
+        phases=phases,
+    )
+    if branches is not None:
+        return branches
+
+    terms: dict[str, EosBranchTerms] = {}
+    failures: dict[str, str] = {}
+    for phase in phases:
+        try:
+            terms[phase] = eos_branch_terms(
+                eos,
+                mixture=mixture,
+                temperature=temperature,
+                pressure=pressure,
+                composition=composition,
+                phase=phase,
+            )
+        except ModelError as exc:
+            failures[phase] = str(exc)
+    return EosBranches(terms, failures)
+
+
+def _branches_from_capability(
+    eos: EquationOfState,
+    *,
+    mixture: Mixture,
+    temperature: float,
+    pressure: float,
+    composition: np.ndarray,
+    phases: Sequence[str],
+) -> EosBranches | None:
+    """The one-solve route, or None when it is not available at this state."""
+    try:
+        raw = eos.ln_fugacity_branches(
+            mixture=mixture,
+            temperature_K=temperature,
+            pressure_Pa=pressure,
+            composition=composition.tolist(),
+        )
+    except Exception:  # noqa: BLE001 - the per-branch route reports it properly
+        return None
+    if raw is None or any(phase not in raw for phase in phases):
+        return None
+
+    terms: dict[str, EosBranchTerms] = {}
+    failures: dict[str, str] = {}
+    for phase in phases:
+        try:
+            terms[phase] = _terms_from_log(
+                eos,
+                raw[phase],
+                mixture=mixture,
+                temperature=temperature,
+                pressure=pressure,
+                composition=composition,
+                phase=phase,
+            )
+        except ModelError as exc:
+            failures[phase] = str(exc)
+    return EosBranches(terms, failures)
+
+
+def _terms_from_log(
+    eos: EquationOfState,
+    values: Sequence[float],
+    *,
+    mixture: Mixture,
+    temperature: float,
+    pressure: float,
+    composition: np.ndarray,
+    phase: str,
+) -> EosBranchTerms:
+    """Rebuild one branch's :class:`EosBranchTerms` from the model's own ``ln phi``.
+
+    The arithmetic mirrors :func:`eos_branch_terms` step for step, on the
+    understanding that ``exp`` of ``values`` is the ``phi`` that function would
+    have received: ``phi = exp(ln phi)``, then ``np.log(phi)`` whenever ``phi``
+    is representable, and only otherwise the model's logarithmic route -
+    which here means asking for it on the same root, since the ADR-0022 guard
+    is a property of the *caller*, not of this capability.
+    """
+    ln_raw = as_float_array(values)
+    if ln_raw.shape != composition.shape:
+        raise ModelError("inconsistent fugacity coefficient shape")
+
+    phi = np.exp(ln_raw)
+    if np.all(np.isfinite(phi)) and np.all(phi > 0.0):
+        return EosBranchTerms(phi=phi, ln_phi=np.log(phi))
 
     try:
         logarithms = eos.log_fugacity_coefficients(

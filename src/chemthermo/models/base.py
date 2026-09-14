@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Sequence
+from typing import Mapping, Sequence
 
 from ..core import Mixture
 
@@ -90,6 +90,64 @@ class EquationOfState(ABC):
         Returns:
             ``ln phi_i``, one per component, or ``None`` when this
             implementation cannot produce them without exponentiating.
+        """
+        return None
+
+    def ln_fugacity_branches(
+        self,
+        *,
+        mixture: Mixture,
+        temperature_K: float,
+        pressure_Pa: float,
+        composition: Sequence[float],
+    ) -> Mapping[str, Sequence[float]] | None:
+        """Return ``ln phi_i`` on **every** density root, from one root solve (ADR-0023).
+
+        **Optional, and a performance capability rather than a second model.**
+        The tangent-plane evaluator's minimum-Gibbs rule (ADR-0005) and the
+        split's lowest-Gibbs fallback (ADR-0019) both have to compare the
+        branches against each other, so they ask the model for
+        ``phase="vapor"`` and then for ``phase="liquid"`` at the same
+        ``(T, P, x)``. Each of those calls solves for the roots from scratch -
+        a cubic for Peng-Robinson, a 1599-point isotherm scan plus a
+        safeguarded Newton for PC-SAFT - and the second solve reproduces the
+        first exactly. An implementation of this method does the root solve
+        once and evaluates every root it found.
+
+        **The values are the model's own ``ln phi``**: the numbers
+        :meth:`log_fugacity_coefficients` would return on the same root, which
+        is to say ``fugacity_coefficients`` *without* the final ``exp``.
+        Callers reconstruct what they used before by exponentiating - see
+        :func:`chemthermo.flash._common.eos_branch_terms_all`, which is the
+        only caller and which keeps the ADR-0022 guard unchanged. That is what
+        makes the capability bit-identical by construction rather than by
+        measurement: ``exp`` of the returned value **is** the ``phi`` the
+        per-branch call returns, on the same root.
+
+        The keys are the ``phase`` labels of :meth:`fugacity_coefficients`. A
+        label the model cannot evaluate here is **omitted**, and a caller that
+        finds a label missing falls back to the per-branch route for that
+        composition, so the error a refusal produces is the per-branch one
+        rather than a paraphrase. Where the model has a single admissible root
+        both labels are present and carry that one root's values, exactly as
+        the two per-branch calls would.
+
+        The default implementation returns ``None`` ("this model has no such
+        capability"), and every caller then keeps its per-branch behaviour.
+
+        Args:
+            mixture: Mixture providing component properties.
+            temperature_K: Temperature in K.
+            pressure_Pa: Pressure in Pa.
+            composition: Mole fractions, sum to 1 within COMPOSITION_SUM_TOL.
+
+        Returns:
+            A mapping from phase label to ``ln phi_i``, or ``None`` when this
+            implementation does not offer the capability.
+
+        Raises:
+            ModelError: If no root exists at this state at all. A caller
+                treats that the way it treats any refusal from the model.
         """
         return None
 

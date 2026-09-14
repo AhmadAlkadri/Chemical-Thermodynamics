@@ -817,6 +817,61 @@ class PCSAFTEOS(EquationOfState, EOSProtocol):
             composition=composition,
         )
 
+    def ln_fugacity_branches(
+        self,
+        *,
+        mixture: Mixture,
+        temperature_K: float,
+        pressure_Pa: float,
+        composition: Sequence[float],
+    ) -> dict[str, list[float]]:
+        """Return ``ln phi_i`` on both density roots from **one** root solve (ADR-0023).
+
+        The ``EquationOfState`` capability, and for PC-SAFT it is the one that
+        pays: :meth:`fugacity_coefficients` spends essentially all of its time
+        in :func:`chemthermo.eos._pcsaft_density.solve_density_roots` - a
+        1599-point isotherm scan plus a safeguarded Newton per bracket - and a
+        caller that needs both branches to compare them used to pay for that
+        twice at the same ``(T, P, x)``, for the same roots.
+
+        The returned values are ``ln phi`` *before* the exponential
+        :meth:`fugacity_coefficients` finishes with, which is what makes the
+        reuse bit-identical rather than merely close: ``exp`` of what comes
+        back here is the same double that method returns, on the same root.
+
+        When the state has a single admissible root both labels carry that
+        root's values - the documented behaviour of ``phase="vapor"`` and
+        ``phase="liquid"`` there - and the evaluation is done once, not twice.
+
+        Raises:
+            ModelError: If no admissible density root exists at this state, or
+                if ``ln phi`` does not exist on a root that was found. The
+                caller then falls back to the per-branch route, which raises
+                the same refusal with the same message.
+        """
+        names = self._resolve_components(mixture)
+        roots = self._density_roots(
+            names=names,
+            temperature_K=temperature_K,
+            pressure_Pa=pressure_Pa,
+            composition=composition,
+        ).densities
+        vapor = self._ln_fugacity_coefficients(
+            names=names,
+            temperature_K=temperature_K,
+            density_mol_m3=roots[0],
+            composition=composition,
+        )
+        if len(roots) == 1:
+            return {_VAPOR: vapor, _LIQUID: list(vapor)}
+        liquid = self._ln_fugacity_coefficients(
+            names=names,
+            temperature_K=temperature_K,
+            density_mol_m3=roots[-1],
+            composition=composition,
+        )
+        return {_VAPOR: vapor, _LIQUID: liquid}
+
     def density_roots(
         self,
         *,

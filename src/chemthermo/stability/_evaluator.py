@@ -94,7 +94,13 @@ import numpy as np
 
 from ..core import Mixture
 from ..exceptions import ModelError
-from ..flash._common import as_float_array, eos_branch_terms, wilson_k
+from ..flash._common import (
+    EosBranches,
+    as_float_array,
+    eos_branch_terms,
+    eos_branch_terms_all,
+    wilson_k,
+)
 from ..models import ActivityModel, EquationOfState
 from ..models._antoine import antoine_saturation_pressures, antoine_temperature_range
 
@@ -279,28 +285,62 @@ class _TangentPlaneEvaluator(Protocol):
 # ---------------------------------------------------------------------------
 
 
-class _CubicRootCandidate:
-    """One compressibility branch of an equation of state (``ln phi_i``)."""
+class _EOSBranchState:
+    """The ``(eos, mixture, T, P)`` every density-root candidate of one evaluator shares.
 
-    optional = True
+    It exists so that a selector which needs *all* the branches can say so in
+    one call (ADR-0023). A candidate on its own can only ask the model for its
+    own branch, and two such asks at the same composition make the model solve
+    for its density roots twice - a cubic twice for Peng-Robinson, a
+    1599-point isotherm scan plus a safeguarded Newton twice for PC-SAFT - for
+    roots that are equal to the last bit. Holding the shared state in one
+    object lets :func:`_all_branch_terms` recognise a homogeneous candidate
+    set and route it through
+    :func:`chemthermo.flash._common.eos_branch_terms_all`.
+
+    The *iteration* of a pinned trial still goes one branch at a time
+    (ADR-0021 decision 3): it has no use for the other branch, and asking for
+    both would undo that saving.
+    """
+
+    __slots__ = ("eos", "mixture", "pressure", "temperature")
 
     def __init__(
         self,
         eos: EquationOfState,
         *,
-        label: str,
         mixture: Mixture,
         temperature: float,
         pressure: float,
     ) -> None:
+        self.eos = eos
+        self.mixture = mixture
+        self.temperature = temperature
+        self.pressure = pressure
+
+    def branch_terms(self, composition: np.ndarray, labels: Sequence[str]) -> EosBranches:
+        """Every branch in ``labels`` at ``composition``, from one root solve where possible."""
+        return eos_branch_terms_all(
+            self.eos,
+            mixture=self.mixture,
+            temperature=self.temperature,
+            pressure=self.pressure,
+            composition=composition,
+            phases=labels,
+        )
+
+
+class _CubicRootCandidate:
+    """One compressibility branch of an equation of state (``ln phi_i``)."""
+
+    optional = True
+
+    def __init__(self, state: _EOSBranchState, *, label: str) -> None:
         self.label = label
-        self._eos = eos
-        self._mixture = mixture
-        self._temperature = temperature
-        self._pressure = pressure
+        self.branch_state = state
 
     def ln_fugacity_terms(self, composition: np.ndarray) -> np.ndarray:
-        """``ln phi`` on this branch.
+        """``ln phi`` on this branch, asking the model for this branch alone.
 
         Delegated to :func:`chemthermo.flash._common.eos_branch_terms`, which
         takes ``np.log`` of the model's own ``phi`` whenever that is
@@ -308,12 +348,16 @@ class _CubicRootCandidate:
         the model's logarithmic route only where ``exp(ln phi)`` has
         under/overflowed, which is what makes a long-chain polymer usable here
         at all.
+
+        A selector that wants *both* branches does not come through here; see
+        :func:`_all_branch_terms`.
         """
+        state = self.branch_state
         return eos_branch_terms(
-            self._eos,
-            mixture=self._mixture,
-            temperature=self._temperature,
-            pressure=self._pressure,
+            state.eos,
+            mixture=state.mixture,
+            temperature=state.temperature,
+            pressure=state.pressure,
             composition=composition,
             phase=self.label,
         ).ln_phi
@@ -381,6 +425,45 @@ class _IdealVaporCandidate:
         return np.zeros_like(composition)
 
 
+def _all_branch_terms(
+    candidates: Sequence[_PhaseCandidate], composition: np.ndarray
+) -> EosBranches | None:
+    """Pre-evaluate a homogeneous density-root candidate set in one root solve.
+
+    Returns None - and the caller then evaluates each candidate the way it
+    always did - unless every candidate is a :class:`_CubicRootCandidate`
+    standing on the *same* :class:`_EOSBranchState`. That is the only case
+    where one model call can answer for all of them (ADR-0023); the
+    modified-Raoult pair, for instance, is two different models and has
+    nothing to share.
+    """
+    states = {getattr(candidate, "branch_state", None) for candidate in candidates}
+    if len(states) != 1:
+        return None
+    state = states.pop()
+    if state is None:
+        return None
+    return state.branch_terms(composition, tuple(candidate.label for candidate in candidates))
+
+
+def _candidate_terms(
+    candidate: _PhaseCandidate, composition: np.ndarray, precomputed: EosBranches | None
+) -> np.ndarray:
+    """One candidate's terms, from the pre-evaluated branches when there are any.
+
+    Raises:
+        ModelError: With the message the per-branch route would have raised,
+            since :func:`chemthermo.flash._common.eos_branch_terms_all` falls
+            back to that route whenever the one-solve capability cannot answer.
+    """
+    if precomputed is None:
+        return candidate.ln_fugacity_terms(composition)
+    terms = precomputed.terms.get(candidate.label)
+    if terms is not None:
+        return terms.ln_phi
+    raise ModelError(precomputed.failures[candidate.label])
+
+
 def _select_min_gibbs(
     candidates: Sequence[_PhaseCandidate],
     composition: np.ndarray,
@@ -402,10 +485,11 @@ def _select_min_gibbs(
     best_label = ""
     best_g = math.inf
     failures: list[str] = []
+    precomputed = _all_branch_terms(candidates, composition)
 
     for candidate in candidates:
         try:
-            terms = candidate.ln_fugacity_terms(composition)
+            terms = _candidate_terms(candidate, composition, precomputed)
         except ModelError as exc:
             if not candidate.optional:
                 raise
@@ -513,9 +597,10 @@ def _select_density_root_surface(
 
     available: list[tuple[str, np.ndarray, float]] = []
     failures: list[str] = []
+    precomputed = _all_branch_terms(candidates, composition)
     for candidate in candidates:
         try:
-            terms = candidate.ln_fugacity_terms(composition)
+            terms = _candidate_terms(candidate, composition, precomputed)
         except ModelError as exc:
             if not candidate.optional:
                 raise
@@ -907,13 +992,13 @@ def _cubic_root_candidates(
     temperature: float,
     pressure: float,
 ) -> tuple[_PhaseCandidate, ...]:
-    """The two compressibility branches of a cubic, in the ADR-0005 order."""
-    return tuple(
-        _CubicRootCandidate(
-            eos, label=label, mixture=mixture, temperature=temperature, pressure=pressure
-        )
-        for label in (_VAPOR, _LIQUID)
-    )
+    """The two compressibility branches of a cubic, in the ADR-0005 order.
+
+    Both stand on one :class:`_EOSBranchState`, which is what lets a selector
+    that needs both of them get both from a single root solve (ADR-0023).
+    """
+    state = _EOSBranchState(eos, mixture=mixture, temperature=temperature, pressure=pressure)
+    return tuple(_CubicRootCandidate(state, label=label) for label in (_VAPOR, _LIQUID))
 
 
 def modified_raoult_candidates(
