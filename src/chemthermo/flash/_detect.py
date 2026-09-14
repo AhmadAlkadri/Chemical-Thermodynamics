@@ -20,6 +20,7 @@ stability result raises rather than guessing.
 from __future__ import annotations
 
 import math
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -57,6 +58,12 @@ from ._verify import (
 )
 from .results import FlashResult
 from .settings import FlashSettings
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    # Imported lazily at run time (see `_flash_tp_tangent_plane`): the stability
+    # package imports `chemthermo.flash._common`, so a module-level import would
+    # make the two packages' import order significant.
+    from ..stability.results import StabilityResult
 
 #: Seed K-value used for components absent from the feed (``z_i == 0``). Those
 #: components have ``x_i = y_i = 0`` at every iteration and are rewritten from
@@ -405,6 +412,7 @@ def _flash_tp_tangent_plane(
         )
 
     trial_w = np.array(trial, dtype=float)
+    trial_ln_capital_w = _stationary_point_ln_capital_w(stability)
     k_seed, incipient_phase = _stability_k_seed(
         mixture,
         temperature,
@@ -412,6 +420,7 @@ def _flash_tp_tangent_plane(
         z=z,
         w=trial_w,
         tpd_min=float(stability.tpd_min),
+        ln_capital_w=trial_ln_capital_w,
     )
 
     seed_label = "stability"
@@ -433,6 +442,7 @@ def _flash_tp_tangent_plane(
             w=trial_w,
             tpd_min=float(stability.tpd_min),
             incipient_vapor=incipient_phase == _VAPOR,
+            ln_capital_w=trial_ln_capital_w,
         )
     elif vapor_fraction is None:
         # Documented fallback: the stationary point is a valid starting phase but
@@ -500,6 +510,7 @@ def _flash_tp_tangent_plane(
                 w=trial_w,
                 tpd_min=float(stability.tpd_min),
                 incipient_vapor=incipient_phase == _VAPOR,
+                ln_capital_w=trial_ln_capital_w,
             )
             seed_label = "stability-log"
 
@@ -1397,6 +1408,31 @@ def _flash_tp_modified_raoult(
     )
 
 
+def _stationary_point_ln_capital_w(stability: "StabilityResult") -> np.ndarray | None:
+    """The stability minimizer's ``ln W``, but only where ``w`` cannot carry it.
+
+    ADR-0025 lets a tangent-plane trial converge on a stationary point whose
+    unnormalized mole numbers leave the exponential's range; there the
+    normalized ``w`` the stability test reports has a component rounded to an
+    exact ``0.0`` and ``exp(-tpd)`` is ``inf``, so neither of the two things a
+    seed was built from survives. The trial records ``ln W`` itself, and that
+    is what is handed on.
+
+    It is handed on **only** for such a trial (``minimizing_trial_log_space``).
+    Everywhere else the reconstruction ``ln W = ln w - tpd`` is what built
+    every seed in this repository before ADR-0025, and it keeps building them,
+    so no converged split moves. The two agree to rounding wherever both are
+    defined - the difference is the rounding of one logarithm and one
+    subtraction - which is asserted over the validation grids in
+    ``tests/test_stability_log_space.py``.
+    """
+    if stability.trial_ln_W is None:
+        return None
+    if not bool(stability.diagnostics.get("minimizing_trial_log_space", False)):
+        return None
+    return np.asarray(stability.trial_ln_W, dtype=float)
+
+
 def _stability_k_seed(
     mixture: Mixture,
     temperature: float,
@@ -1405,6 +1441,7 @@ def _stability_k_seed(
     z: np.ndarray,
     w: np.ndarray,
     tpd_min: float,
+    ln_capital_w: np.ndarray | None = None,
 ) -> tuple[np.ndarray, str]:
     """Initial K-values from the tangent-plane minimizer.
 
@@ -1424,16 +1461,30 @@ def _stability_k_seed(
     ``EquationOfState`` exposes no molar volume - and is resolved by volatility
     ordering: see :func:`_incipient_is_vapor_like`.
 
+    ``ln_capital_w`` (ADR-0025) is the stability test's own ``ln W``, passed
+    only where ``exp(-tpd)`` has left the exponential's range - a polymer melt
+    has ``sum_i W_i = exp(1452)`` - and therefore where the reconstruction
+    above cannot be carried out at all. Where it is not passed, the pre-ADR-0025
+    expression runs unchanged. The ratio is then formed in logs and
+    exponentiated once, which saturates at ``inf`` or ``0.0`` instead of
+    raising; such an entry is not usable as a K-value and is replaced by the
+    inert seed exactly as a non-finite one always was.
+
     Returns:
         ``(K, incipient_phase)`` with ``incipient_phase`` in
         ``{"vapor", "liquid"}``.
     """
-    sum_capital_w = math.exp(-tpd_min) if math.isfinite(tpd_min) else 1.0
-    capital_w = w * sum_capital_w
-
     incipient_vapor = _incipient_is_vapor_like(mixture, temperature, pressure, z=z, w=w)
-    with np.errstate(divide="ignore", invalid="ignore"):
-        ratio = capital_w / z if incipient_vapor else z / capital_w
+    if ln_capital_w is None:
+        sum_capital_w = math.exp(-tpd_min) if math.isfinite(tpd_min) else 1.0
+        capital_w = w * sum_capital_w
+        with np.errstate(divide="ignore", invalid="ignore"):
+            ratio = capital_w / z if incipient_vapor else z / capital_w
+    else:
+        with np.errstate(divide="ignore", invalid="ignore", over="ignore", under="ignore"):
+            ln_z = np.log(np.where(z > 0.0, z, 1.0))
+            values = np.asarray(ln_capital_w, dtype=float)
+            ratio = np.exp((values - ln_z) if incipient_vapor else (ln_z - values))
 
     usable = np.isfinite(ratio) & (ratio > 0.0)
     K = np.where(usable, ratio, _INERT_SEED_K)
