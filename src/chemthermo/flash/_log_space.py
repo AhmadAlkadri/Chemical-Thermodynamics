@@ -69,6 +69,20 @@ followed *downhill* instead of being discarded, which is how the iteration
 leaves the trivial solution. The flag is set only after the unsafeguarded
 stage has already failed to reach ``FlashSettings.tol``, so it cannot move a
 number that was ever returned.
+
+**The seed ladder (ADR-0028).** The robustness map of ADR-0027 measured the
+remaining refusals and both of them are about *where the stage starts*, not
+about how it steps. Two seeds and one flag turn out to cover them, and
+:func:`stability_seed_ladder` is that ordered list. The first entry is the
+ADR-0024 seed as it has always been formed; the second is the same seed with
+the ADR-0026 safeguard; the third moves the seed's phase fraction from the
+neutral :data:`_SEED_PHASE_FRACTION` to :func:`lever_rule_phase_fraction`,
+which is what a dilute feed needs - there the equilibrium phases are nowhere
+near half and half, a half-and-half seed sits on the far side of the trivial
+solution, and the stage's "accept a step that lowers the residual" rule then
+holds it there, the trivial solution having residual zero. The callers walk
+the ladder only where the state was about to be refused, so the ladder cannot
+move a number either.
 """
 
 from __future__ import annotations
@@ -103,6 +117,10 @@ _SEED_PHASE_FRACTION = 0.5
 #: an exact ``0.0`` gives ``ln K = -inf``; clamping keeps the seed finite
 #: without changing any ``ln K`` that is representable at all.
 _SEED_LN_K_CLAMP = 1.0e4
+#: How far inside ``(0, 1)`` the lever-rule phase fraction of
+#: :func:`lever_rule_phase_fraction` is kept. The seed only has to be
+#: admissible, and ``beta`` at an exact ``0`` or ``1`` is not.
+_LEVER_RULE_MARGIN = 1e-12
 
 #: A mole fraction at or below this is "outside machine range" for the purposes
 #: of choosing a parametrization (ADR-0024 decision 2). It is far below any
@@ -231,6 +249,7 @@ def log_space_seed(
     tpd_min: float,
     incipient_vapor: bool,
     ln_capital_w: np.ndarray | None = None,
+    phase_fraction: float | None = None,
 ) -> np.ndarray:
     """Phase-II log mole numbers from the tangent-plane stationary point.
 
@@ -280,6 +299,11 @@ def log_space_seed(
             ADR-0025 is formed by the same expression it was formed by then.
             The two agree to rounding wherever both are defined; ``ln W`` is
             the accurate one, being what the iteration carried.
+        phase_fraction: The ``beta`` of the denominator above. ``None`` - the
+            default, and every seed formed before ADR-0028 - is the neutral
+            :data:`_SEED_PHASE_FRACTION`. :func:`lever_rule_phase_fraction`
+            supplies the other value this repository uses, on a retry only
+            (:func:`stability_seed_ladder`).
 
     Returns:
         ``u = ln n`` for the components present in the feed; entries for absent
@@ -297,7 +321,7 @@ def log_space_seed(
     ln_k = (ln_capital_w - ln_z) if incipient_vapor else (ln_z - ln_capital_w)
     ln_k = np.clip(ln_k, -_SEED_LN_K_CLAMP, _SEED_LN_K_CLAMP)
 
-    beta = _SEED_PHASE_FRACTION
+    beta = _SEED_PHASE_FRACTION if phase_fraction is None else float(phase_fraction)
     ln_t = np.logaddexp(math.log1p(-beta), math.log(beta) + ln_k)
     seed = math.log(beta) + ln_k + ln_z - ln_t
     # ``beta K / ((1 - beta) + beta K) < 1`` exactly, but it rounds to one for
@@ -305,6 +329,103 @@ def log_space_seed(
     # inside the box, where the stage needs it.
     ceiling = ln_z + math.log1p(-1e-12)
     return np.where(active, np.minimum(seed, ceiling), -math.inf)
+
+
+def lever_rule_phase_fraction(*, z: np.ndarray, w: np.ndarray, incipient_vapor: bool) -> float:
+    """Phase-II fraction of the *lever rule* at the stationary point (ADR-0028).
+
+    :func:`log_space_seed` builds an admissible seed for **any** ``beta`` in
+    ``(0, 1)``, and :data:`_SEED_PHASE_FRACTION` picks the neutral one because
+    the stage is a descent method from wherever it starts. That is true and it
+    is not always enough: at a dilute polymer feed the two phases are nowhere
+    near half and half, and a seed that puts them there is on the wrong side of
+    the *trivial* solution, where the stage's "accept a step that lowers the
+    residual" rule then holds it - the trivial solution has residual zero, so
+    it is an attractor of that rule even though it is not a minimum of ``g``
+    (validation Case P-17).
+
+    The lever rule fixes the side without needing the answer. One phase of the
+    split is the stationary composition ``w``; if it holds a fraction
+    ``lambda`` of the feed, the complement is ``(z - lambda w) / (1 - lambda)``
+    and must be non-negative componentwise, so
+
+        lambda <= min_i z_i / w_i
+
+    and that bound is attained exactly when the complement is empty of the
+    component attaining it. At a polymer melt stationary point (``w`` an
+    essentially pure polymer, the solvent phase holding ``exp(-450)`` of it)
+    the bound is tight to a factor of a few, and - which is what matters - it
+    is a *bound*, so it never puts the seed on the wrong side.
+
+    ``w`` is phase II when the stationary point is the vapour-like one and
+    phase I otherwise, the same convention :func:`log_space_seed` uses, so the
+    bound is returned as ``lambda`` or as ``1 - lambda`` accordingly.
+
+    Args:
+        z: Feed mole fractions.
+        w: Normalized tangent-plane stationary composition.
+        incipient_vapor: Whether ``w`` is phase II of the split.
+
+    Returns:
+        A phase-II fraction strictly inside ``(0, 1)``.
+    """
+    active = np.asarray(z, dtype=float) > 0.0
+    values = np.asarray(w, dtype=float)
+    ratios = np.where(
+        active & (values > 0.0),
+        np.asarray(z, dtype=float) / np.where(values > 0.0, values, 1.0),
+        math.inf,
+    )
+    lam = float(np.min(ratios))
+    if not math.isfinite(lam):  # pragma: no cover - `w` is a normalized composition
+        lam = _SEED_PHASE_FRACTION
+    lam = min(max(lam, _LEVER_RULE_MARGIN), 1.0 - _LEVER_RULE_MARGIN)
+    return lam if incipient_vapor else 1.0 - lam
+
+
+def stability_seed_ladder(
+    *,
+    z: np.ndarray,
+    w: np.ndarray,
+    tpd_min: float,
+    incipient_vapor: bool,
+    ln_capital_w: np.ndarray | None = None,
+) -> tuple[tuple[np.ndarray, bool], ...]:
+    """Ordered ``(seed, curvature_safeguard)`` attempts from the stability point.
+
+    The three entries are the three things this repository has measured to
+    matter on a polymer/solvent split, cheapest and most conservative first
+    (ADR-0028, validation Case P-17):
+
+    1. the ADR-0024 seed at the neutral phase fraction, unsafeguarded - the
+       call that has always been made here;
+    2. the same seed with the ADR-0026 curvature safeguard, which is what gets
+       an iterate out of the trivial solution's basin when the Gibbs Hessian
+       there is indefinite;
+    3. the same seed at the :func:`lever_rule_phase_fraction` phase fraction,
+       safeguarded, which is what gets a *dilute* feed started on the right
+       side of the trivial solution in the first place.
+
+    The list is ordered, not exhaustive: the caller stops at the first entry
+    that converges, and every caller reaches it only on a state that would
+    otherwise refuse.
+    """
+    neutral = log_space_seed(
+        z=z,
+        w=w,
+        tpd_min=tpd_min,
+        incipient_vapor=incipient_vapor,
+        ln_capital_w=ln_capital_w,
+    )
+    lever = log_space_seed(
+        z=z,
+        w=w,
+        tpd_min=tpd_min,
+        incipient_vapor=incipient_vapor,
+        ln_capital_w=ln_capital_w,
+        phase_fraction=lever_rule_phase_fraction(z=z, w=w, incipient_vapor=incipient_vapor),
+    )
+    return ((neutral, False), (neutral, True), (lever, True))
 
 
 def seed_from_iterate(*, z: np.ndarray, x_ii: np.ndarray, beta: float) -> np.ndarray:

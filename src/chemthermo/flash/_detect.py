@@ -20,7 +20,7 @@ stability result raises rather than guessing.
 from __future__ import annotations
 
 import math
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 import numpy as np
 
@@ -30,10 +30,12 @@ from ..models import ActivityModel, EquationOfState
 from ._assemble import _single_phase_result, _two_phase_result
 from ._common import wilson_k
 from ._log_space import (
+    LogSpaceSplit,
     has_trace_component,
     log_space_seed,
     log_space_split,
     seed_from_iterate,
+    stability_seed_ladder,
 )
 from ._multiphase import (
     _ActivityPhaseSet,
@@ -545,6 +547,13 @@ def _flash_tp_tangent_plane(
             roots_x=roots_x,
             roots_y=roots_y,
             seed="stability-w",
+            ladder=stability_seed_ladder(
+                z=z,
+                w=trial_w,
+                tpd_min=float(stability.tpd_min),
+                incipient_vapor=incipient_phase == _VAPOR,
+                ln_capital_w=trial_ln_capital_w,
+            ),
         )
         x, y, beta = split.x, split.y, split.vapor_fraction
         ln_f_x, ln_f_y = split.ln_f_x, split.ln_f_y
@@ -568,6 +577,13 @@ def _flash_tp_tangent_plane(
                 split=split,
                 roots_x=roots_x,
                 roots_y=roots_y,
+                ladder=stability_seed_ladder(
+                    z=z,
+                    w=trial_w,
+                    tpd_min=float(stability.tpd_min),
+                    incipient_vapor=incipient_phase == _VAPOR,
+                    ln_capital_w=trial_ln_capital_w,
+                ),
             )
 
     if not 0.0 < beta < 1.0:
@@ -770,6 +786,64 @@ def _log_space_diagnostics(
     }
 
 
+#: Names of the :func:`chemthermo.flash._log_space.stability_seed_ladder`
+#: entries, in the same order, for ``log_space_seed`` in the diagnostics.
+_LADDER_SEED_LABELS = ("stability-w", "stability-w", "stability-w-lever-rule")
+
+
+def _walk_stability_seed_ladder(
+    *,
+    settings: FlashSettings,
+    z: np.ndarray,
+    ladder: tuple[tuple[np.ndarray, bool], ...],
+    terms_i: Callable[[np.ndarray], np.ndarray],
+    terms_ii: Callable[[np.ndarray], np.ndarray],
+    skip: int = 0,
+) -> tuple[LogSpaceSplit, str, bool] | None:
+    """First ladder entry that converges to a *physical* split (ADR-0028).
+
+    "Physical" is both halves of what the caller needs and neither on its own:
+    an equal-fugacity residual at or under ``FlashSettings.tol``, and a phase
+    fraction strictly inside ``(0, 1)``. The second half is not pedantry - the
+    trivial solution satisfies the first half *exactly* (both phases carry the
+    feed composition, so every residual is zero) while its phase fraction
+    collapses to ``0``, and that is the shape of the dilute-feed refusals this
+    ladder exists for.
+
+    Args:
+        settings: ``tol`` decides convergence; the stage reads its own budget.
+        z: Feed mole fractions.
+        ladder: Ordered ``(seed, curvature_safeguard)`` attempts.
+        terms_i: Phase I's tangent-plane fugacity terms.
+        terms_ii: Phase II's terms.
+        skip: How many leading entries the caller has already run itself, so
+            they are not repeated. Skipping cannot change an answer: the
+            entries are independent calls from independent seeds.
+
+    Returns:
+        ``(split, seed_label, curvature_safeguard)`` for the first entry that
+        converged, or ``None`` when none did - in which case the caller is left
+        with exactly the state it had, and raises the message it raised before.
+    """
+    for position, (u0, safeguard) in enumerate(ladder):
+        if position < skip:
+            continue
+        try:
+            candidate = log_space_split(
+                z=z,
+                u0=u0,
+                terms_i=terms_i,
+                terms_ii=terms_ii,
+                settings=settings,
+                curvature_safeguard=safeguard,
+            )
+        except ModelError:
+            continue
+        if candidate.residual <= settings.tol and 0.0 < candidate.beta < 1.0:
+            return candidate, _LADDER_SEED_LABELS[position], safeguard
+    return None
+
+
 def _phi_phi_log_space(
     mixture: Mixture,
     *,
@@ -779,6 +853,7 @@ def _phi_phi_log_space(
     roots_x: _PhaseRoot,
     roots_y: _PhaseRoot,
     seed: str,
+    ladder: tuple[tuple[np.ndarray, bool], ...] | None = None,
 ) -> tuple[_SplitSolution, dict[str, float | int | str | bool]]:
     """Solve a phi-phi split entirely in log mole numbers (ADR-0024).
 
@@ -792,6 +867,14 @@ def _phi_phi_log_space(
     ``K = x^II / x^I`` is formed from the *logarithms* and may underflow to
     ``0.0`` for a component whose mole fraction is not a double; ``k_min`` is
     then an honest zero and the magnitude is in ``log_space_ln_x_min``.
+
+    ``ladder`` is the ADR-0028 continuation. Its first two entries **are** the
+    two calls written out below - the same seed, unsafeguarded and then
+    safeguarded - so only the entries past them are walked, and only where the
+    two below have left a residual above ``FlashSettings.tol`` or a phase
+    fraction outside ``(0, 1)``. Both of those already ended the flash before
+    ADR-0028 (the second as ``beta``-outside-window, one frame up), so no
+    number this function ever returned can move.
     """
     refined = log_space_split(
         z=z,
@@ -818,6 +901,25 @@ def _phi_phi_log_space(
         if retry.residual < refined.residual:
             refined = retry
             safeguarded = True
+    if ladder is not None and (refined.residual > settings.tol or not 0.0 < refined.beta < 1.0):
+        # ADR-0028. Either the two calls above did not converge, or they
+        # converged on the *trivial* solution - equal compositions, an exactly
+        # zero residual and a phase fraction that collapses to ``0``, which the
+        # caller refuses as ``beta``-outside-window. The remaining ladder
+        # entries are further independent calls from further seeds; the first
+        # one that returns a physical split wins, and if none does, `refined`
+        # is untouched and the message below is the message this state raised
+        # before.
+        walked = _walk_stability_seed_ladder(
+            settings=settings,
+            z=z,
+            ladder=ladder,
+            terms_i=roots_x.ln_fugacity_terms,
+            terms_ii=roots_y.ln_fugacity_terms,
+            skip=2,
+        )
+        if walked is not None:
+            refined, seed, safeguarded = walked
     if refined.residual > settings.tol:
         raise ConvergenceError(
             "flash_tp did not converge the phi-phi split in log mole numbers; "
@@ -865,6 +967,7 @@ def _phi_phi_second_order(
     split: _SplitSolution,
     roots_x: _PhaseRoot,
     roots_y: _PhaseRoot,
+    ladder: tuple[tuple[np.ndarray, bool], ...] | None = None,
 ) -> tuple[
     np.ndarray,
     np.ndarray,
@@ -886,6 +989,18 @@ def _phi_phi_second_order(
     equation (2) there holds phase by phase, and holds for ``ln phi`` for the
     same reason it holds for ``ln gamma``: the Gibbs-Duhem relation at fixed
     ``T, P``.
+
+    ``ladder`` is the ADR-0028 last resort, and it is here because of what the
+    two stages below are given to start from. Both continue from the K-loop's
+    **last iterate**, and where the K-loop *diverged* - the polyethylene band
+    of the robustness map, whose ``max_delta_k`` runs to ``1e+128`` - that
+    iterate is not an approximation to anything: a phase at ``exp(-300)`` of a
+    component, a phase fraction that fails the two-phase box, and nothing about
+    it near the answer. The tangent-plane stationary point is a starting phase
+    that *was* measured, and it is already in the caller's hand; the ladder is
+    the log-space stage run from there instead. It is walked only where both
+    stages below have already failed, so no number either of them returned can
+    move.
 
     Returns:
         ``(x, y, beta, ln_f_x, ln_f_y, diagnostics)`` for the better of the two
@@ -959,6 +1074,39 @@ def _phi_phi_second_order(
                 seed="linear-iterate",
             )
             second_order_iterations += log_refined.iterations
+
+    if ladder is not None and residual > settings.tol:
+        # ADR-0028: the stationary point, not the K-loop's wreckage. Reached
+        # only where the state was about to raise below. The gate is the
+        # residual alone and deliberately not "or a phase fraction outside
+        # (0, 1)" as well: the collapsed-to-trivial outcome that needs the
+        # second half happens on the *other* log-space entry point
+        # (:func:`_phi_phi_log_space`), which carries it, and no state measured
+        # here reaches this line with a converged residual, so adding it would
+        # ship a branch nothing exercises (ADR-0002).
+        walked = _walk_stability_seed_ladder(
+            settings=settings,
+            z=z,
+            ladder=ladder,
+            terms_i=terms_x,
+            terms_ii=terms_y,
+        )
+        if walked is not None:
+            ladder_split, ladder_seed, ladder_safeguard = walked
+            x, y, beta = ladder_split.x_i, ladder_split.x_ii, ladder_split.beta
+            ln_f_x, ln_f_y = ladder_split.ln_f_i, ladder_split.ln_f_ii
+            residual = ladder_split.residual
+            converged_stage = "second-order-log"
+            log_space_diagnostics = _log_space_diagnostics(
+                mixture,
+                z=z,
+                ln_x_ii=ladder_split.ln_x_ii,
+                iterations=ladder_split.iterations,
+                residual=ladder_split.residual,
+                seed=ladder_seed,
+                curvature_safeguard=ladder_safeguard,
+            )
+            second_order_iterations += ladder_split.iterations
 
     if residual > settings.tol:
         raise ConvergenceError(

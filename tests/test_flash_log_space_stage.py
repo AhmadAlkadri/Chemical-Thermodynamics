@@ -42,12 +42,15 @@ from chemthermo.exceptions import ModelError
 from chemthermo.flash import _detect
 from chemthermo.flash._common import wilson_k
 from chemthermo.flash._log_space import (
+    _SEED_PHASE_FRACTION,
     TRACE_MOLE_FRACTION,
     _safeguarded_directions,
     has_trace_component,
+    lever_rule_phase_fraction,
     log_space_seed,
     log_space_split,
     seed_from_iterate,
+    stability_seed_ladder,
 )
 from chemthermo.flash._split import (
     _PhaseRoot,
@@ -732,3 +735,80 @@ def test_the_safeguard_is_off_on_a_state_that_never_needed_it() -> None:
     )
     assert result.diagnostics["converged_stage"] == "second-order-log"
     assert result.diagnostics["log_space_curvature_safeguard"] is False
+
+
+# ---------------------------------------------------------------------------
+# The seed ladder (ADR-0028)
+# ---------------------------------------------------------------------------
+
+
+def test_the_lever_rule_fraction_is_the_bound_a_non_negative_complement_allows() -> None:
+    """``lambda <= min_i z_i / w_i``, and the complement at it is non-negative.
+
+    This is the whole content of :func:`lever_rule_phase_fraction`: if the
+    ``w``-phase holds a fraction ``lambda`` of one mole of feed, the other
+    phase holds ``(z - lambda w) / (1 - lambda)``, and that has to be a
+    composition. Nothing about the model enters.
+    """
+    z = np.array([1.37497633e-05, 0.999986250])
+    w = np.array([1.0, 1.7e-197])  # an essentially pure polymer melt
+
+    # The convention follows `log_space_seed`: when `w` is phase II the
+    # fraction returned *is* ``lambda``, and when it is phase I the complement's
+    # fraction is returned instead.
+    lam = lever_rule_phase_fraction(z=z, w=w, incipient_vapor=True)
+    assert lam == float(np.min(z / w))
+    assert lever_rule_phase_fraction(z=z, w=w, incipient_vapor=False) == 1.0 - lam
+
+    complement = (z - lam * w) / (1.0 - lam)
+    assert np.all(complement >= 0.0)
+    # A hair past the bound and the complement goes negative, which is what
+    # makes this a bound and not a guess.
+    assert np.any((z - 1.01 * lam * w) < 0.0)
+
+    # A stationary point at the feed gives the neutral answer back: the bound
+    # is 1, so the complement's fraction is 0, and the clamp keeps it inside.
+    edge = lever_rule_phase_fraction(z=z, w=z, incipient_vapor=True)
+    assert 0.0 < edge < 1.0
+
+
+def test_the_lever_rule_seed_is_inside_the_two_phase_box_like_the_neutral_one() -> None:
+    """The property that makes any ``beta`` in ``(0, 1)`` admissible, at this one."""
+    z = np.array([2.3148042e-04, 0.99976852])
+    w = np.array([1.0, 1e-200])
+    beta = lever_rule_phase_fraction(z=z, w=w, incipient_vapor=False)
+    u = log_space_seed(z=z, w=w, tpd_min=-455.0, incipient_vapor=False, phase_fraction=beta)
+    assert np.all(np.isfinite(u))
+    moles = np.exp(u)
+    assert np.all(moles > 0.0)
+    assert np.all(moles < z)
+
+
+def test_the_ladders_first_entry_is_the_seed_the_route_already_formed() -> None:
+    """Entry 1 is bit-identical to the pre-ADR-0028 seed, which is why it is skippable.
+
+    ``_phi_phi_log_space`` runs entries 1 and 2 itself and walks the ladder from
+    entry 3; that is only sound if entry 1 is the very array it was given.
+    """
+    z = np.array([1.37497633e-05, 0.999986250])
+    w = np.array([1.0, 2.3e-178])
+    ladder = stability_seed_ladder(z=z, w=w, tpd_min=-1492.0, incipient_vapor=False)
+    neutral = log_space_seed(z=z, w=w, tpd_min=-1492.0, incipient_vapor=False)
+
+    assert len(ladder) == 3
+    assert np.array_equal(ladder[0][0], neutral)
+    assert np.array_equal(ladder[1][0], neutral)
+    assert [safeguard for _seed, safeguard in ladder] == [False, True, True]
+    # Entry 3 is a different seed, and it is the lever-rule one.
+    assert not np.array_equal(ladder[2][0], neutral)
+    assert np.array_equal(
+        ladder[2][0],
+        log_space_seed(
+            z=z,
+            w=w,
+            tpd_min=-1492.0,
+            incipient_vapor=False,
+            phase_fraction=lever_rule_phase_fraction(z=z, w=w, incipient_vapor=False),
+        ),
+    )
+    assert _SEED_PHASE_FRACTION == 0.5
