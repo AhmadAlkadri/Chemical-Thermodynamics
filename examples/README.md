@@ -388,6 +388,30 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
     default; `--full` adds the 25-point pressure scan from 0.3 to 12 MPa - the
     VLE -> LLE -> single-liquid verdict sequence - and the bisected
     vapour-liquid / liquid-liquid boundary (about 30 s).
+- `examples/validation/22_stability_log_space.py`
+  - **Tangent-plane stability in log mole numbers** (ADR-0025, validation Case
+    P-15), with PASS/FAIL per check, and the golden path for that slice. Before
+    it, Michelsen's iteration clamped `ln W` to `[-700, 700]`, so a stationary
+    point outside that window was not merely inaccurate but *unreachable*: a
+    `Mw = 53000` polyethylene melt against a solvent-vapour feed sits at
+    `ln W_polymer = 1452`, and the three trials walking at it spent 51
+    iterations parked on the clamp with a residual of exactly `1452 - 700`.
+    Five routes: the stationary point against Michelsen's own equations (5) and
+    (7) re-derived in the script, including that `sum_W` has overflowed to
+    `inf` while `ln sum_W` has not; the split it seeds at 0.5 and 1 MPa, with
+    both phases named from a measured compressibility and every residual
+    reported; a one-dimensional equal-fugacity solve written in the script,
+    which reproduces the melt's solvent content to 1.2e-14; FeOs's chemical
+    potentials at chemthermo's converged phases (1.1e-12 with matched universal
+    constants, 8.6e-08 as shipped, at `k_ij = 0` because feos 0.10.1 cannot be
+    given one); and **dormancy**, which is the whole bit-identity argument
+    measured rather than argued - the shorter `Mw = 16400` chain, a
+    Peng-Robinson state, a PC-SAFT state and an NRTL state all run the
+    pre-ADR-0025 arithmetic. Routes 1, 2, 3 and 5 run without `feos` (the
+    script says so and still exits 0). About 5 s by default; `--full` adds the
+    144-state Peng-Robinson stability grid (0 of 624 trials in log space) and
+    the 0.4-2 MPa scan, every point of which either raised or was seeded from
+    the wrong stationary point before this slice (about 10 s).
 - `examples/validation/*.py`
   - Optional validation sweeps against `thermo` (requires `pip install -e ".[validation]"`).
   - CSV output is disabled by default; pass `--outdir <dir>` or set `CHEMTHERMO_OUTDIR`.

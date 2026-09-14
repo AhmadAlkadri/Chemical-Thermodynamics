@@ -812,6 +812,17 @@ print(result.trial_composition)  # incipient-phase mole fractions w
 print(result.k_values)           # w_i / z_i for the incipient phase
 ```
 
+Since ADR-0025 the iteration carries Michelsen's unnormalized mole numbers
+without clamping them, so a stationary point outside the exponential's range is
+found rather than missed. Where that happens - a polymer melt against a
+solvent-vapour feed needs `ln W_polymer = 1452` - the normalized
+`trial_composition` rounds to an exact `0.0` in some component and
+`result.trial_ln_W` is what carries the magnitude; `diagnostics["ln_sum_W"]`
+is `-tpd_min` (equation (7)) and `sum_W` itself is `inf`. Nothing else changed:
+the diagnostics key `log_space_trial_count` appears **only** when the route
+engaged, and it does not on any Peng-Robinson, PC-SAFT or activity-model state
+in this repository. See [Polymers](#polymers-adr-0022) and ADR-0025.
+
 Runnable demo:
 
 ```bash
@@ -1202,15 +1213,24 @@ untouched - `ComponentData` still requires `Tc` / `Pc` / `omega` and
   residual: `fugacity_residual` is taken over the components present in both
   phases and cannot see it.
 
-- **The longest chain below 1 MPa is still out of reach.** `Mw = 53000` at 0.5
-  and 1 MPa does not converge, because `stability_tp`'s deepest stationary
-  point there is a shallow vapour-side one and the melt is never found. That is
-  a stability trial-set limitation for `m = 1393.9`, pinned by test.
+- **The longest chain is in reach since ADR-0025.** `Mw = 53000` (`m = 1393.9`)
+  at 0.5 and 1 MPa used to raise, because the stability iteration clamped
+  `ln W` to `[-700, 700]` and the melt's stationary point sits at
+  `ln W_polymer = 1452`. The normalization is now done in logarithms where -
+  and only where - that clamp would have engaged, so the melt is found in three
+  successive substitutions (`tpd_min = -1452.21`) and `flash_tp` returns the
+  verified vapour-liquid split: melt `x_solvent = 0.97881` (5.92 wt% solvent),
+  `beta_vapor = 0.99662`, `ln y_polymer = -1507.98`. A stationary point whose
+  mole numbers leave machine range is reported as
+  `StabilityResult.trial_ln_W`, because the normalized `trial_composition`
+  rounds to `(1.0, 0.0)` there; `diagnostics["ln_sum_W"]` is equation (7)'s
+  `-tpd`, and `sum_W` itself is then `inf`.
 
-See ADR-0022 and ADR-0024, validation Cases P-12, P-13 and P-14,
-`examples/basic/pcsaft_polymer_demo.py`,
-`examples/validation/20_pcsaft_polymer_vs_feos.py` and
-`examples/validation/21_pcsaft_polymer_vle.py`.
+See ADR-0022, ADR-0024 and ADR-0025, validation Cases P-12, P-13, P-14 and
+P-15, `examples/basic/pcsaft_polymer_demo.py`,
+`examples/validation/20_pcsaft_polymer_vs_feos.py`,
+`examples/validation/21_pcsaft_polymer_vle.py` and
+`examples/validation/22_stability_log_space.py`.
 
 ### Association (ADR-0018)
 
