@@ -99,6 +99,35 @@ Run the canonical demo from the repo root:
 python examples/basic/flash_tp_peng_robinson_demo.py
 ```
 
+## Benchmarks (ADR-0023)
+
+Run the fixed workload and write a record:
+
+```bash
+python -m chemthermo.bench --out benchmarks/mine.json
+# from a source checkout without an install:
+python tools/bench.py --out benchmarks/mine.json
+```
+
+`--list` prints the case ids, `--case ID` runs one (repeatable), `--repeats N`
+sets the timed repeats after the warm-up (default 5). The whole workload takes
+about half a minute.
+
+Compare two records:
+
+```bash
+python -m chemthermo.bench --compare benchmarks/baseline_<sha>.json benchmarks/after_<sha>.json
+```
+
+It prints the per-case median before, after and ratio, and **exits 1 if any
+case's `result_hash` differs**.
+
+**Any performance change is reported with a baseline record, an after record,
+identical result hashes and a measured ratio**, the two records measured back
+to back on one machine - the workload's three activity-model cases are the
+drift control. See `benchmarks/README.md` and ADR-0023. A wall time is never
+portable between machines; a result hash is.
+
 ## Slice evidence
 
 For every thin vertical slice report, include:

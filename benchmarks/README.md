@@ -71,13 +71,38 @@ construction - happens **outside** the timed region. What is timed is
 
 | file | what it is |
 | --- | --- |
-| `baseline_<sha>.json` | the state of the reference paths before the `perf-baseline-and-root-reuse` optimizations |
-| `after_<sha>.json` | the same workload after them |
+| `baseline_3ce68df.json` | the reference paths before the `perf-baseline-and-root-reuse` optimizations |
+| `after_2ca41bf.json` | the same workload after them |
 
-Both were measured on the machine named in their own `environment` block.
-**Wall times are not portable**: compare records measured on the same machine,
-back to back, or compare nothing. The `result_hash` *is* portable and is what
-a comparison on a different machine can still assert.
+Both were measured on the machine named in their own `environment` block
+(Apple M2 Max, Python 3.11.6, numpy 2.4.2), five timed repeats per case, **47
+seconds apart** - the baseline from a detached worktree at `3ce68df`, the after
+record from `2ca41bf`. That matters: a baseline taken twenty minutes earlier in
+the same session read 5-10 % slower on cases whose code had not changed, which
+is larger than two of the three optimizations being measured. Compare records
+taken back to back on one machine, or compare nothing.
+
+```
+case                           before / s    after / s   speedup  result
+------------------------------------------------------------------------------
+modified-raoult-vle              0.020264     0.019569     1.04x  identical
+nrtl-lle-tessier-p1              0.043876     0.043711     1.00x  identical
+pcsaft-lle-water-hexane          1.626994     1.236466     1.32x  identical
+pcsaft-polymer-lle               0.962138     0.814358     1.18x  identical
+pcsaft-vle-methane-hexane        0.240769     0.188477     1.28x  identical
+pr-flash-grid-24                 0.140889     0.117589     1.20x  identical
+pr-flash-ternary                 0.015261     0.013040     1.17x  identical
+pr-stability-ternary             0.004649     0.003881     1.20x  identical
+vlle-364k                        0.099957     0.097971     1.02x  identical
+```
+
+The three activity-model cases are the **drift control**: none of the three
+optimizations touches the code they run, so their 1.00x / 1.04x / 1.02x is what
+this machine's noise looks like over one pair of runs. Read the
+equation-of-state ratios against that, not against 1.00x exactly.
+
+**Wall times are not portable** between machines. The `result_hash` *is*, and
+is what a comparison on a different machine can still assert.
 
 ## Adding a case
 
