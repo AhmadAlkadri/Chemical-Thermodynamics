@@ -32,8 +32,10 @@ round-off either way, which is the comparison this slice is actually about.
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import math
+from pathlib import Path
 from typing import Iterable, Mapping, Sequence
 
 import numpy as np
@@ -436,24 +438,37 @@ def test_the_agreement_is_not_vacuous() -> None:
     assert abs(internal.a_assoc - contributions["Association"]) > 1e-3
 
 
+def _assert_matches_capture(*args: object, **kwargs: object) -> None:
+    """``tests/_capture_identity.py``, loaded by path (``.agents/dev-contract.md``)."""
+    path = Path(__file__).resolve().parents[1] / "_capture_identity.py"
+    spec = importlib.util.spec_from_file_location("_capture_identity", path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    module.assert_matches_capture(*args, **kwargs)
+
+
 def test_non_associating_hexane_is_unchanged() -> None:
-    """Case P-1's pinned n-hexane numbers, reproduced bit for bit."""
+    """Case P-1's pinned n-hexane numbers: bit for bit on macOS arm64, where
+    they were captured, and to 5e-14 elsewhere (ADR-0032; the same pins and
+    bound as ``tests/test_pcsaft_association.py``)."""
     eos = PCSAFTEOS(components=("n-Hexane",))
     assert not eos.associates()
-    assert (
-        eos.residual_helmholtz(temperature_K=300.0, volume_m3=1.0 / 7700.0, composition=[1.0])
-        == -5.783742760059239
-    )
-    assert (
-        eos.compressibility_factor(temperature_K=300.0, density_mol_m3=7700.0, composition=[1.0])
-        == 0.661534529144653
-    )
-    assert (
-        eos.ln_fugacity_coefficients(temperature_K=300.0, density_mol_m3=7700.0, composition=[1.0])[
-            0
-        ]
-        == -5.709015132378622
-    )
+    computed = {
+        "a_res": eos.residual_helmholtz(
+            temperature_K=300.0, volume_m3=1.0 / 7700.0, composition=[1.0]
+        ),
+        "z": eos.compressibility_factor(
+            temperature_K=300.0, density_mol_m3=7700.0, composition=[1.0]
+        ),
+        "ln_phi": float(
+            eos.ln_fugacity_coefficients(
+                temperature_K=300.0, density_mol_m3=7700.0, composition=[1.0]
+            )[0]
+        ),
+    }
+    pinned = {"a_res": -5.783742760059239, "z": 0.661534529144653, "ln_phi": -5.709015132378622}
+    _assert_matches_capture(pinned, computed, rtol=0.0, atol=5e-14, label="hexane_300_7700")
 
 
 # ---------------------------------------------------------------------------

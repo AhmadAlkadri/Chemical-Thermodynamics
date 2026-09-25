@@ -71,6 +71,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import platform
 
 import numpy as np
 
@@ -408,10 +409,22 @@ def non_associating_unchanged() -> None:
         temperature_K=300.0, density_mol_m3=7700.0, composition=[1.0]
     )[0]
     print(f"    A^res/RT {a_res!r}\n    Z        {z_factor!r}\n    ln phi   {ln_phi!r}")
-    record(
-        "n-hexane at 300 K / 7700 mol/m^3 is bit-identical to the pinned values",
-        (a_res, z_factor, ln_phi) == PINNED_HEXANE,
-    )
+    computed = (a_res, z_factor, float(ln_phi))
+    # Pinned on macOS arm64. Bit for bit there; elsewhere exp/log differ in
+    # the last bits, so 5e-14 absolute - the floor at which Case P-1 accepted
+    # these quantities as equal to teqp's (ADR-0032).
+    if platform.system() == "Darwin" and platform.machine() == "arm64":
+        record(
+            "n-hexane at 300 K / 7700 mol/m^3 is bit-identical to the pinned values",
+            computed == PINNED_HEXANE,
+        )
+    else:
+        worst = max(abs(c - p) for c, p in zip(computed, PINNED_HEXANE))
+        print(f"    off the capture platform: worst |diff| from the pins {worst:.2e}")
+        record(
+            "n-hexane at 300 K / 7700 mol/m^3 matches the macOS-pinned values to 5e-14",
+            worst <= 5e-14,
+        )
     record("and the model reports itself non-associating", not eos.associates())
 
 
