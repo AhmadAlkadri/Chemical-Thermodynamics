@@ -153,3 +153,27 @@ tests (private `agentslint` install), so this is the branch's first CI test run.
 
 Not rerun in this session (inherited): validation extras (teqp/FeOs/thermo),
 `pytest -m slow`, the full 2505-state map, benchmark timings.
+
+### 7a. Cloud baseline (slice A, first cloud session, 2026-09-25)
+
+Claude Code cloud container at handoff SHA
+`5864ab0c9fe43a9a792a87b12b590aa1c644438d`: Linux 6.18.44 x86_64, 4 CPUs,
+CPython 3.11.15, numpy 2.4.6, validation extras not installed.
+
+| check | result |
+| --- | --- |
+| ruff format / ruff check / pyright | clean / clean / 0 errors |
+| `pytest -q` | **5 failed**, 764 passed, 51 skipped, 74 deselected, 6:43 |
+| `tools/smoke_install.py --package .`, golden path | pass |
+| `python -m build`; wheel in a fresh venv, `release_smoke.py --expect-version 0.2.0b1` from outside the tree | pass (4 smoke flashes) |
+| `chemthermo.bench robustness --quick` | 224 states, 219 verdicts, 5 by-design `rr-no-bracket` - identical totals to macOS |
+
+The 5 failures: the 3 of CI run 36121300741, plus
+`test_pcsaft_polymer.py::test_the_band_the_diverged_k_loop_used_to_end[53000.0-0.15-8100000.0]`
+(route label `linear-iterate` vs `stability-w`, same tie line to 1.3e-12) and
+`test_stability_candidates.py::test_results_are_invariant_under_component_reordering[z0-361.0]`
+(8.4e-11 vs 1e-12: two tied trials reported in the two orders). The CI runner
+and this host also disagree with each other on the PC-SAFT literals (`a_res`
+exact here, 3 ULP off there). Diagnosis and the rule adopted: ADR-0032, ledger
+Cases P-11 and P-17 "cross-platform". Slice A2 (`cross-platform-guards`)
+followed; its result is below.
