@@ -164,6 +164,14 @@ Polydispersity (ADR-0022 roadmap item), water/alcohol `kij` for the R-MAP-1
 `gamma-gamma` third liquid. Each needs a cited source, a reference to check
 against, and an acceptance test before a slice is opened.
 
+## State after the first cloud session (2026-09-25)
+
+A, A2, B0-B3, C1 + C3 accepted; release 0.3.0b1 gated at `64130a2` but the
+tag could not be pushed from the session (handoff section 7b; packet in
+`.agents/handoffs/release-packet-v0.3.0b1.md`). Next, in order: C2, then
+A3/A4, then D, then E. If a session again cannot push tags, say so in the
+handoff and keep the packet current rather than retrying.
+
 ## Session end checklist
 
 `git status --porcelain` empty; `git log --oneline -n 20`;
