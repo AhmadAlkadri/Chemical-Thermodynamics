@@ -177,6 +177,17 @@ tag could not be pushed from the session (handoff section 7b; packet in
 A3/A4, then D, then E. If a session again cannot push tags, say so in the
 handoff and keep the packet current rather than retrying.
 
+## State after cloud session 2 (2026-09-25): release readiness
+
+The owner replaced the open-ended plan with one goal: an honest, tidy public
+repository merged to `main` and **0.4.0 on PyPI**, published by the owner.
+Done from the cloud: C2, A3, A4 (all ADR'd and in the ledger), ADR-0037
+(`chemthermo.vlle` removed), README/`docs/` split, PyPI packaging, ADR-0038,
+the full map record at `761fd57`, and the release commit `4aa4753` with its
+gates. Remaining, owner-side: `.agents/handoffs/release-packet-v0.4.0.md`
+(macOS check, fast-forward `main`, tag, GitHub release, TestPyPI, PyPI).
+Items E and C4 are paused pending an owner decision after 0.4.0.
+
 ## Session end checklist
 
 `git status --porcelain` empty; `git log --oneline -n 20`;

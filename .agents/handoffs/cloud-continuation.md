@@ -284,3 +284,36 @@ reference.
 **Failed:** nothing. **Skipped:** the validation extras,
 `pytest -m slow`, the robustness map, and benchmark timings were not rerun
 on macOS for this release. PyPI publication is out of scope.
+
+### 7d. Cloud session 2 (2026-09-25): C2, A3, A4, and release readiness for 0.4.0
+
+Continued from `a916370` (after 7c). Slices, in order:
+`pcsaft-association-temperature-derivative` (C2, ADR-0034 amendment, ledger
+P-20), `stability-tie-break` (A3, ADR-0035, S-9), `flash-trivial-split` (A4,
+ADR-0036, P-17 "ADR-0036"), `docs` (plan item D re-measured: 2:57 on macOS is
+inside budget), then - **after the owner changed the goal to release
+readiness** - `release-tidy` (ADR-0037: `chemthermo.vlle` removed; stray
+`AGENT/`, `AGENT.md`, `ROADMAP.md` removed; `CONTRIBUTING.md`), `public-docs`
+(README 1585 -> ~190 lines, detail in `docs/`), `packaging` (PyPI metadata,
+`py.typed`, library-only sdist, CI matrix 3.11-3.13 + `twine check --strict`),
+`release-policy` (ADR-0038: owner publishes to PyPI by hand),
+`robustness-record` (`benchmarks/robustness_761fd57.*`, first full map on
+Linux, identical state by state to macOS `f852726`), and `release` (0.4.0 at
+`4aa475385791b29f7da76e68332ebfdd39870f1e`).
+
+Owner decisions (interview, 2026-09-25): 0.4.0 final, Beta; short README +
+`docs/`; keep `.agents/` and `benchmarks/`, tidy; remove `chemthermo.vlle`
+only (gamma-phi stays for the CLI v1 contract). The open-ended sprint is
+over; the target is `main` + PyPI.
+
+**Release state:** gates passed on a clean clone of `4aa4753` (Linux; wheel on
+3.11/3.12/3.13); PR https://github.com/AhmadAlkadri/Chemical-Thermodynamics/pull/1
+open (`dev/sprint` -> `main`, fast-forward possible). Tag, GitHub release,
+macOS check, merge and PyPI upload are the owner's:
+`.agents/handoffs/release-packet-v0.4.0.md` has the exact steps and notes.
+
+**Next session starts** only after the owner has worked the packet; its
+first action is to record the outcome (7e) if the owner-side agent did not.
+There is no open-ended development queue: plan items E (deferred science) and
+C4 (`d ln phi / dT`, needs a consumer) wait for an owner decision after 0.4.0.
+
