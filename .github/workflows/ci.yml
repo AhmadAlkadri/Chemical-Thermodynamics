@@ -22,10 +22,24 @@ jobs:
           python -m venv .venv
           .venv/bin/python -m pip install --upgrade pip
           .venv/bin/pip install -e ".[dev]"
-          .venv/bin/pip install git+https://github.com/AhmadAlkadri/agentslint.git@v0.3.0
+
+      # agentslint lives in a private repository, which this public workflow
+      # cannot clone without a credential. It lints the agent docs, not the
+      # science, so it runs wherever it is installable and is otherwise skipped
+      # with a visible warning; every other gate below stays hard.
+      # See .agents/brain/adr/0031-versioned-releases.md.
+      - name: Install agentslint (optional; private repository)
+        id: aglint_install
+        continue-on-error: true
+        run: .venv/bin/pip install git+https://github.com/AhmadAlkadri/agentslint.git@v0.3.0
 
       - name: Aglint
+        if: steps.aglint_install.outcome == 'success'
         run: .venv/bin/aglint check --repo .
+
+      - name: Aglint unavailable
+        if: steps.aglint_install.outcome != 'success'
+        run: echo "::warning::agentslint could not be installed (private repository); aglint check skipped in this run."
 
       - name: Editable install smoke
         run: |
