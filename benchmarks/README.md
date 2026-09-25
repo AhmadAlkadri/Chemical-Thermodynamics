@@ -240,12 +240,21 @@ ADR-0027 before using it to justify anything.
 
 | file | what it is |
 | --- | --- |
-| `robustness_f852726.json` | the full 2505-state sweep at `f852726` (ADR-0030) |
-| `robustness_f852726.md` | its summary table |
+| `robustness_761fd57.json` | the full 2505-state sweep at `761fd57` (after ADR-0035/0036; Linux x86_64, CPython 3.11.15, numpy 2.4.6) |
+| `robustness_761fd57.md` | its summary table |
+| `robustness_f852726.md` | the summary of the superseded `f852726` sweep (macOS arm64, ADR-0030) |
 | `robustness_64831bd.md` | the summary of the superseded `64831bd` sweep, the *before* measurement for ADR-0030 |
 | `robustness_74820b8.md` | the summary of the superseded `74820b8` sweep, the *before* measurement for ADR-0029 |
 | `robustness_9adf390.md` | the summary of the superseded `9adf390` (2110-state) sweep |
 | `robustness_87f0820.md` | the summary of the superseded `87f0820` sweep |
+
+At `761fd57` (the first record taken on Linux): **2500 of 2505 states
+converge, 5 refuse (the deprecated gamma-phi path's `rr-no-bracket`, by
+design), 0 converge and violate an invariant** - the same totals and, matched
+by `(system, state_index)`, the same bucket for every state as the macOS
+`f852726` record; a before/after pair on one machine showed ADR-0036 changes
+no state (ledger Case P-17 "ADR-0036"). Records from different machines must
+be matched by index: generated grid pressures can differ by 1 ULP.
 
 At `f852726`: **2500 of 2505 states converge, 5 refuse, 0 converge and violate an invariant**, unchanged from `64831bd` - the ADR-0030 call-local solve
 memo is a performance change and the whole sweep was re-run to say so. The
