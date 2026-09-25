@@ -147,8 +147,13 @@ golden fixtures `tests/fixtures/cli/tp_flash_v1.json`,
 
 ## D. Performance and validation cost (when measured)
 
-- Default suite exceeds the 4-minute target (~4:20-4:45 measured locally;
-  `tests/test_examples.py` ~86 s). Profile (`pytest --durations=30`) before
+- ~~Default suite exceeds the 4-minute target (~4:20-4:45 measured locally;
+  `tests/test_examples.py` ~86 s).~~ **Re-measured 2026-09-25, no action
+  needed now:** macOS arm64 clean clone at `64130a2`, 814 tests, **2:57**
+  (handoff 7c) - inside the target on the development machine. Linux x86_64:
+  cloud host 6:40-7:00 (no extras), 10:40-11:36 with the validation extras;
+  GitHub Actions `ubuntu-latest` 7-8 min for the whole job. Revisit only if
+  the macOS figure passes 4 min again; profile first (`--durations=30`). Profile (`pytest --durations=30`) before
   changing anything; move tests to `slow` only per the dev-contract rule
   (never the only test of a capability) and record the change in the ledger.
 - Any solver speed-up follows ADR-0023/0030: baseline + after records, equal

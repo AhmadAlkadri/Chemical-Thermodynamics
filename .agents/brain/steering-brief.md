@@ -402,6 +402,10 @@
   - Validation policy promotion to required CI remains deferred.
 
 ## Risks / unknowns
+- **Suite runtime is platform-bound, not over budget (plan item D, re-measured
+  2026-09-25).** macOS arm64 2:57 for 814 tests (target 4 min); Linux x86_64
+  hosts are ~2.3x slower (6:40-7:00; CI job 7-8 min). No test was moved to
+  `slow` for time.
 - **"Bit-identical" is a same-platform statement (ADR-0032).** Captured-value
   guards are exact only on macOS arm64; CI and cloud sessions check discrete
   fields exactly and floats to 1e-12 / 5e-14. A numerical change smaller than
