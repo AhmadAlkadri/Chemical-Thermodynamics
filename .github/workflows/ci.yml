@@ -7,6 +7,11 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Every version the package metadata advertises (pyproject classifiers).
+        python-version: ["3.11", "3.12", "3.13"]
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -14,7 +19,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
           cache: "pip"
 
       - name: Bootstrap venv + install dev dependencies
@@ -22,6 +27,24 @@ jobs:
           python -m venv .venv
           .venv/bin/python -m pip install --upgrade pip
           .venv/bin/pip install -e ".[dev]"
+
+      # agentslint lives in a private repository, which this public workflow
+      # cannot clone without a credential. It lints the agent docs, not the
+      # science, so it runs wherever it is installable and is otherwise skipped
+      # with a visible warning; every other gate below stays hard.
+      # See .agents/brain/adr/0031-versioned-releases.md.
+      - name: Install agentslint (optional; private repository)
+        id: aglint_install
+        continue-on-error: true
+        run: .venv/bin/pip install git+https://github.com/AhmadAlkadri/agentslint.git@v0.3.0
+
+      - name: Aglint
+        if: steps.aglint_install.outcome == 'success'
+        run: .venv/bin/aglint check --repo .
+
+      - name: Aglint unavailable
+        if: steps.aglint_install.outcome != 'success'
+        run: echo "::warning::agentslint could not be installed (private repository); aglint check skipped in this run."
 
       - name: Editable install smoke
         run: |
@@ -39,5 +62,39 @@ jobs:
       - name: Pytest
         run: .venv/bin/pytest -q
 
+      - name: Build sdist + wheel and check the PyPI metadata
+        run: |
+          .venv/bin/python -m build --outdir dist/
+          .venv/bin/twine check --strict dist/*
+          rm -rf dist/ build/
+
       - name: Non-editable install smoke
         run: .venv/bin/python tools/smoke_install.py --package .
+
+      - name: Commit cadence trailers
+        run: |
+          slice_lines="$(git log -n 200 --format=%B | grep -E '^Slice:' || true)"
+          if [ -z "$slice_lines" ]; then
+            echo "No Slice trailers found in recent commits (no-slice run)."
+            exit 0
+          fi
+
+          invalid_lines="$(printf '%s\n' "$slice_lines" | grep -Ev '^Slice: [a-z0-9][a-z0-9_-]*$' || true)"
+          if [ -n "$invalid_lines" ]; then
+            echo "Missing Slice trailer on slice-closing commits."
+            echo "Use trailer format: Slice: <slug>"
+            echo "$invalid_lines"
+            exit 1
+          fi
+
+          counts="$(printf '%s\n' "$slice_lines" | awk -F': ' '{print $2}' | sort | uniq -c)"
+          echo "$counts"
+          printf '%s\n' "$counts" | awk '{if ($1 < 1) exit 1}'
+
+      - name: Clean handoff tree
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Dirty working tree at handoff"
+            git status --short
+            exit 1
+          fi

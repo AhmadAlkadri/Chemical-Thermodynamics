@@ -1,0 +1,538 @@
+"""Phase addition and removal in `flash_tp` (ADR-0011, validation Case V-3).
+
+This module covers the *mechanism*: the `FlashSettings.max_phases` contract,
+the add-then-remove route that resolves the refusal window of Case R-3, the
+result contract for a three-phase answer, and the regression that none of it
+reaches the paths it was not wired to.
+
+The tie-triangle itself, with its independent Newton solve and its Gibbs
+ordering, is validation Cases V-1 and V-2 in
+`tests/validation/test_vlle_water_propanol_butanol.py`, and the verdict map over
+a grid of feeds is Case V-5 in `tests/validation/test_vlle_verdict_map.py`. The
+ternary feed that Case V-2 recorded as a *miss* until ADR-0012 is pinned here,
+with the answer it has now.
+
+System for the refusal window
+-----------------------------
+n-Butanol(1) / Water(2) at P = 101325 Pa, `flash_mode="modified-raoult"`, NRTL
+pair 2-3 of Table 1 of Tessier, Brennecke and Stadtherr, Chem. Eng. Sci. 55
+(2000) 1785-1796 (tau_12 = 0.90047, tau_21 = 3.51307, alpha = 0.48 implied by
+the printed `G`), Antoine from the packaged databank. The three-phase
+temperature of this model is T3 = 366.213774 K (Case R-3), and the binodal is
+temperature independent here because the fitted tau are, so the two-liquid
+answer below T3 is the *same* tie-line at every temperature:
+x1 = 0.019998419467 / 0.359999661508.
+
+Why the window needs *removal*
+------------------------------
+Just below T3 the deepest tangent-plane minimum from the feed is a vapor, so
+the first two-phase iterate is a vapor-liquid pair that is not the equilibrium.
+Adding the second liquid the post-split test finds gives a three-phase set, and
+a binary cannot have three phases at any temperature other than T3 (Gibbs'
+phase rule: F = 2 - 3 + 2 = 1), so the three-phase Rachford-Rice has no finite
+solution and the vapor's amount runs negative. Removing it leaves the two
+liquids. The history is `"V -> LV -> LLV -> LL"`.
+"""
+
+from __future__ import annotations
+
+from typing import Sequence
+
+import numpy as np
+import pytest
+
+import chemthermo as ct
+
+PRESSURE_PA = 101325.0
+
+NAMES = ("n-Butanol", "Water")
+TAU_12 = 0.90047
+TAU_21 = 3.51307
+ALPHA = 0.48
+FEED = (0.20, 0.80)
+
+#: Three-phase temperature of this model, from validation Case R-3.
+T3_K = 366.213774
+#: Temperature-independent binodal of this NRTL pair (Cases L-3, R-1, R-3).
+BINODAL_X1 = (0.019998419467, 0.359999661508)
+
+# Mirrors the phi-phi grid of tests/test_flash_phase_detection.py, kept in
+# sync by hand so this module stays self-contained.
+GRID_MIXTURES: tuple[tuple[tuple[str, ...], tuple[float, ...]], ...] = (
+    (("Methane", "Ethane"), (0.5, 0.5)),
+    (("Methane", "Propane"), (0.7, 0.3)),
+    (("Ethane", "n-Heptane"), (0.7, 0.3)),
+    (("Methane", "n-Pentane"), (0.6, 0.4)),
+    (("Methane", "Ethane", "Propane"), (0.5, 0.3, 0.2)),
+    (("Propane", "n-Butane", "n-Pentane"), (0.4, 0.3, 0.3)),
+)
+GRID_T_K = (170.0, 200.0, 240.0, 280.0, 320.0, 360.0)
+GRID_P_PA = (2.0e5, 1.0e6, 3.0e6, 8.0e6)
+
+
+@pytest.fixture(scope="module")
+def butanol_water() -> ct.NRTL:
+    return ct.NRTL(
+        parameters=ct.NRTLParameters.from_pairs(
+            [(NAMES[0], NAMES[1], TAU_12, TAU_21, ALPHA, ALPHA)]
+        )
+    )
+
+
+def _flash(
+    model: ct.NRTL,
+    temperature_K: float,
+    z: Sequence[float] = FEED,
+    settings: ct.FlashSettings | None = None,
+) -> ct.FlashResult:
+    return ct.flash_tp(
+        ct.Mixture.from_database(list(NAMES), list(z), normalize=True),
+        temperature_K=temperature_K,
+        pressure_Pa=PRESSURE_PA,
+        activity_model=model,
+        flash_mode="modified-raoult",
+        settings=settings,
+    )
+
+
+def _ln_gamma(model: ct.NRTL):
+    mixture = ct.Mixture.from_database(list(NAMES), [0.5, 0.5], normalize=True)
+
+    def ln_gamma(x: np.ndarray) -> np.ndarray:
+        values = np.asarray(x, dtype=float)
+        values = values / float(np.sum(values))
+        return np.log(
+            np.array(
+                model.activity_coefficients(
+                    mixture=mixture,
+                    temperature_K=298.15,
+                    composition=[float(value) for value in values],
+                ),
+                dtype=float,
+            )
+        )
+
+    return ln_gamma
+
+
+def _psat(temperature_K: float) -> np.ndarray:
+    values = []
+    for name in NAMES:
+        antoine = ct.Component.from_database(name).antoine
+        assert antoine is not None, name
+        values.append(np.exp(antoine.A - antoine.B / (temperature_K + antoine.C)) * 1.0e5)
+    return np.array(values, dtype=float)
+
+
+# --------------------------------------------------------------------------
+# FlashSettings.max_phases
+# --------------------------------------------------------------------------
+
+
+def test_max_phases_defaults_to_three_and_is_validated() -> None:
+    assert ct.FlashSettings().max_phases == 3
+    assert ct.FlashSettings(max_phases=5).max_phases == 5
+    for invalid in (0, -1):
+        with pytest.raises(ct.InputRangeError, match="max_phases"):
+            ct.FlashSettings(max_phases=invalid)
+
+
+def test_max_phases_two_reproduces_the_pre_adr_0011_refusal(butanol_water) -> None:
+    """The documented behavior of Case R-3 is still reachable, unchanged."""
+    with pytest.raises(ct.ConvergenceError, match="third phase is required"):
+        _flash(butanol_water, T3_K - 0.05, settings=ct.FlashSettings(max_phases=2))
+    # max_phases=1 cannot un-split a feed the stability test proved unstable,
+    # so it behaves exactly like max_phases=2 here.
+    with pytest.raises(ct.ConvergenceError, match="third phase is required"):
+        _flash(butanol_water, T3_K - 0.05, settings=ct.FlashSettings(max_phases=1))
+
+
+def test_post_split_stability_false_still_returns_the_two_phase_pair(butanol_water) -> None:
+    """The escape hatch is not overridden by the search.
+
+    ``post_split_stability=False`` means "do not police the phase set", so it
+    returns the converged two-phase answer with the failure in diagnostics and
+    never enters the addition/removal loop. This is what Case R-3 inspects.
+    """
+    result = _flash(
+        butanol_water, T3_K - 0.05, settings=ct.FlashSettings(post_split_stability=False)
+    )
+    assert sorted(result.phase_names()) == ["liquid", "vapor"]
+    assert result.diagnostics["post_split_status"] == "unstable"
+    assert "phase_set_history" not in result.diagnostics
+
+
+# --------------------------------------------------------------------------
+# Case V-3: the refusal window is resolved by removal
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("offset_K", (-0.05, -0.10))
+def test_below_t3_the_window_resolves_to_the_two_liquids(butanol_water, offset_K: float) -> None:
+    """Case V-3. Achieved: tie-line to 3.3e-13 of the independent binodal.
+
+    Phase fractions 0.470585520652 / 0.529414479348 at both temperatures, equal
+    to the lever rule exactly (difference 0.0) - the tie-line of this model is
+    temperature independent, so the lever rule gives the same answer at each.
+    """
+    result = _flash(butanol_water, T3_K + offset_K)
+
+    assert sorted(result.phase_names()) == ["liquid1", "liquid2"]
+    assert result.diagnostics["phase_regime"] == "LLE"
+    assert result.diagnostics["phase_count"] == 2
+    assert result.vapor_fraction is None
+    assert result.diagnostics["phase_set_history"] == "V -> LV -> LLV -> LL"
+    assert result.diagnostics["phases_added"] == 1
+    assert result.diagnostics["phases_removed"] == 1
+
+    tie_line = sorted(
+        float(result.phases[name].composition.fractions[0]) for name in result.phase_names()
+    )
+    assert tie_line[0] == pytest.approx(BINODAL_X1[0], abs=1e-8)
+    assert tie_line[1] == pytest.approx(BINODAL_X1[1], abs=1e-8)
+
+    lever = (FEED[0] - tie_line[0]) / (tie_line[1] - tie_line[0])
+    heavier = max(result.phase_names(), key=lambda n: result.phases[n].composition.fractions[0])
+    assert result.phase_fractions[heavier] == pytest.approx(lever, abs=1e-10)
+
+    assert float(result.diagnostics["equilibrium_residual"]) < 1e-10
+    assert float(result.diagnostics["mass_balance_residual"]) < 1e-12
+    assert float(result.diagnostics["delta_g_split_rt"]) < 0.0
+    assert result.diagnostics["post_split_stable"] is True
+
+
+def test_just_above_t3_the_answer_is_a_vapor_liquid_pair(butanol_water) -> None:
+    """Case V-3, the control on the other side of T3.
+
+    Case R-3 recorded a *single vapor* two kelvin above T3; 0.05 K above it the
+    feed is still between its bubble and dew points, so the model gives a
+    vapor-liquid pair. That is checked independently here against modified
+    Raoult's law and against the liquid being exactly at its bubble point, both
+    written out in this module.
+    """
+    result = _flash(butanol_water, T3_K + 0.05)
+
+    assert sorted(result.phase_names()) == ["liquid", "vapor"]
+    assert result.diagnostics["phase_regime"] == "VLE"
+    assert "phase_set_history" not in result.diagnostics
+    assert result.diagnostics["post_split_stable"] is True
+
+    ln_gamma = _ln_gamma(butanol_water)
+    psat = _psat(T3_K + 0.05)
+    x = np.array(result.phases["liquid"].composition.fractions)
+    y = np.array(result.phases["vapor"].composition.fractions)
+
+    bubble = float(np.sum(x * np.exp(ln_gamma(x)) * psat / PRESSURE_PA))
+    assert bubble == pytest.approx(1.0, abs=1e-10)
+    raoult = np.max(np.abs(y * PRESSURE_PA - x * np.exp(ln_gamma(x)) * psat)) / PRESSURE_PA
+    assert raoult < 1e-10, raoult
+
+    # And the single liquid is inside the miscibility gap no longer: it is
+    # stable against a second liquid.
+    liquid = ct.Mixture.from_database(list(NAMES), list(x), normalize=True)
+    assert (
+        ct.stability_tp(
+            liquid,
+            temperature_K=T3_K + 0.05,
+            pressure_Pa=PRESSURE_PA,
+            activity_model=butanol_water,
+        ).status
+        == "stable"
+    )
+
+
+def test_the_window_answer_is_the_same_as_a_direct_liquid_liquid_flash(butanol_water) -> None:
+    """The route does not change the answer.
+
+    Below T3 the two-liquid state is also reachable without any vapor at all,
+    by the `gamma-gamma` path. The tie-line the addition/removal search returns
+    must be that tie-line, not merely something near it: achieved worst
+    composition deviation 1.8e-12, against the two routes' own convergence
+    tolerances.
+    """
+    through_the_window = _flash(butanol_water, T3_K - 0.05)
+    direct = ct.flash_tp(
+        ct.Mixture.from_database(list(NAMES), list(FEED), normalize=True),
+        temperature_K=T3_K - 0.05,
+        pressure_Pa=PRESSURE_PA,
+        activity_model=butanol_water,
+    )
+
+    assert sorted(direct.phase_names()) == ["liquid1", "liquid2"]
+    windowed = sorted(
+        tuple(through_the_window.phases[name].composition.fractions)
+        for name in through_the_window.phase_names()
+    )
+    reference = sorted(
+        tuple(direct.phases[name].composition.fractions) for name in direct.phase_names()
+    )
+    assert np.allclose(np.array(windowed), np.array(reference), rtol=0.0, atol=1e-9)
+
+
+def test_the_window_result_is_deterministic_and_permutation_invariant(butanol_water) -> None:
+    temperature_K = T3_K - 0.05
+    base = _flash(butanol_water, temperature_K)
+    assert dict(_flash(butanol_water, temperature_K).diagnostics) == dict(base.diagnostics)
+
+    swapped_model = ct.NRTL(
+        parameters=ct.NRTLParameters.from_pairs(
+            [(NAMES[0], NAMES[1], TAU_12, TAU_21, ALPHA, ALPHA)]
+        )
+    )
+    swapped = ct.flash_tp(
+        ct.Mixture.from_database([NAMES[1], NAMES[0]], [FEED[1], FEED[0]], normalize=True),
+        temperature_K=temperature_K,
+        pressure_Pa=PRESSURE_PA,
+        activity_model=swapped_model,
+        flash_mode="modified-raoult",
+    )
+    assert sorted(swapped.phase_names()) == ["liquid1", "liquid2"]
+    restored = sorted(
+        tuple(reversed(swapped.phases[name].composition.fractions))
+        for name in swapped.phase_names()
+    )
+    reference = sorted(
+        tuple(base.phases[name].composition.fractions) for name in base.phase_names()
+    )
+    assert np.allclose(np.array(restored), np.array(reference), rtol=0.0, atol=1e-9)
+    assert swapped.diagnostics["phase_set_history"] == base.diagnostics["phase_set_history"]
+
+
+# --------------------------------------------------------------------------
+# Case V-2 amended: the near-plait ternary feed at 363 K (ADR-0012)
+# --------------------------------------------------------------------------
+
+
+def test_the_near_plait_ternary_feed_at_363_k_is_a_three_phase_state(
+    tessier2000_names, tessier2000_model
+) -> None:
+    """The pinned miss of validation Case V-2, now the right answer.
+
+    At 363 K the 1-propanol / n-butanol / water tie-triangle is thin - the two
+    liquid vertices differ by 0.053 in `x_1` - and a feed weighted 0.5 / 0.3 /
+    0.2 towards its vertices used to come back a **single liquid**, because
+    every stability trial collapsed onto the trivial solution. The tangent-plane
+    distance at the equilibrium vapor is -9.92e-03, so the feed was provably
+    unstable and the test simply never reached that stationary point: from the
+    Raoult-vapor start the liquid candidate is the lower-Gibbs one at the
+    intermediate compositions, and re-selecting it at every iteration dragged
+    the iterate onto the liquid surface.
+
+    ADR-0012 pins each modified-Raoult trial to one candidate surface. The
+    vapor-surface trial then converges in a single substitution, because the
+    ideal-gas term is zero and equation (8) reduces to `ln W_i = d_i`.
+
+    The vertices below are the tie-triangle of validation Case V-1, pinned here
+    rather than solved; they are derived independently in
+    `tests/validation/test_vlle_water_propanol_butanol.py` and the verdict map
+    around them is Case V-5 in `tests/validation/test_vlle_verdict_map.py`.
+    """
+    x_i = np.array([0.10282779, 0.03539032, 0.86178189])
+    x_ii = np.array([0.15630287, 0.06422717, 0.77946996])
+    y = np.array([0.28312929, 0.06046985, 0.65640086])
+    weights = np.array([0.5, 0.3, 0.2])
+    vertices = np.column_stack([x_i, x_ii, y])
+    z = vertices @ weights
+    z = z / float(np.sum(z))
+    assert np.allclose(z, [0.15493061, 0.04905728, 0.7960121], rtol=0.0, atol=1e-8)
+
+    mixture = ct.Mixture.from_database(
+        tessier2000_names, [float(value) for value in z], normalize=True
+    )
+    stability = ct.stability_tp(
+        mixture,
+        temperature_K=363.0,
+        pressure_Pa=PRESSURE_PA,
+        activity_model=tessier2000_model,
+        vapor="ideal",
+    )
+    assert stability.status == "unstable"
+    assert stability.feed_branch == "liquid"
+    assert stability.phase_branch == "vapor"
+    assert stability.tpd_min == pytest.approx(-0.011680295426, abs=1e-6)
+    assert stability.diagnostics["minimizing_trial"] == "raoult-vapor"
+    assert stability.diagnostics["minimizing_trial_surface"] == "vapor"
+    # Equation (7) still holds at the stationary point of the pinned surface.
+    assert float(stability.diagnostics["tpd_from_sum_W"]) == pytest.approx(
+        stability.tpd_min, abs=1e-12
+    )
+
+    result = ct.flash_tp(
+        mixture,
+        temperature_K=363.0,
+        pressure_Pa=PRESSURE_PA,
+        activity_model=tessier2000_model,
+        flash_mode="modified-raoult",
+    )
+    assert sorted(result.phase_names()) == ["liquid1", "liquid2", "vapor"]
+    assert result.diagnostics["phase_regime"] == "VLLE"
+    assert result.diagnostics["post_split_stable"] is True
+    balance = np.zeros(3)
+    for name, reference, weight in (
+        ("liquid1", x_i, weights[0]),
+        ("liquid2", x_ii, weights[1]),
+        ("vapor", y, weights[2]),
+    ):
+        composition = np.array(result.phases[name].composition.fractions, dtype=float)
+        assert np.allclose(composition, reference, rtol=0.0, atol=1e-8), name
+        # The vertices pinned above are rounded to eight digits, so `z` sits a
+        # few 1e-9 off the model's exact triangle and the lever rule amplifies
+        # that into the phase fractions: measured 5.7e-08 on liquid1. The
+        # fractions are therefore pinned at 1e-6 here and at 1e-8 in
+        # `tests/validation/test_vlle_water_propanol_butanol.py`, where the
+        # triangle is solved rather than rounded.
+        assert result.phase_fractions[name] == pytest.approx(float(weight), abs=1e-6), name
+        balance = balance + result.phase_fractions[name] * composition
+    # The mass balance is exact whatever the rounding of the reference.
+    assert float(np.max(np.abs(balance - z))) < 1e-12
+    assert float(result.diagnostics["mass_balance_residual"]) < 1e-12
+
+
+# --------------------------------------------------------------------------
+# The result contract
+# --------------------------------------------------------------------------
+
+
+def test_a_three_phase_result_satisfies_the_flash_result_invariants(
+    tessier2000_names, tessier2000_model
+) -> None:
+    """Case V-1 invariants at the API level, for the ternary tie-triangle."""
+    result = ct.flash_tp(
+        ct.Mixture.from_database(
+            tessier2000_names, [0.13418838, 0.08427618, 0.78153544], normalize=True
+        ),
+        temperature_K=364.0,
+        pressure_Pa=PRESSURE_PA,
+        activity_model=tessier2000_model,
+        flash_mode="modified-raoult",
+    )
+
+    assert sorted(result.phase_names()) == ["liquid1", "liquid2", "vapor"]
+    assert set(result.phase_fractions) == set(result.phases)
+    total = sum(result.phase_fractions.values())
+    assert total == pytest.approx(1.0, abs=1e-15)
+    assert all(0.0 <= value <= 1.0 for value in result.phase_fractions.values())
+    assert result.vapor_fraction == result.phase_fractions["vapor"]
+    for name, phase in result.phases.items():
+        assert phase.name == name
+        assert sum(phase.composition.fractions) == pytest.approx(1.0, abs=1e-12)
+
+    diagnostics = result.diagnostics
+    for key in (
+        "phase_count",
+        "phase_regime",
+        "phase_state",
+        "phase_set_history",
+        "phases_added",
+        "phases_removed",
+        "post_split_stable",
+        "post_split_status",
+        "post_split_tpd_min",
+        "equilibrium_residual",
+        "mass_balance_residual",
+        "delta_g_split_rt",
+        "delta_g_vs_two_phase_rt",
+        "ssi_iterations",
+        "second_order_iterations",
+        "rachford_rice_iterations",
+        "converged_stage",
+    ):
+        assert key in diagnostics, key
+    for name in result.phase_names():
+        assert f"phase_stability_{name}" in diagnostics
+        assert f"phase_stability_tpd_min_{name}" in diagnostics
+    assert diagnostics["flash_mode"] == "modified-raoult"
+    assert diagnostics["phase_detection"] == "tangent-plane"
+
+
+# --------------------------------------------------------------------------
+# Regression: nothing else moved
+# --------------------------------------------------------------------------
+
+
+def test_the_phi_phi_grid_never_reaches_a_third_phase() -> None:
+    """Requirement of ADR-0011: `max_phases = 3` changes no phi-phi state.
+
+    No state on the in-repo Peng-Robinson grid needs a third phase (Case L-4),
+    so none of them enters the search: `phase_set_history` is absent from every
+    one and no state has more than two phases. The stronger statement - that
+    every number is bit-identical - is
+    `tests/test_flash_refactor_bit_identity.py`, whose fixture predates this
+    slice and is unchanged by it.
+    """
+    eos = ct.PengRobinsonEOS()
+    counts: dict[int, int] = {}
+    for names, z in GRID_MIXTURES:
+        for temperature_K in GRID_T_K:
+            for pressure_Pa in GRID_P_PA:
+                result = ct.flash_tp(
+                    ct.Mixture.from_database(list(names), list(z), normalize=True),
+                    temperature_K=temperature_K,
+                    pressure_Pa=pressure_Pa,
+                    eos=eos,
+                )
+                count = int(result.diagnostics["phase_count"])
+                counts[count] = counts.get(count, 0) + 1
+                assert count <= 2, (names, temperature_K, pressure_Pa, count)
+                assert "phase_set_history" not in result.diagnostics
+                assert "phases_added" not in result.diagnostics
+    assert sum(counts.values()) == 144
+    assert counts == {1: 97, 2: 47}, counts
+
+
+def test_gamma_gamma_still_stops_at_two_phases_whatever_max_phases_says(
+    butanol_water,
+) -> None:
+    """ADR-0020 wires the search to phi-phi; `gamma-gamma` is still two-phase.
+
+    No in-repo activity-only state needs a third liquid (Case L-4), so wiring
+    the loop there would ship a path nothing exercises. The failure below is
+    manufactured by loosening the split tolerance, exactly as in
+    `tests/test_flash_lle.py::test_post_split_failure_raises_and_post_split_stability_false_returns`;
+    what this test pins is that `max_phases` does not change it.
+    """
+    gamma_gamma = ct.Mixture.from_database(list(NAMES), list(FEED), normalize=True)
+    with pytest.raises(ct.ConvergenceError, match="not a stable phase set"):
+        ct.flash_tp(
+            gamma_gamma,
+            temperature_K=298.15,
+            pressure_Pa=PRESSURE_PA,
+            activity_model=butanol_water,
+            settings=ct.FlashSettings(tol=1e-3, second_order=False, max_phases=4),
+        )
+
+
+def test_a_manufactured_phi_phi_instability_is_resolved_by_removal() -> None:
+    """The phi-phi path now enters the search, and removal is what ends it.
+
+    Ethane / n-Heptane at 360 K and 1 MPa with a deliberately loose `tol`
+    converges a two-phase split whose phases do not pass their own stability
+    test - the same manufactured failure the pre-ADR-0020 version of this test
+    used to pin the refusal. With `max_phases = 2` the documented refusal is
+    unchanged; with the default 3 the search adds the incipient phase, the
+    multiphase Rachford-Rice drives it back out, and the answer is the same two
+    phases, reached through `V -> LV -> LLV -> LV`.
+    """
+    phi_phi = ct.Mixture.from_database(["Ethane", "n-Heptane"], [0.7, 0.3], normalize=True)
+    with pytest.raises(ct.ConvergenceError, match="not a stable phase set"):
+        ct.flash_tp(
+            phi_phi,
+            temperature_K=360.0,
+            pressure_Pa=1.0e6,
+            eos=ct.PengRobinsonEOS(),
+            settings=ct.FlashSettings(tol=1e-3, max_phases=2),
+        )
+
+    resolved = ct.flash_tp(
+        phi_phi,
+        temperature_K=360.0,
+        pressure_Pa=1.0e6,
+        eos=ct.PengRobinsonEOS(),
+        settings=ct.FlashSettings(tol=1e-3, max_phases=3),
+    )
+    assert sorted(resolved.phases) == ["liquid", "vapor"]
+    assert resolved.diagnostics["phase_count"] == 2
+    assert resolved.diagnostics["phase_set_history"] == "V -> LV -> LLV -> LV"
+    assert resolved.diagnostics["phases_added"] == 1
+    assert resolved.diagnostics["phases_removed"] == 1
+    assert resolved.diagnostics["post_split_status"] == "stable"

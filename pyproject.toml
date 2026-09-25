@@ -1,23 +1,59 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "chemthermo"
-version = "0.0.0"
-description = "Chemical engineering thermodynamics utilities."
+version = "0.4.0"
+description = "Phase equilibrium for chemical engineering: tangent-plane stability, multiphase TP flash, Peng-Robinson, PC-SAFT and NRTL."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Ahmad Alkadri" }]
+keywords = [
+  "thermodynamics",
+  "phase equilibrium",
+  "flash",
+  "stability",
+  "PC-SAFT",
+  "Peng-Robinson",
+  "NRTL",
+  "chemical engineering",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Science/Research",
+  "Intended Audience :: Education",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering :: Chemistry",
+  "Topic :: Scientific/Engineering :: Physics",
+  "Typing :: Typed",
+]
 dependencies = [
   "numpy>=1.24",
   "pydantic>=2.0",
-  "bibtexparser>=1.4.0",
+  "bibtexparser>=1.4.0,<2",
 ]
+
+[project.urls]
+Homepage = "https://github.com/AhmadAlkadri/Chemical-Thermodynamics"
+Documentation = "https://github.com/AhmadAlkadri/Chemical-Thermodynamics/tree/main/docs"
+Changelog = "https://github.com/AhmadAlkadri/Chemical-Thermodynamics/blob/main/CHANGELOG.md"
+Issues = "https://github.com/AhmadAlkadri/Chemical-Thermodynamics/issues"
+
+[project.scripts]
+chemthermo = "chemthermo.cli:main"
 
 [project.optional-dependencies]
 dev = [
   "build>=1.2.2",
+  "twine>=5",
   "nbstripout>=0.7.1",
   "pytest>=7.4",
   "ruff==0.14.13",
@@ -25,7 +61,23 @@ dev = [
 ]
 validation = [
   "thermo>=0.6.0",
+  "teqp>=0.23",
+  # FeOs is the reference for the PC-SAFT **association** term (ADR-0018):
+  # teqp's PCSAFT kind does not implement association. It pulls in its own
+  # units package, whose PyPI name is `si-units` and whose import name is
+  # `si_units`; it is not listed separately because feos depends on it.
+  "feos>=0.10",
 ]
+
+[tool.pytest.ini_options]
+markers = [
+  "slow: a full validation grid whose representative subset runs by default (e.g. the 188-state PC-SAFT grid of Case F-4), or a repetition of a capability the default run already covers (ADR-0020); deselected by default (see addopts below), opt in with `pytest -q -m slow`. Never the only test of a capability - see `.agents/dev-contract.md`",
+]
+# Deselected, not skipped, by default: `-m slow` on the command line overrides
+# this addopts entry (pytest keeps the last `-m` value), so `pytest -q -m slow`
+# runs exactly the slow-marked tests and nothing else. See
+# `.agents/dev-contract.md` for the full-grid command and CI's choice.
+addopts = "-m 'not slow'"
 
 [tool.setuptools]
 package-dir = { "" = "src" }
@@ -34,8 +86,9 @@ package-dir = { "" = "src" }
 where = ["src"]
 
 [tool.setuptools.package-data]
+"chemthermo" = ["py.typed"]
 "chemthermo.data" = ["components.json", "references.bib"]
-"chemthermo.parameters" = ["data/activity/nrtl.json"]
+"chemthermo.parameters" = ["data/activity/nrtl.json", "data/eos/pcsaft.json"]
 
 [tool.ruff]
 target-version = "py311"

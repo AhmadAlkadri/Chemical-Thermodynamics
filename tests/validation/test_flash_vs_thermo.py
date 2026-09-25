@@ -106,6 +106,15 @@ def test_flash_pr_mixture_vs_thermo() -> None:
 
 
 def test_nrtl_activity_coefficients_vs_thermo() -> None:
+    """Packaged (synthetic, symmetric-alpha) binary against `thermo`.
+
+    Both sides evaluate the same closed-form Renon-Prausnitz equation, so the
+    tolerance is round-off, not "physically reasonable". This case is kept for
+    continuity but is deliberately weak evidence: with a symmetric alpha the
+    row-sum bug fixed in the `nrtl-gibbs-duhem-fix` slice moved ln gamma here by
+    only ~1.1e-3, which the previous 2e-3 tolerance could not see. The sharp
+    check is the asymmetric one below.
+    """
     names = ["Methane", "Ethane"]
     zs = [0.50, 0.50]
     temperature_K = 240.0
@@ -122,5 +131,27 @@ def test_nrtl_activity_coefficients_vs_thermo() -> None:
     tau, alpha = params.for_components(names)
     ref_gammas = NRTL_gammas(xs=list(mixture.fractions), taus=tau, alphas=alpha)
 
-    # Different NRTL implementations may vary slightly; keep a tight but realistic tolerance.
-    assert np.allclose(gammas, ref_gammas, rtol=2e-3, atol=2e-3)
+    assert np.allclose(gammas, ref_gammas, rtol=1e-12, atol=1e-12)
+
+
+def test_nrtl_activity_coefficients_vs_thermo_asymmetric(
+    tessier2000_ln_gamma: Any, tessier2000_payload: dict[str, Any]
+) -> None:
+    """Asymmetric published parameters against `thermo`, at round-off.
+
+    Tessier (2000) Problem 1: tau_12 = -0.61259 vs tau_21 = 0.71640, and
+    alpha_23 = 0.48 vs alpha_12 = alpha_13 = 0.3. See
+    `tests/validation/test_nrtl_tessier2000.py` for the full cross-check;
+    this keeps a tight asymmetric case next to the weak packaged-binary one.
+    """
+    tau = np.asarray(tessier2000_payload["tau"], dtype=float)
+    alpha = np.asarray(tessier2000_payload["alpha"], dtype=float)
+
+    worst = 0.0
+    for composition in ((0.12, 0.08, 0.80), (0.50, 0.30, 0.20), (0.20, 0.20, 0.60)):
+        x = np.asarray(composition, dtype=float)
+        reference = np.log(np.asarray(NRTL_gammas(xs=x.tolist(), taus=tau, alphas=alpha)))
+        worst = max(worst, float(np.max(np.abs(tessier2000_ln_gamma(x) - reference))))
+
+    # Achieved: 8.9e-16.
+    assert worst < 1e-9

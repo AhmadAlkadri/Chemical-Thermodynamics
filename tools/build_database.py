@@ -1,15 +1,19 @@
-"""Build the runtime JSON component database from raw text sources."""
+"""Build the canonical packaged component database from raw text sources."""
 
 from __future__ import annotations
 
 import argparse
 import json
+import sys
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Iterable
 
 PA_PER_BAR = 1e5
 G_PER_KG = 1000.0
 SCHEMA_VERSION = 1
+
+CANONICAL_RUNTIME_DB_PATH = Path("src/chemthermo/data/components.json")
+DEFAULT_MIRROR_PATH = Path("database/components.mirror.json")
 
 
 def normalize_name(name: str) -> str:
@@ -17,13 +21,9 @@ def normalize_name(name: str) -> str:
 
 
 def parse_fixed_tail(path: Path) -> list[dict[str, object]]:
-    """Parse a whitespace-delimited file with two text columns then numeric columns.
+    """Parse a whitespace-delimited file with two text columns then numeric columns."""
 
-    The first line provides column headers. The first two columns are treated as
-    strings (Formula, Name), and the trailing columns are parsed as floats.
-    """
-
-    lines = path.read_text().splitlines()
+    lines = path.read_text(encoding="utf-8").splitlines()
     if not lines:
         raise ValueError(f"{path} is empty.")
 
@@ -56,9 +56,20 @@ def parse_fixed_tail(path: Path) -> list[dict[str, object]]:
     return rows
 
 
+def _parameter(value: float, units: str, source_key: str) -> dict[str, Any]:
+    return {
+        "value": value,
+        "units": units,
+        "source_key": source_key,
+        "uncertainty": None,
+        "method": None,
+    }
+
+
 def build_records(
     rows: Iterable[dict[str, object]],
     *,
+    source_key: str,
     name_filter: set[str] | None = None,
 ) -> list[dict[str, object]]:
     records: dict[str, dict[str, object]] = {}
@@ -75,21 +86,22 @@ def build_records(
         pc_pa = float(row["Pc[bar]"]) * PA_PER_BAR
         omega = float(row["omega"])
 
-        record = {
+        record: dict[str, object] = {
             "name": name,
             "formula": str(row["Formula"]),
-            "properties": {
-                "MW_kg_per_mol": mw_kg_per_mol,
-                "Tc_K": tc_k,
-                "Pc_Pa": pc_pa,
-                "omega": omega,
-            },
+            "CAS": None,
+            "MW": _parameter(mw_kg_per_mol, "kg/mol", source_key),
+            "Tc": _parameter(tc_k, "K", source_key),
+            "Pc": _parameter(pc_pa, "Pa", source_key),
+            "omega": _parameter(omega, "-", source_key),
             "antoine": {
                 "A": float(row["A"]),
                 "B": float(row["B"]),
                 "C": float(row["C"]),
                 "Tmin_K": float(row["Tmin"]),
                 "Tmax_K": float(row["Tmax"]),
+                "units": "bar",
+                "source_key": source_key,
             },
         }
         records[canonical] = record
@@ -97,34 +109,50 @@ def build_records(
     return [records[key] for key in sorted(records)]
 
 
-def build_database(
+def build_payload(
     data_dir: Path,
-    output_path: Path,
     *,
+    source_key: str,
     names: Iterable[str] | None = None,
-) -> Path:
+) -> dict[str, object]:
     organics = parse_fixed_tail(data_dir / "organics.txt")
     inorganics = parse_fixed_tail(data_dir / "inorganics.txt")
 
     name_filter = {normalize_name(name) for name in names} if names else None
-    records = build_records([*organics, *inorganics], name_filter=name_filter)
+    records = build_records([*organics, *inorganics], source_key=source_key, name_filter=name_filter)
 
-    payload = {
+    return {
         "schema_version": SCHEMA_VERSION,
         "components": records,
     }
 
+
+def write_payload(payload: dict[str, object], output_path: Path) -> Path:
     output_path = output_path.expanduser().resolve()
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with output_path.open("w", encoding="utf-8") as handle:
         json.dump(payload, handle, indent=2, sort_keys=True, ensure_ascii=True)
         handle.write("\n")
-
     return output_path
 
 
+def check_canonical_sync(payload: dict[str, object], canonical_path: Path) -> bool:
+    canonical_path = canonical_path.expanduser().resolve()
+    if not canonical_path.exists():
+        raise FileNotFoundError(f"Canonical runtime database file not found: {canonical_path}")
+
+    current_payload = json.loads(canonical_path.read_text(encoding="utf-8"))
+    return payload == current_payload
+
+
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Build components.json from raw text sources.")
+    parser = argparse.ArgumentParser(
+        description=(
+            "Build the canonical packaged runtime database at "
+            "src/chemthermo/data/components.json from database/organics.txt and "
+            "database/inorganics.txt."
+        )
+    )
     parser.add_argument(
         "--data-dir",
         type=Path,
@@ -134,8 +162,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("src/chemthermo/data/components.json"),
-        help="Output JSON path.",
+        default=CANONICAL_RUNTIME_DB_PATH,
+        help="Output JSON path when writing payload (default: canonical runtime path).",
+    )
+    parser.add_argument(
+        "--source-key",
+        default="koretsky2012engineering",
+        help="BibTeX source key used for generated parameter provenance.",
     )
     parser.add_argument(
         "--names",
@@ -143,13 +176,56 @@ def parse_args() -> argparse.Namespace:
         default=None,
         help="Optional component names to include (case-insensitive).",
     )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help=(
+            "Validate generated payload against canonical runtime path "
+            "src/chemthermo/data/components.json without writing files."
+        ),
+    )
+    parser.add_argument(
+        "--write-mirror",
+        action="store_true",
+        help=(
+            "Also write a non-runtime mirror file to database/components.mirror.json "
+            "(or --mirror-output)."
+        ),
+    )
+    parser.add_argument(
+        "--mirror-output",
+        type=Path,
+        default=DEFAULT_MIRROR_PATH,
+        help="Mirror output path used only with --write-mirror.",
+    )
     return parser.parse_args()
 
 
-def main() -> None:
+def main() -> int:
     args = parse_args()
-    build_database(args.data_dir, args.output, names=args.names)
+    payload = build_payload(args.data_dir, source_key=args.source_key, names=args.names)
+
+    if args.check:
+        if check_canonical_sync(payload, CANONICAL_RUNTIME_DB_PATH):
+            print(f"Canonical runtime database is up to date: {CANONICAL_RUNTIME_DB_PATH}")
+            return 0
+
+        print(
+            "Canonical runtime database is out of sync. "
+            "Regenerate and write src/chemthermo/data/components.json.",
+            file=sys.stderr,
+        )
+        return 1
+
+    written = write_payload(payload, args.output)
+    print(f"Wrote canonical payload to {written}")
+
+    if args.write_mirror:
+        mirror_written = write_payload(payload, args.mirror_output)
+        print(f"Wrote non-runtime mirror payload to {mirror_written}")
+
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

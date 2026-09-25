@@ -1,0 +1,88 @@
+{
+  "cli_schema_version": 1,
+  "command": "tp-flash",
+  "diagnostics": {
+    "converged": true,
+    "delta_g_split_rt": -0.10308174629879852,
+    "feed_branch": "liquid",
+    "flash_mode": "phi-phi",
+    "fugacity_residual": 6.913299932520545e-10,
+    "incipient_phase": "vapor",
+    "iterations": 12,
+    "k_max": 3.0325566708205094,
+    "k_min": 0.11340778307803721,
+    "k_seed": "stability",
+    "mass_balance_residual": 9.869882688917642e-14,
+    "max_delta_k": 2.0941874900870516e-09,
+    "phase_count": 2,
+    "phase_detection": "tangent-plane",
+    "phase_regime": "VLE",
+    "phase_stability_liquid": "stable",
+    "phase_stability_vapor": "stable",
+    "phase_state": "two_phase",
+    "post_split_checked": true,
+    "post_split_stable": true,
+    "post_split_status": "stable",
+    "stability_status": "unstable",
+    "stability_trials": 5,
+    "termination_reason": "tolerance_met",
+    "tpd_min": -0.34927702066775673
+  },
+  "inputs": {
+    "components": [
+      "Methane",
+      "Ethane",
+      "Propane"
+    ],
+    "normalize": false,
+    "pressure_Pa": 3000000.0,
+    "temperature_K": 240.0,
+    "z_mole": [
+      0.5,
+      0.3,
+      0.2
+    ]
+  },
+  "result": {
+    "component_order": [
+      "Methane",
+      "Ethane",
+      "Propane"
+    ],
+    "phase_fractions": {
+      "liquid": 0.5317095621994667,
+      "vapor": 0.46829043780053325
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": {
+        "fractions": [
+          0.2561702636693893,
+          0.40184261411976957,
+          0.3419871222108413
+        ]
+      },
+      "vapor": {
+        "fractions": [
+          0.7768508427470482,
+          0.184365155903747,
+          0.03878400134920464
+        ]
+      }
+    },
+    "vapor_fraction": 0.46829043780053325
+  },
+  "solver": {
+    "algorithm": "tangent-plane+rachford-rice+fixed-point",
+    "eos": "peng_robinson",
+    "method": "phi-phi",
+    "settings": {
+      "damping": null,
+      "max_iter": 100,
+      "tol": 1e-08
+    }
+  }
+}

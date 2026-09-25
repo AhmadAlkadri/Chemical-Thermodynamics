@@ -1,0 +1,11 @@
+# sdist contents: the library, its metadata and user-facing docs.
+# tests/ is excluded on purpose: several tests read fixtures that are not
+# redistributable (e.g. DECHEMA-derived NRTL data, test-only by ADR policy),
+# so a partial test tree would not run. Run the tests from a git checkout.
+include LICENSE README.md CHANGELOG.md
+prune tests
+prune .agents
+prune benchmarks
+prune notebooks
+prune database
+prune tools

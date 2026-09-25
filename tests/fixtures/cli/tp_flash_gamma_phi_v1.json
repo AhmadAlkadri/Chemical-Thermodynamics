@@ -1,0 +1,72 @@
+{
+  "cli_schema_version": 1,
+  "command": "tp-flash",
+  "diagnostics": {
+    "converged": true,
+    "flash_mode": "gamma-phi",
+    "iterations": 12,
+    "k_max": 3.433875573623854,
+    "k_min": 0.4846789528468791,
+    "k_seed": "wilson",
+    "max_delta_k": 2.557426270755059e-09,
+    "phase_count": 2,
+    "phase_detection": "wilson-heuristic",
+    "phase_regime": "VLE",
+    "phase_state": "two_phase",
+    "post_split_checked": false,
+    "post_split_skipped_reason": "gamma_phi_stability_unsupported",
+    "termination_reason": "tolerance_met"
+  },
+  "inputs": {
+    "components": [
+      "Methane",
+      "Ethane"
+    ],
+    "normalize": false,
+    "pressure_Pa": 3000000.0,
+    "temperature_K": 240.0,
+    "z_mole": [
+      0.5,
+      0.5
+    ]
+  },
+  "result": {
+    "component_order": [
+      "Methane",
+      "Ethane"
+    ],
+    "phase_fractions": {
+      "liquid": 0.23516474545613164,
+      "vapor": 0.7648352545438684
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": {
+        "fractions": [
+          0.17473268589184338,
+          0.8252673141081566
+        ]
+      },
+      "vapor": {
+        "fractions": [
+          0.6000103024449528,
+          0.3999896975550472
+        ]
+      }
+    },
+    "vapor_fraction": 0.7648352545438684
+  },
+  "solver": {
+    "algorithm": "wilson+rachford-rice+fixed-point",
+    "eos": "peng_robinson",
+    "method": "gamma-phi",
+    "settings": {
+      "damping": null,
+      "max_iter": 100,
+      "tol": 1e-08
+    }
+  }
+}

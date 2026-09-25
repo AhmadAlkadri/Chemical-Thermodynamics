@@ -3,8 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from ..exceptions import InputRangeError
+
+if TYPE_CHECKING:  # pragma: no cover - import kept out of the runtime cycle
+    from ..stability import StabilitySettings
+
+#: Admissible values of :attr:`FlashSettings.phase_detection`.
+PHASE_DETECTION_MODES = ("tangent-plane", "wilson-heuristic")
 
 
 @dataclass(frozen=True)
@@ -15,6 +22,98 @@ class FlashSettings:
         max_iter: Maximum number of iterations.
         tol: Convergence tolerance on K-value updates (dimensionless).
         damping: Optional damping factor for K updates in (0, 1].
+        phase_detection: How the phi-phi path decides one phase versus two.
+
+            - ``"tangent-plane"`` (default): run Michelsen's tangent-plane
+              stability test on the feed (:func:`chemthermo.stability_tp`),
+              return a single phase only when the feed is found stable, and
+              seed the two-phase split from the stability minimizer. An
+              ``"inconclusive"`` stability result raises
+              :class:`chemthermo.ConvergenceError` rather than silently
+              producing a single-phase answer.
+            - ``"wilson-heuristic"``: the legacy path, which declares a single
+              phase when all Wilson K-values fall on one side of 1 or when
+              Rachford-Rice finds no root for the Wilson K-values. Both are
+              heuristics on an *initial estimate*, not thermodynamic criteria.
+              Kept reachable so the old behavior stays testable (ADR-0008).
+
+            Gamma-phi always uses ``"wilson-heuristic"`` in this release; see
+            ADR-0007 and ADR-0008 for why gamma-phi stability is not available,
+            and prefer ``flash_mode="modified-raoult"``, which does have one.
+        stability_settings: Settings forwarded to
+            :func:`chemthermo.stability_tp` when ``phase_detection`` is
+            ``"tangent-plane"``, for the feed test and for the post-split test
+            of each converged phase. ``None`` uses ``StabilitySettings()``.
+        post_split_stability: Refuse to return a two-phase result whose phases
+            are not themselves stable (ADR-0009). Every converged phase is fed
+            back into :func:`chemthermo.stability_tp` and the outcome is always
+            reported in ``diagnostics``; this flag decides what happens when
+            that check *fails*. ``True`` (default) raises
+            :class:`chemthermo.ConvergenceError` saying that a third phase is
+            required; ``False`` returns the two-phase result anyway, with the
+            failure visible in ``diagnostics["post_split_status"]``.
+
+            The check runs on the tangent-plane phi-phi path, the
+            liquid-liquid (``"gamma-gamma"``) path and the
+            ``"modified-raoult"`` path, where each phase is re-tested against
+            **both** candidates (liquid and ideal vapor). It cannot run for
+            ``"gamma-phi"`` (there is no gamma-phi stability test, ADR-0007),
+            and it deliberately does not run on the legacy
+            ``phase_detection="wilson-heuristic"`` path, whose purpose is to
+            reproduce pre-ADR-0008 behavior unchanged. Those two paths report
+            ``diagnostics["post_split_checked"] = False`` and a
+            ``post_split_skipped_reason``.
+        second_order: Run a second-order stage after successive substitution.
+            The stage is a damped Newton minimization of the two-phase Gibbs
+            energy whose gradient is the equal-activity (or equal-fugacity)
+            residual (ADR-0009, generalized to two different phase candidates
+            in ADR-0010 and to the phi-phi split in ADR-0016). Near a plait
+            point successive substitution needs thousands of iterations, so the
+            stage is what makes those liquid-liquid feeds solvable at all.
+
+            **When it runs differs by path.** The liquid-liquid
+            (``"gamma-gamma"``) and ``"modified-raoult"`` splits hand over
+            after ``ssi_iterations``. The phi-phi split hands over only when
+            successive substitution has spent the whole ``max_iter`` budget
+            without converging, or when an updated set of K-values admits no
+            vapor fraction at all - so that every phi-phi state that converged
+            before ADR-0016 still converges through the first stage alone, bit
+            for bit. ``second_order=False`` is the pre-ADR-0016 phi-phi split.
+            The gamma-phi split never enters the stage.
+        ssi_iterations: Successive-substitution iterations performed in the
+            liquid-liquid and modified-Raoult splits before the second-order
+            stage takes over. Capped by ``max_iter``. Deliberately **not**
+            consulted by the phi-phi split; see ``second_order`` and ADR-0016.
+        second_order_max_iter: Maximum second-order iterations.
+        max_phases: Largest number of phases :func:`chemthermo.flash_tp` may
+            return (ADR-0011, ADR-0020). Validated ``>= 1``.
+
+            The default 3 lets the ``"modified-raoult"`` path (ADR-0011) and
+            the ``"phi-phi"`` path (ADR-0020) *discover* a third phase: after
+            any converged phase set fails its post-split stability test, the
+            incipient phase found there is added and the set is re-solved, and
+            a phase whose fraction converges to zero or below is removed again.
+            ``max_phases=2`` reproduces the pre-search behavior exactly - a
+            phase set that needs a third phase raises
+            :class:`chemthermo.ConvergenceError` instead of being resolved.
+
+            The cap is only consulted for the *third* and further phases. The
+            one-versus-two decision is thermodynamic (Michelsen's tangent-plane
+            test on the feed), not a setting, so ``max_phases=1`` behaves like
+            ``max_phases=2``: it cannot turn a feed the stability test proved
+            unstable into a single-phase answer.
+
+            The ``"gamma-gamma"`` path still stops at two phases whatever
+            this is set to: no activity-only state in this repository needs a
+            third liquid, so wiring it would ship an unexercised path
+            (ADR-0011 "What remains", narrowed by ADR-0020 decision 5).
+        second_order_tol: Target for the second-order stage, measured on the
+            equal-activity residual ``max_i |ln(x_i^I gamma_i^I)
+            - ln(x_i^II gamma_i^II)|``. It is tighter than ``tol`` because the
+            stage converges quadratically (one extra step is cheap) and because
+            this residual is what a caller verifies in ``diagnostics``. The
+            stage stops early when it can no longer make progress; a split is
+            accepted as converged as soon as it meets ``tol``.
 
     Notes:
         The solver is deterministic for fixed inputs, models, and settings.
@@ -23,6 +122,14 @@ class FlashSettings:
     max_iter: int = 100
     tol: float = 1e-8
     damping: float | None = None
+    phase_detection: str = "tangent-plane"
+    stability_settings: StabilitySettings | None = None
+    post_split_stability: bool = True
+    second_order: bool = True
+    ssi_iterations: int = 50
+    second_order_max_iter: int = 100
+    second_order_tol: float = 1e-12
+    max_phases: int = 3
 
     def __post_init__(self) -> None:
         if self.max_iter <= 0:
@@ -32,3 +139,16 @@ class FlashSettings:
         if self.damping is not None:
             if not (0.0 < self.damping <= 1.0):
                 raise InputRangeError("damping must be in (0, 1] when specified.")
+        if self.phase_detection not in PHASE_DETECTION_MODES:
+            raise InputRangeError(
+                f"phase_detection must be one of {PHASE_DETECTION_MODES}; "
+                f"got {self.phase_detection!r}."
+            )
+        if self.ssi_iterations <= 0:
+            raise InputRangeError("ssi_iterations must be positive.")
+        if self.second_order_max_iter <= 0:
+            raise InputRangeError("second_order_max_iter must be positive.")
+        if self.second_order_tol <= 0.0:
+            raise InputRangeError("second_order_tol must be positive.")
+        if self.max_phases < 1:
+            raise InputRangeError("max_phases must be at least 1.")

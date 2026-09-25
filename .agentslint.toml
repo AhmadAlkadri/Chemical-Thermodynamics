@@ -1,0 +1,13 @@
+[agentslint]
+version = "0.2"
+
+[golden_path]
+install = '.venv/bin/pip install -e ".[dev]"'
+format = ".venv/bin/ruff format --check src tests"
+lint = ".venv/bin/ruff check src tests"
+test = ".venv/bin/pytest -q"
+
+[commit_cadence]
+require_clean_tree_before_handoff = true
+require_slice_trailer = true
+min_commits_per_slice = 1

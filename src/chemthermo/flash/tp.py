@@ -1,110 +1,456 @@
-"""TP flash calculations (T,P) for VLE in SI units.
+"""TP flash calculations (T,P) in SI units.
 
-Supports phi-phi and gamma-phi. The solver uses Wilson K-value initialization,
-Rachford-Rice vapor fraction updates, and fixed-point K updates. Given the
-same inputs and settings, results are deterministic.
+Supports phi-phi (vapor-liquid, equation of state), modified-raoult
+(low-pressure vapor-liquid *and* liquid-liquid from an activity model with
+Antoine reference fugacities and an ideal vapor), gamma-gamma (liquid-liquid,
+both phases described by one activity model) and the deprecated gamma-phi
+(activity-model liquid against an equation-of-state vapor). Given the same
+inputs and settings, results are deterministic.
+
+Phase detection (phi-phi, gamma-gamma and modified-raoult)
+-----------------------------------------------------------
+Every reference path decides one phase versus two from Michelsen's tangent-plane
+stability criterion rather than from Wilson K-value bounds (ADR-0008, ADR-0009,
+ADR-0010). The flow is
+
+    flash_tp -> stability_tp(feed) -> single phase | seeded split
+             -> post-split stability of every converged phase
+
+1. ``stability_tp`` is run on the feed at the same ``(T, P)`` with the same
+   model (``eos=`` for phi-phi, ``activity_model=`` for gamma-gamma,
+   ``activity_model=`` plus ``vapor="ideal"`` for modified-raoult).
+2. ``status == "stable"``: a single-phase ``FlashResult`` is returned with
+   ``termination_reason = "feed_stable_tangent_plane"``. For phi-phi its phase
+   name is the branch the stability test selected (``feed_branch``), which the
+   evaluator names from ``EquationOfState.phase_identity`` (a compressibility
+   criterion, ADR-0017) when the model implements one - including when the
+   cubic has a single real root, where the two branches coincide and a
+   min-Gibbs comparison alone cannot tell them apart. For gamma-gamma the
+   single phase is a liquid and is named ``"liquid"``.
+3. ``status == "unstable"``: the converged stationary point seeds the K-values
+   (see :func:`chemthermo.flash._detect._stability_k_seed`) and the
+   successive-substitution / Rachford-Rice loop - Michelsen's recommended
+   first-stage phase split - runs from there. For phi-phi, if the seeded
+   K-values give no Rachford-Rice root the Wilson estimate is tried as a
+   documented fallback, and ``diagnostics["k_seed"]`` records which seed was
+   actually used. Inside that loop (phi-phi only) the vapor fraction is
+   allowed to leave ``[0, 1]`` - the "negative flash" of Whitson & Michelsen
+   (1989) on the Leibovici-Neoschil window - and a second-order stage finishes
+   the split when successive substitution does not; see ADR-0016.
+
+   Where the stationary point has a component below ``1e-30`` **and** its
+   K-values bracket no vapor fraction at all - a polymer/solvent
+   vapour-liquid state, where the minimizer is an essentially pure melt and
+   ``K`` spans ``1e+180`` - the loop has nowhere to start, and the split is
+   solved instead in **log mole numbers** from a seed built out of the same
+   stationary point (``k_seed = "stability-log"``, ADR-0024). The same
+   log-space stage also finishes a split the linear second-order stage could
+   not, and rescues one whose K-values were not even representable.
+   ``diagnostics["converged_stage"] == "second-order-log"`` records it.
+4. ``status == "inconclusive"``: a :class:`chemthermo.ConvergenceError` is
+   raised. A stability search that could not converge must not silently produce
+   a single-phase answer.
+
+The converged split is then verified (material balance, phase fractions, equal
+fugacities or equal activities, and a negative Gibbs-energy change against the
+single-phase feed) and every residual is reported in ``diagnostics``.
+
+Post-split stability, and phase addition / removal
+--------------------------------------------------
+Every converged result on these paths is re-tested: each phase is fed back into
+``stability_tp`` with the same model. Coexisting phases share one tangent
+plane, so each of them is *marginally* stable with respect to the others - a
+trial that converges onto a partner phase has ``tpd = 0`` up to the split's own
+convergence tolerance and is classified ``"marginal"`` here, not as an
+instability (validation Case S-3). A phase whose tangent-plane minimum is
+genuinely negative somewhere else means the phase set is not the answer.
+
+On the ``modified-raoult`` path (ADR-0011) and on the phi-phi path (ADR-0020)
+that failure is *resolved* rather than refused: the minimizer found on the
+failing phase is the incipient new phase, it is added, and the enlarged set is
+re-solved with the multiphase Rachford-Rice of
+:mod:`chemthermo.flash._multiphase_rr`; a phase whose fraction converges to
+zero or below is removed again. Each phase carries its own tangent-plane
+surface - a phase candidate for the activity path, a pinned density root
+(:class:`chemthermo.flash._split._PhaseRoot`, ADR-0019) for an equation of
+state - so a vapour and two liquids sit on three independent roots. A removal
+is a *choice* among the phases the solve names, and since ADR-0029 it can be
+taken back: a two-phase set that converges to a non-positive fraction sends the
+search back to the set before the removal, to take the next candidate. The
+search is bounded by ``FlashSettings.max_phases`` (default 3) and the sets it
+visited are reported in ``diagnostics["phase_set_history"]`` - where two
+different two-phase sets print the same compact label, because that label names
+the phase types and the history is a route. ``max_phases=2``
+reproduces the pre-search behavior, which raises
+:class:`chemthermo.ConvergenceError`; so does the ``gamma-gamma`` path at any
+``max_phases``, because no activity-only state in this repository exercises a
+third liquid (ADR-0011 "What remains", narrowed by ADR-0020).
+``FlashSettings(post_split_stability=False)`` returns the two-phase result
+anyway with the failure recorded in ``diagnostics``, without searching.
+
+Modified Raoult (low-pressure gamma-phi)
+----------------------------------------
+``flash_mode="modified-raoult"`` puts an activity-coefficient liquid and an
+ideal-gas vapor on **one** Gibbs surface, using the pure-liquid reference
+fugacity ``f_i^0 = Psat_i(T)`` from the databank Antoine coefficients
+(``phi_i^sat = 1``, Poynting = 1, ``phi_i^V = 1``). The equilibrium condition is
+modified Raoult's law ``y_i P = x_i gamma_i(x) Psat_i(T)``; in tangent-plane
+form the two candidates contribute
+
+    liquid: ln gamma_i(w) + ln( Psat_i(T) / P )      vapor: 0
+
+against the common reference ``ln( f_i / (x_i P) )``. One stability test
+therefore detects a vapor-liquid split, a liquid-liquid split or neither, and
+the candidate label of the stationary point says which; the split then
+evaluates each phase with the candidate assigned to it, so
+``K_i = gamma_i Psat_i / P`` (VLE) and ``K_i = gamma_i^I / gamma_i^II`` (LLE)
+are the same update rule. See :func:`chemthermo.flash._detect._flash_tp_modified_raoult`.
+
+``flash_mode="gamma-phi"`` is **deprecated** in favour of this mode; see
+:func:`flash_tp`.
+
+The liquid-liquid split
+-----------------------
+With two liquid phases described by one activity model at the same pure-liquid
+reference state, ``mu_i^0`` cancels and the equilibrium condition is equality of
+activities,
+
+    x_i^I gamma_i^I = x_i^II gamma_i^II                                   (1)
+
+so the K-values of the shared split loop are ``K_i = x_i^II / x_i^I =
+gamma_i^I / gamma_i^II``. Phase I is the feed-like phase and phase II the
+incipient-like one; ``beta`` is the mole fraction of phase II, which is what
+Rachford-Rice returns for that K convention. The two phases are named
+``"liquid1"`` (feed-like) and ``"liquid2"`` (incipient-like): those labels are
+*roles assigned by the seed*, carry no physical identity, and may swap between
+two feeds on the same tie-line (see :func:`flash_tp`).
+
+Successive substitution on (1) converges linearly with a ratio close to one
+near a plait point - hundreds to thousands of iterations on the Tessier et al.
+(2000) Problem 1 feeds - so a second-order stage is required; see
+:func:`chemthermo.flash._second_order._second_order_split` for the derivation.
+
+Limits
+------
+Up to ``FlashSettings.max_phases`` phases are returned on the
+``modified-raoult`` and phi-phi paths; ``gamma-gamma`` still stops at two and
+raises when a third is needed. A negative ``tpd_min`` proves a feed is not
+one phase; ``"stable"`` only means no negative tangent-plane distance was found
+from the deterministic trial set - so a phase count is never more reliable than
+the stability test that produced it. Each trial of that set runs on one fixed
+phase candidate (ADR-0012), which is what lets a thin three-phase region be
+found near a plait point; over the ternary grid of validation Case V-5 the
+verdict agrees with an independent lowest-Gibbs classifier at every feed. That
+is evidence, not a global proof.
+
+Module layout
+-------------
+This module is the thin public orchestrator: it validates inputs, resolves the
+mode, and dispatches to the internal module that implements it - ``_detect``
+(phase detection and split seeding), ``_split`` (the shared K-loop), ``_second_order``
+(the Newton stage shared by the liquid-liquid, modified-Raoult and phi-phi
+splits), ``_multiphase_rr`` (the multiphase
+Rachford-Rice), ``_multiphase`` (the multiphase split and the phase
+addition/removal loop), ``_verify`` (residuals and post-split stability),
+``_assemble`` (``FlashResult`` construction) and ``_legacy`` (the
+``wilson-heuristic`` path). All are internal (ADR-0001): none is re-exported.
 """
 
 from __future__ import annotations
 
-import math
-
 import numpy as np
 
-from ..core import Composition, Mixture
-from ..exceptions import CompositionError, ConvergenceError, ModelError
+from .._eos_memo import scoped as _scoped_eos_memo
+from ..core import Mixture
+from ..exceptions import CompositionError, ModelError
 from ..models import ActivityModel, EquationOfState
-from ..validation import COMPOSITION_SUM_TOL, validate_pressure, validate_temperature
-from ._common import as_float_array, normalize_composition, wilson_k
-from .results import FlashResult, PhaseResult
+from ..validation import validate_pressure, validate_temperature
+from ._detect import (
+    _flash_tp_liquid_liquid,
+    _flash_tp_modified_raoult,
+    _flash_tp_tangent_plane,
+)
+from ._legacy import _flash_tp_wilson_heuristic
+from .results import FlashResult
 from .settings import FlashSettings
 
+#: Supported ``flash_mode`` values.
+#:
+#: ``"gamma-phi"`` is **deprecated** in favour of ``"modified-raoult"``; see the
+#: :func:`flash_tp` docstring and ADR-0010. It is not removed and its numbers
+#: are unchanged.
+FLASH_MODES = ("phi-phi", "gamma-phi", "gamma-gamma", "modified-raoult")
 
+
+@_scoped_eos_memo
 def flash_tp(
     mixture: Mixture,
     *,
     temperature_K: float,
     pressure_Pa: float,
-    eos: EquationOfState | None,
+    eos: EquationOfState | None = None,
     activity_model: ActivityModel | None = None,
-    flash_mode: str = "phi-phi",
+    flash_mode: str | None = None,
     settings: FlashSettings | None = None,
 ) -> FlashResult:
-    """Perform a TP flash calculation using phi-phi or gamma-phi.
+    """Perform a TP flash calculation using phi-phi, gamma-phi or gamma-gamma.
 
     Args:
         mixture: Mixture with mole-fraction composition.
         temperature_K: Temperature in K.
         pressure_Pa: Pressure in Pa.
-        eos: Equation-of-state model used for fugacity coefficients.
-        activity_model: Activity model (required for gamma-phi).
-        flash_mode: Case-insensitive mode: "phi-phi" or "gamma-phi".
-        settings: Iteration controls (tolerance, damping, max iterations).
+        eos: Equation-of-state model used for fugacity coefficients. Required
+            for ``"phi-phi"`` and ``"gamma-phi"``, and must be omitted for
+            ``"gamma-gamma"`` and ``"modified-raoult"``.
+        activity_model: Activity model. Required for ``"gamma-phi"`` (liquid
+            phase), ``"gamma-gamma"`` (both liquid phases) and
+            ``"modified-raoult"`` (the liquid candidate).
+        flash_mode: Case-insensitive mode: ``"phi-phi"``, ``"modified-raoult"``,
+            ``"gamma-gamma"`` or the deprecated ``"gamma-phi"``. ``None`` (the
+            default) infers the mode from the models supplied:
+            ``"gamma-gamma"`` when only ``activity_model`` is given,
+            ``"phi-phi"`` otherwise. ``"modified-raoult"`` and ``"gamma-phi"``
+            are never inferred and must be named: which vapor model applies at
+            a given pressure is the caller's physical judgement, not
+            something the package should guess.
+        settings: Iteration controls (tolerance, damping, max iterations,
+            phase-detection mode, stability settings, post-split check,
+            second-order stage).
 
     Returns:
         FlashResult with phase compositions and fractions. Phase names follow:
-        VLE -> "liquid"/"vapor", single-phase -> "liquid" or "vapor".
+        VLE -> ``"liquid"``/``"vapor"``, LLE -> ``"liquid1"``/``"liquid2"``
+        (on the phi-phi path too, since ADR-0019),
+        VLLE -> ``"liquid1"``/``"liquid2"``/``"vapor"``, single phase ->
+        ``"liquid"`` or ``"vapor"``. ``vapor_fraction`` is ``None`` for every
+        gamma-gamma result and for any result with no ``"vapor"`` phase in it:
+        reporting a number there would be fiction. A result that does contain a
+        vapor carries that phase's mole fraction.
 
     Diagnostics:
-        Diagnostics keys are implementation details. Current stable keys include:
-        - VLE: iterations, converged, termination_reason, max_delta_k, k_min,
-          k_max, phase_count, phase_state, phase_regime, flash_mode.
-        - VLE single-phase fallbacks may also include rr_f0, rr_f1, rr_status.
+        Diagnostics keys are implementation details. Current stable keys:
+
+        - Always: ``flash_mode``, ``phase_detection``, ``iterations``,
+          ``converged``, ``termination_reason``, ``phase_count``,
+          ``phase_state``, ``phase_regime``.
+        - Results that went through the phase addition/removal search
+          (``modified-raoult`` and, since ADR-0020, phi-phi - and only when a
+          converged phase set failed its post-split test) add
+          ``phase_set_history``, ``phases_added``, ``phases_removed``,
+          ``rachford_rice_iterations`` and, when the search started from a
+          converged two-phase set, ``delta_g_vs_two_phase_rt``; plus - **only
+          when the ADR-0029 multiphase log-space stage actually ran** -
+          ``log_space_iterations``, with ``converged_stage ==
+          "second-order-log"`` where that stage is what met the tolerance.
+          Those keys are **absent** from every other result, deliberately: the
+          two-phase numbers of the earlier slices are unchanged down to the
+          last bit, diagnostics included.
+        - Tangent-plane paths (phi-phi default, gamma-gamma and
+          modified-raoult):
+          ``stability_status``, ``tpd_min``, ``stability_trials``, and
+          ``feed_branch`` when the model reports one. A single phase adds
+          nothing else, uses
+          ``termination_reason = "feed_stable_tangent_plane"``, and - phi-phi
+          only - ``phase_label_method`` (ADR-0017: ``"compressibility"`` or
+          ``"tie-break"``). A two-phase result adds ``k_seed``,
+          ``mass_balance_residual``, ``delta_g_split_rt``, the equilibrium
+          residual (``fugacity_residual`` for phi-phi, ``equilibrium_residual``
+          for gamma-gamma) and the post-split keys ``post_split_checked``,
+          ``post_split_stable``, ``post_split_status``,
+          ``post_split_tpd_min``, ``phase_stability_<name>`` and
+          ``phase_stability_tpd_min_<name>``. Phi-phi additionally reports
+          ``incipient_phase``, ``phase_label_method`` (``"compressibility"`` or
+          ``"wilson-ranking"``), ``max_delta_k``, ``k_min`` and ``k_max``,
+          plus - **only when the two phases did not converge on the historical
+          ``("liquid", "vapor")`` pair of density roots** (ADR-0019) -
+          ``phase_i_branch`` and ``phase_ii_branch``,
+          plus - **only when the ADR-0016 second-order stage actually ran** -
+          ``ssi_iterations``, ``second_order_iterations``, ``converged_stage``
+          and ``negative_flash_steps``. Those four keys are absent from a
+          phi-phi result that converged in the first stage, deliberately: such
+          a result carries the mapping it carried before ADR-0016, down to the
+          last bit. Use ``.get()`` for them. When the ADR-0024 **log-space**
+          stage ran (``converged_stage == "second-order-log"``) five more
+          appear: ``log_space_seed`` (``"stability-w"`` or
+          ``"linear-iterate"``), ``log_space_iterations``,
+          ``log_space_residual``, ``log_space_ln_x_min`` with
+          ``log_space_ln_x_min_component`` (the smallest log mole fraction of
+          the split's second phase and the component it belongs to), and
+          ``log_space_zero_fractions`` (how many of that phase's mole
+          fractions underflowed to an exact ``0.0``). Gamma-gamma additionally reports
+          ``ssi_iterations``,
+          ``second_order_iterations`` and ``converged_stage``. Modified-raoult
+          reports ``incipient_phase``, ``k_min``, ``k_max``, the three stage
+          keys, and ``antoine_valid_Tmin_K`` / ``antoine_valid_Tmax_K`` (the
+          intersection of the components' Antoine validity ranges) on every
+          result.
+        - Legacy heuristic path: ``k_min``, ``k_max``, ``max_delta_k``,
+          ``k_seed`` (``"wilson"``), and, for its single-phase fallbacks,
+          ``rr_f0``, ``rr_f1``, ``rr_status``.
+
     Raises:
         InputRangeError: If temperature or pressure is non-physical.
-        ModelError: If required models are missing or return invalid values.
+        ModelError: If required models are missing, if models are combined in an
+            unsupported way, or if a model returns invalid values.
+        InputRangeError: (modified-raoult) If the temperature is outside the
+            Antoine validity range of a component.
+        PropertyNotFoundError: (modified-raoult) If a component has no Antoine
+            record.
         CompositionError: If the mixture composition is invalid.
-        ConvergenceError: If iteration fails to converge.
+        ConvergenceError: If iteration fails to converge; or (tangent-plane
+            modes only) if the stability analysis is inconclusive, if an
+            unstable feed admits no Rachford-Rice root from either seed, or if
+            a converged phase set fails the post-split stability check and no
+            further phase may be added (``gamma-gamma`` always, or
+            ``FlashSettings.max_phases`` reached on the modified-Raoult and
+            phi-phi paths).
 
     Notes:
-        Single-phase fallbacks are returned (not raised) when K-bounds or
-        Rachford-Rice root checks indicate only one phase is possible.
+        **``flash_mode="gamma-phi"`` is DEPRECATED** in favour of
+        ``"modified-raoult"``. It is not removed, nothing about it changed, and
+        its removal would need its own ADR. It is deprecated because it is not
+        a consistent model: it sets ``K_i = gamma_i phi_i^L / phi_i^V`` with
+        ``gamma`` from the activity model *and* ``phi^L`` from the equation of
+        state evaluated on the liquid mixture, so the liquid's nonideality is
+        counted twice, and it carries no pure-liquid reference fugacity at all
+        (no ``Psat_i``, no ``phi_i^sat``, no Poynting), so the two phases are
+        not on one Gibbs surface. That is also why it has no stability test and
+        no post-split check (ADR-0007, ADR-0009). ``"modified-raoult"`` is the
+        low-pressure model written down correctly; for high pressure use
+        ``"phi-phi"``.
+
+        **Modified-Raoult limits.** Ideal vapor (no ``phi^V``), so low pressure
+        only; no Poynting correction and no ``phi^sat``; and the temperature
+        must lie inside every component's Antoine validity range, which is
+        enforced rather than extrapolated.
+
+        With ``phase_detection="tangent-plane"`` (the default for phi-phi and
+        the only option for gamma-gamma and modified-raoult) a single-phase
+        result means the feed was *found stable* by Michelsen's test. With
+        ``phase_detection="wilson-heuristic"`` it only means an initial-estimate
+        heuristic said so.
+
+        **Vapor/liquid labelling by compressibility (ADR-0017, ADR-0019).** A
+        phi-phi phase name comes from ``EquationOfState.phase_identity``,
+        evaluated on the root the phase actually converged on: a dimensionless
+        isothermal-compressibility ratio (``kappa = -P / (V dP/dV)`` for
+        Peng-Robinson, the analogous ``P / (rho dP/drho)`` for PC-SAFT) that is
+        1 for an ideal gas and well below 1 for a liquid
+        (``chemthermo.models.base.KAPPA_LIQUID_THRESHOLD``). For a
+        single-phase result this replaces the historical min-Gibbs tie-break -
+        the case where the cubic has a single real root and both branches
+        return identical fugacity coefficients, so no Gibbs comparison can
+        distinguish them, is exactly the case ``kappa`` was added to settle.
+        For a two-phase result: one liquid and one vapor gives
+        ``"liquid"`` / ``"vapor"`` with a real ``vapor_fraction``; **two
+        liquids give** ``"liquid1"`` / ``"liquid2"`` with
+        ``vapor_fraction = None`` and ``phase_regime = "LLE"`` (ADR-0019);
+        and when both phases measure as vapors (near-critical states, where any
+        label is a convention) or the model does not implement
+        ``phase_identity``, the historical volatility ordering is kept instead
+        - the phase enriched (relative to the feed) in the component with the
+        largest Wilson K relative to the one with the smallest is named
+        ``"vapor"``. ``diagnostics["phase_label_method"]`` records which rule
+        decided: ``"compressibility"``, ``"wilson-ranking"`` (a two-phase
+        fallback) or ``"tie-break"`` (a single-phase fallback, for a model that
+        does not implement ``phase_identity``). Neither rule ever decides the
+        verdict, the compositions or the vapor fraction's *magnitude* - only
+        which already-converged phase (or ``1 - vapor_fraction``) each name
+        attaches to. See ADR-0008 decision 3 (superseded), ADR-0017 and
+        ADR-0019.
+
+        **Which density root each phi-phi phase sits on (ADR-0019).** Each
+        phase is evaluated on the branch the tangent-plane stability test found
+        *that phase* on - ``feed_branch`` for the feed-like phase,
+        ``phase_branch`` for the incipient one - held for the whole split,
+        rather than one phase always on the model's liquid root and the other
+        always on its vapor root. That is what makes a liquid-liquid split from
+        an equation of state expressible at a pressure where a vapor root also
+        exists. The lowest-Gibbs rule applies where the pinned branch is not
+        evaluable, and the post-split stability test re-applies it to every
+        converged phase. ``diagnostics["phase_i_branch"]`` and
+        ``["phase_ii_branch"]`` report the measured identity of each converged
+        root, and are present **only** when that pair is not
+        ``("liquid", "vapor")``; use ``.get()``.
+
+        **A mole fraction may be exactly zero (ADR-0024).** When the two
+        phases' ``ln phi`` differ by more than the exponential's range - a
+        53 000 g/mol polyethylene in n-pentane has a vapour-phase polymer mole
+        fraction of ``exp(-1315)`` - the composition carries ``0.0`` for that
+        component, because ``0.0`` is the nearest double there is. The number
+        is not lost: its logarithm is
+        ``diagnostics["log_space_ln_x_min"]``, with the component named in
+        ``diagnostics["log_space_ln_x_min_component"]``. Nothing else is
+        approximated by it - the *other* phase then holds every mole of that
+        component the feed had, so the material balance is exact rather than
+        nearly exact, and the equal-fugacity condition for that component is
+        verified in log space by the stage itself
+        (``diagnostics["log_space_residual"]``; ``fugacity_residual`` is taken
+        over the components present in both phases and so cannot see it).
+
+        **Liquid-liquid phase names are roles, not identities - except on the
+        phi-phi path.** On the ``gamma-gamma`` and ``modified-raoult`` paths
+        ``"liquid1"`` is the phase the split was started from as feed-like and
+        ``"liquid2"`` the one started from the tangent-plane minimizer, so two
+        feeds on the same tie-line can come back with the same pair of
+        compositions under swapped labels. Compare the phase *set*, not
+        ``result.phases["liquid1"]``. The same holds for the two liquids of a
+        three-phase result, whose ordering follows the order in which the
+        search happened to create them; only the ``"vapor"`` name carries a
+        model-level meaning (it is the phase the ideal-gas candidate
+        describes). On the **phi-phi** path the two names are assigned by
+        composition instead (ADR-0019): ``"liquid1"`` is the phase with the
+        larger mole fraction of the **first** component, ties broken by the
+        second and so on. That order is deterministic and does not swap between
+        feeds on one tie line, which is what makes a lever-rule comparison
+        across feeds meaningful; permuting the mixture's components permutes
+        which phase is ``"liquid1"``, and the phase *set* is unchanged.
     """
 
     temperature = validate_temperature(temperature_K)
     pressure = validate_pressure(pressure_Pa)
 
-    if eos is None:
-        raise ModelError("An equation-of-state model is required for flash_tp.")
-
+    mode = _resolve_flash_mode(flash_mode, eos=eos, activity_model=activity_model)
     settings = settings or FlashSettings()
-    mode = flash_mode.strip().casefold()
-
-    if mode in {"phi-phi", "gamma-phi"}:
-        if mode == "gamma-phi" and activity_model is None:
-            raise ModelError("An activity model is required for gamma-phi flash.")
-        if mode != "gamma-phi" and activity_model is not None:
-            raise ModelError("activity_model is only used when flash_mode='gamma-phi'.")
-        return _flash_tp_vle(
-            mixture,
-            temperature,
-            pressure,
-            eos=eos,
-            activity_model=activity_model,
-            mode=mode,
-            settings=settings,
-        )
 
     if mode == "vlle":
         raise ModelError(
-            "VLLE support is provided by the optional chemthermo_vlle plugin. "
-            "Install chemthermo_vlle to enable VLLE support."
+            "flash_mode='vlle' is not a supported mode. Three-phase "
+            "(vapor-liquid-liquid) equilibrium is discovered automatically: use "
+            "flash_mode='modified-raoult' with FlashSettings(max_phases=3) (the "
+            "default) and see ADR-0011. The chemthermo.vlle plugin package was "
+            "removed in 0.4.0 (ADR-0037)."
         )
+    if mode not in FLASH_MODES:
+        raise ModelError(f"Unsupported flash_mode '{flash_mode}'.")
 
-    raise ModelError(f"Unsupported flash_mode '{flash_mode}'.")
+    if mode == "gamma-gamma":
+        if activity_model is None:
+            raise ModelError("An activity model is required for gamma-gamma (liquid-liquid) flash.")
+        if eos is not None:
+            raise ModelError(
+                "gamma-gamma flash describes both phases with the activity model, so 'eos' "
+                "must not be given. Combined gamma-phi equilibrium is flash_mode='gamma-phi'."
+            )
+    elif mode == "modified-raoult":
+        if activity_model is None:
+            raise ModelError("An activity model is required for modified-Raoult flash.")
+        if eos is not None:
+            raise ModelError(
+                "modified-raoult flash describes the vapor as an ideal gas and the liquid "
+                "with the activity model plus Antoine reference fugacities, so 'eos' must "
+                "not be given."
+            )
+    else:
+        if eos is None:
+            raise ModelError("An equation-of-state model is required for flash_tp.")
+        if mode == "gamma-phi" and activity_model is None:
+            raise ModelError("An activity model is required for gamma-phi flash.")
+        if mode == "phi-phi" and activity_model is not None:
+            raise ModelError(
+                "activity_model is only used when flash_mode='gamma-phi' or 'gamma-gamma'."
+            )
 
-
-def _flash_tp_vle(
-    mixture: Mixture,
-    temperature: float,
-    pressure: float,
-    *,
-    eos: EquationOfState,
-    activity_model: ActivityModel | None,
-    mode: str,
-    settings: FlashSettings,
-) -> FlashResult:
-    """Internal TP VLE solver (phi-phi or gamma-phi) with K-value iteration."""
     if mixture.basis != "mole":
         raise ModelError("flash_tp currently requires mole-fraction compositions.")
 
@@ -112,261 +458,62 @@ def _flash_tp_vle(
     if z.size == 0:
         raise CompositionError("Mixture composition must be non-empty.")
 
-    K = wilson_k(mixture, temperature, pressure)
-    if np.any(K <= 0.0):
-        raise ModelError("Non-positive K-values encountered in Wilson estimate.")
-
-    k_min = float(np.min(K))
-    k_max = float(np.max(K))
-
-    if np.all(K <= 1.0):
-        return _single_phase_result(
+    if mode == "modified-raoult":
+        assert activity_model is not None
+        return _flash_tp_modified_raoult(
             mixture,
             temperature,
             pressure,
-            phase_name="liquid",
-            vapor_fraction=0.0,
-            diagnostics={
-                "k_min": k_min,
-                "k_max": k_max,
-                "iterations": 0,
-                "converged": True,
-                "termination_reason": "single_phase_k_bounds",
-                "max_delta_k": 0.0,
-                "phase_count": 1,
-                "phase_state": "liquid",
-                "phase_regime": "single-phase",
-                "flash_mode": mode,
-            },
+            activity_model=activity_model,
+            settings=settings,
+            z=z,
         )
 
-    if np.all(K >= 1.0):
-        return _single_phase_result(
+    if mode == "gamma-gamma":
+        assert activity_model is not None
+        return _flash_tp_liquid_liquid(
             mixture,
             temperature,
             pressure,
-            phase_name="vapor",
-            vapor_fraction=1.0,
-            diagnostics={
-                "k_min": k_min,
-                "k_max": k_max,
-                "iterations": 0,
-                "converged": True,
-                "termination_reason": "single_phase_k_bounds",
-                "max_delta_k": 0.0,
-                "phase_count": 1,
-                "phase_state": "vapor",
-                "phase_regime": "single-phase",
-                "flash_mode": mode,
-            },
+            activity_model=activity_model,
+            settings=settings,
+            z=z,
         )
 
-    vapor_fraction, f0, f1 = _rachford_rice(z, K)
-    if vapor_fraction is None:
-        phase_name = "vapor" if f0 > 0.0 else "liquid"
-        vapor_fraction_value = 1.0 if phase_name == "vapor" else 0.0
-        return _single_phase_result(
-            mixture,
-            temperature,
-            pressure,
-            phase_name=phase_name,
-            vapor_fraction=vapor_fraction_value,
-            diagnostics={
-                "k_min": k_min,
-                "k_max": k_max,
-                "iterations": 0,
-                "converged": True,
-                "termination_reason": "rr_no_root",
-                "max_delta_k": 0.0,
-                "phase_count": 1,
-                "phase_state": phase_name,
-                "phase_regime": "single-phase",
-                "flash_mode": mode,
-                "rr_f0": float(f0),
-                "rr_f1": float(f1),
-                "rr_status": "no_root",
-            },
+    assert eos is not None
+    if mode == "phi-phi" and settings.phase_detection == "tangent-plane":
+        return _flash_tp_tangent_plane(
+            mixture, temperature, pressure, eos=eos, mode=mode, settings=settings, z=z
         )
 
-    max_delta = float("inf")
-    for iteration in range(1, settings.max_iter + 1):
-        x = z / (1.0 + vapor_fraction * (K - 1.0))
-        x = normalize_composition(x, label="liquid", error_cls=ConvergenceError)
-
-        y = K * x
-        y = normalize_composition(y, label="vapor", error_cls=ConvergenceError)
-
-        phi_v = as_float_array(
-            eos.fugacity_coefficients(
-                mixture=mixture,
-                temperature_K=temperature,
-                pressure_Pa=pressure,
-                composition=y.tolist(),
-                phase="vapor",
-            )
-        )
-        phi_l = as_float_array(
-            eos.fugacity_coefficients(
-                mixture=mixture,
-                temperature_K=temperature,
-                pressure_Pa=pressure,
-                composition=x.tolist(),
-                phase="liquid",
-            )
-        )
-
-        if phi_v.shape != phi_l.shape or phi_v.shape != K.shape:
-            raise ModelError("EOS returned inconsistent fugacity coefficient shapes.")
-        if np.any(phi_v <= 0.0) or np.any(phi_l <= 0.0):
-            raise ModelError("EOS returned non-positive fugacity coefficients.")
-
-        if mode == "gamma-phi":
-            assert activity_model is not None
-            gamma_l = as_float_array(
-                activity_model.activity_coefficients(
-                    mixture=mixture,
-                    temperature_K=temperature,
-                    composition=x.tolist(),
-                )
-            )
-            if gamma_l.shape != K.shape:
-                raise ModelError("Activity model returned inconsistent coefficient shapes.")
-            if np.any(gamma_l <= 0.0):
-                raise ModelError("Activity model returned non-positive activity coefficients.")
-            K_new = gamma_l * phi_l / phi_v
-        else:
-            K_new = phi_l / phi_v
-
-        max_delta = float(np.max(np.abs(K_new - K)))
-        if max_delta < settings.tol:
-            return _two_phase_result(
-                mixture,
-                temperature,
-                pressure,
-                x,
-                y,
-                vapor_fraction,
-                diagnostics={
-                    "iterations": iteration,
-                    "converged": True,
-                    "termination_reason": "tolerance_met",
-                    "max_delta_k": max_delta,
-                    "k_min": float(np.min(K_new)),
-                    "k_max": float(np.max(K_new)),
-                    "phase_count": 2,
-                    "phase_state": "two_phase",
-                    "phase_regime": "VLE",
-                    "flash_mode": mode,
-                },
-            )
-
-        if settings.damping is None:
-            K = K_new
-        else:
-            K = K + settings.damping * (K_new - K)
-
-        if np.any(K <= 0.0):
-            raise ModelError("Non-positive K-values encountered during iteration.")
-
-        vapor_fraction, f0, f1 = _rachford_rice(z, K)
-        if vapor_fraction is None:
-            raise ConvergenceError("Rachford-Rice failed to bracket a vapor fraction.")
-
-    raise ConvergenceError(
-        f"flash_tp did not converge within the iteration limit; max_delta_k={max_delta:.3e}."
+    return _flash_tp_wilson_heuristic(
+        mixture,
+        temperature,
+        pressure,
+        eos=eos,
+        activity_model=activity_model,
+        mode=mode,
+        settings=settings,
+        z=z,
     )
 
 
-def _single_phase_result(
-    mixture: Mixture,
-    temperature_K: float,
-    pressure_Pa: float,
+def _resolve_flash_mode(
+    flash_mode: str | None,
     *,
-    phase_name: str,
-    vapor_fraction: float,
-    diagnostics: dict[str, float | int | str | bool],
-) -> FlashResult:
-    composition = Composition(
-        fractions=mixture.fractions, basis=mixture.basis, normalize=False, tol=COMPOSITION_SUM_TOL
-    )
-    phase = PhaseResult(name=phase_name, composition=composition)
-    phase_fractions = {phase_name: 1.0}
-    return FlashResult(
-        temperature_K=temperature_K,
-        pressure_Pa=pressure_Pa,
-        phases={phase_name: phase},
-        vapor_fraction=vapor_fraction,
-        phase_fractions=phase_fractions,
-        diagnostics=diagnostics,
-    )
+    eos: EquationOfState | None,
+    activity_model: ActivityModel | None,
+) -> str:
+    """Resolve the requested mode, inferring it when it was not given.
 
-
-def _two_phase_result(
-    mixture: Mixture,
-    temperature_K: float,
-    pressure_Pa: float,
-    x: np.ndarray,
-    y: np.ndarray,
-    vapor_fraction: float,
-    diagnostics: dict[str, float | int | str | bool],
-) -> FlashResult:
-    liquid = PhaseResult(
-        name="liquid",
-        composition=Composition(
-            fractions=tuple(x.tolist()),
-            basis=mixture.basis,
-            normalize=False,
-            tol=COMPOSITION_SUM_TOL,
-        ),
-    )
-    vapor = PhaseResult(
-        name="vapor",
-        composition=Composition(
-            fractions=tuple(y.tolist()),
-            basis=mixture.basis,
-            normalize=False,
-            tol=COMPOSITION_SUM_TOL,
-        ),
-    )
-    phase_fractions = {"liquid": 1.0 - float(vapor_fraction), "vapor": float(vapor_fraction)}
-    return FlashResult(
-        temperature_K=temperature_K,
-        pressure_Pa=pressure_Pa,
-        phases={"liquid": liquid, "vapor": vapor},
-        vapor_fraction=float(vapor_fraction),
-        phase_fractions=phase_fractions,
-        diagnostics=diagnostics,
-    )
-
-
-def _rachford_rice(z: np.ndarray, K: np.ndarray) -> tuple[float | None, float, float]:
-    """Solve the Rachford-Rice equation; returns (vapor_fraction, f0, f1)."""
-
-    def f(v: float) -> float:
-        denom = 1.0 + v * (K - 1.0)
-        if np.any(denom <= 0.0):
-            return float("nan")
-        return float(np.sum(z * (K - 1.0) / denom))
-
-    f0 = f(0.0)
-    f1 = f(1.0)
-    if not math.isfinite(f0) or not math.isfinite(f1):
-        return None, f0, f1
-
-    if f0 * f1 > 0.0:
-        return None, f0, f1
-
-    low, high = 0.0, 1.0
-    for _ in range(200):
-        mid = 0.5 * (low + high)
-        value = f(mid)
-        if not math.isfinite(value):
-            return None, f0, f1
-        if abs(value) < 1e-12:
-            return mid, f0, f1
-        if value * f0 > 0.0:
-            low = mid
-            f0 = value
-        else:
-            high = mid
-    return mid, f0, f1
+    ``flash_mode=None`` means "use the models I passed": an activity model on
+    its own is a liquid-liquid problem, anything else keeps the historical
+    ``"phi-phi"`` default. Naming a mode explicitly always wins, so
+    ``flash_mode="phi-phi"`` without an ``eos`` is still an error rather than a
+    silent reinterpretation.
+    """
+    if flash_mode is None:
+        if eos is None and activity_model is not None:
+            return "gamma-gamma"
+        return "phi-phi"
+    return flash_mode.strip().casefold()

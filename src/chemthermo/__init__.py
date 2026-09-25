@@ -6,7 +6,7 @@ from .core.component import Component
 from .core.composition import Composition
 from .core.mixture import Mixture
 from .data import list_component_names
-from .eos import get_eos, list_eos
+from .eos import PCSAFTEOS, get_eos, list_eos
 from .exceptions import (
     CompositionError,
     ConvergenceError,
@@ -19,12 +19,20 @@ from .exceptions import (
 )
 from .flash import FlashResult, FlashSettings, PhaseResult, flash_tp
 from .models import NRTL, ActivityModel, EquationOfState, PengRobinsonEOS
-from .parameters import ActivityParameters, NRTLParameters, PCSAFTParameterError
+from .parameters import (
+    ActivityParameters,
+    NRTLParameters,
+    PCSAFTAssociationRecord,
+    PCSAFTParameterError,
+    PCSAFTParameters,
+    PCSAFTRecord,
+)
 from .phase_boundary import bubble_pressure, bubble_temperature, dew_pressure, dew_temperature
+from .stability import StabilityResult, StabilitySettings, StabilityTrial, stability_tp
 from .units import PA_PER_BAR, STANDARD_P_PA
 from .validation import validate_fractions, validate_pressure, validate_temperature
 
-__version__ = "0.0.0"
+__version__ = "0.4.0"
 
 __all__ = [
     "ChemThermoError",
@@ -38,6 +46,7 @@ __all__ = [
     "ActivityModel",
     "EquationOfState",
     "NRTL",
+    "PCSAFTEOS",
     "PengRobinsonEOS",
     "ActivityParameters",
     "NRTLParameters",
@@ -46,7 +55,10 @@ __all__ = [
     "STANDARD_P_PA",
     "validate_fractions",
     "Composition",
+    "PCSAFTAssociationRecord",
     "PCSAFTParameterError",
+    "PCSAFTParameters",
+    "PCSAFTRecord",
     "ConvergenceError",
     "ModelError",
     "FlashResult",
@@ -59,6 +71,10 @@ __all__ = [
     "bubble_temperature",
     "dew_pressure",
     "dew_temperature",
+    "stability_tp",
+    "StabilityResult",
+    "StabilitySettings",
+    "StabilityTrial",
     "cite",
 ]
 

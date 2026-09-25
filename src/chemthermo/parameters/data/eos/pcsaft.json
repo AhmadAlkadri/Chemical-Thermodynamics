@@ -1,0 +1,189 @@
+{
+  "schema_version": 1,
+  "model": "PC-SAFT",
+  "provenance": {
+    "status": "published",
+    "primary_source": "J. Gross and G. Sadowski, \"Perturbed-Chain SAFT: An Equation of State Based on a Perturbation Theory for Chain Molecules\", Ind. Eng. Chem. Res. 40 (2001) 1244-1260, Table 1 (pure-component parameters of non-associating compounds). DOI 10.1021/ie0003887.",
+    "primary_source_read": false,
+    "primary_source_note": "The paper itself is behind the ACS paywall and could not be opened from the environment that produced this file (pubs.acs.org returned HTTP 403). The eleven records below were therefore transcribed from two independent secondary sources that both cite Table 1 of the same paper, and they agree digit for digit; the citation above remains the primary one.",
+    "secondary_sources": [
+      "FeOs (feos-org/feos, MIT/Apache-2.0), parameters/pcsaft/gross2001.json - one record per compound with m, sigma, epsilon_k.",
+      "Clapeyron.jl (ClapeyronThermo/Clapeyron.jl, MIT), database/SAFT/PCSAFT/PCSAFT_like.csv - rows whose 'source' column is the DOI 10.1021/ie0003887.",
+      "teqp (usnistgov/teqp, MIT), include/teqp/models/pcsaft.hpp - its built-in PCSAFTLibrary hard-codes Methane, Ethane and Propane with the BibTeXKey 'Gross-IECR-2001' and confirms those three independently."
+    ],
+    "units": "m is dimensionless (segments per chain); sigma_A is the segment diameter in Angstrom; epsilon_k_K is the segment dispersion energy divided by the Boltzmann constant, in K.",
+    "scope": "Non-associating and associating compounds. The eleven records carrying only m, sigma_A and epsilon_k_K are the 2001 non-associating set; the five carrying an 'association' block are the 2002 associating set (see 'association_provenance' below). Polar (dipolar/quadrupolar) terms are still not implemented, so strongly polar non-associating compounds remain out of scope.",
+    "association_provenance": {
+      "status": "published",
+      "primary_source": "J. Gross and G. Sadowski, \"Application of the Perturbed-Chain SAFT Equation of State to Associating Systems\", Ind. Eng. Chem. Res. 41 (2002) 5510-5515. DOI 10.1021/ie010954d.",
+      "primary_source_read": false,
+      "primary_source_note": "The paper is behind the ACS paywall; https://pubs.acs.org/doi/10.1021/ie010954d returned HTTP 403 from this environment, so its parameter table was not read directly. The five records below were transcribed from two independent secondary sources that both cite that DOI and agree digit for digit.",
+      "secondary_sources": [
+        "FeOs (feos-org/feos, MIT OR Apache-2.0), parameters/pcsaft/gross2002.json - m, sigma, epsilon_k and an association_sites entry with kappa_ab, epsilon_k_ab, na = nb = 1 per compound.",
+        "Clapeyron.jl (ClapeyronThermo/Clapeyron.jl, MIT), database/SAFT/PCSAFT/PCSAFT_like.csv and PCSAFT_assoc.csv - rows whose 'source' column is the DOI 10.1021/ie010954d, with n_H = n_e = 1 (i.e. the 2B scheme)."
+      ],
+      "scheme": "All five are the 2B scheme of the 2002 paper: one type-A (proton-donor) site and one type-B (proton-acceptor) site per molecule, bonding A-B only. 'na' and 'nb' are what the model reads; 'scheme' is the conventional label and is checked against them.",
+      "units": "kappa_ab is the dimensionless effective association volume; epsilon_ab_k_K is the association energy divided by the Boltzmann constant, in K.",
+      "cross_association": "Not stored: cross-association parameters are computed from these pure-component ones by the combining rules of Wolbach & Sandler, Ind. Eng. Chem. Res. 37 (1998) 2917 (arithmetic mean in epsilon^AB, geometric mean in kappa^AB times [sqrt(sigma_i sigma_j)/(0.5(sigma_i+sigma_j))]^3). Clapeyron.jl's PCSAFT_assoc.csv stores the water/ethanol cross pair explicitly as epsilon 2577.05 K and bond volume 0.03356196748232913, which those rules reproduce digit for digit from the two pure records - an independent confirmation of the rules, not only of the values. See ADR-0018.",
+      "kij": "No binary interaction parameters are packaged for these either; k_ij defaults to 0, which is a poor model for water/hydrocarbon systems and is documented as such in ADR-0018."
+    },
+    "molar_mass": "No MW is stored here on purpose: the packaged component databank (src/chemthermo/data/components.json) is the single source of truth for molar mass, and PC-SAFT does not use it. PCSAFTParameters.from_records() accepts an optional MW_g_mol for user-supplied records.",
+    "names": "Component names match the packaged databank after chemthermo.data.normalize_name, so PCSAFTEOS(components=[...]) accepts the same spellings the rest of the package does.",
+    "kij": "No binary interaction parameters are packaged. k_ij defaults to 0 and is supplied per call as PCSAFTEOS(kij=...), either as a scalar or as a name-keyed per-pair mapping (ADR-0006).",
+    "note": "Keys outside 'schema_version', 'model' and 'components' (and extra keys inside a component entry) are documentation only; the loader ignores them, so recording provenance does not require a schema bump."
+  },
+  "components": [
+    {
+      "name": "Methane",
+      "m": 1.0,
+      "sigma_A": 3.7039,
+      "epsilon_k_K": 150.03,
+      "source": "Gross & Sadowski 2001, Table 1"
+    },
+    {
+      "name": "Ethane",
+      "m": 1.6069,
+      "sigma_A": 3.5206,
+      "epsilon_k_K": 191.42,
+      "source": "Gross & Sadowski 2001, Table 1"
+    },
+    {
+      "name": "Propane",
+      "m": 2.002,
+      "sigma_A": 3.6184,
+      "epsilon_k_K": 208.11,
+      "source": "Gross & Sadowski 2001, Table 1"
+    },
+    {
+      "name": "n-Butane",
+      "m": 2.3316,
+      "sigma_A": 3.7086,
+      "epsilon_k_K": 222.88,
+      "source": "Gross & Sadowski 2001, Table 1"
+    },
+    {
+      "name": "n-Pentane",
+      "m": 2.6896,
+      "sigma_A": 3.7729,
+      "epsilon_k_K": 231.2,
+      "source": "Gross & Sadowski 2001, Table 1"
+    },
+    {
+      "name": "n-Hexane",
+      "m": 3.0576,
+      "sigma_A": 3.7983,
+      "epsilon_k_K": 236.77,
+      "source": "Gross & Sadowski 2001, Table 1"
+    },
+    {
+      "name": "n-Heptane",
+      "m": 3.4831,
+      "sigma_A": 3.8049,
+      "epsilon_k_K": 238.4,
+      "source": "Gross & Sadowski 2001, Table 1"
+    },
+    {
+      "name": "n-Octane",
+      "m": 3.8176,
+      "sigma_A": 3.8373,
+      "epsilon_k_K": 242.78,
+      "source": "Gross & Sadowski 2001, Table 1"
+    },
+    {
+      "name": "n-Decane",
+      "m": 4.6627,
+      "sigma_A": 3.8384,
+      "epsilon_k_K": 243.87,
+      "source": "Gross & Sadowski 2001, Table 1"
+    },
+    {
+      "name": "Nitrogen",
+      "m": 1.2053,
+      "sigma_A": 3.313,
+      "epsilon_k_K": 90.96,
+      "source": "Gross & Sadowski 2001, Table 1"
+    },
+    {
+      "name": "Carbon dioxide",
+      "m": 2.0729,
+      "sigma_A": 2.7852,
+      "epsilon_k_K": 169.21,
+      "source": "Gross & Sadowski 2001, Table 1"
+    },
+    {
+      "name": "Water",
+      "m": 1.0656,
+      "sigma_A": 3.0007,
+      "epsilon_k_K": 366.51,
+      "source": "Gross & Sadowski 2002, Table 1",
+      "association": {
+        "scheme": "2B",
+        "kappa_ab": 0.034868,
+        "epsilon_ab_k_K": 2500.7,
+        "na": 1,
+        "nb": 1,
+        "source": "Gross & Sadowski 2002, Table 1"
+      }
+    },
+    {
+      "name": "Methanol",
+      "m": 1.5255,
+      "sigma_A": 3.23,
+      "epsilon_k_K": 188.9,
+      "source": "Gross & Sadowski 2002, Table 1",
+      "association": {
+        "scheme": "2B",
+        "kappa_ab": 0.035176,
+        "epsilon_ab_k_K": 2899.5,
+        "na": 1,
+        "nb": 1,
+        "source": "Gross & Sadowski 2002, Table 1"
+      }
+    },
+    {
+      "name": "Ethanol",
+      "m": 2.3827,
+      "sigma_A": 3.1771,
+      "epsilon_k_K": 198.24,
+      "source": "Gross & Sadowski 2002, Table 1",
+      "association": {
+        "scheme": "2B",
+        "kappa_ab": 0.032384,
+        "epsilon_ab_k_K": 2653.4,
+        "na": 1,
+        "nb": 1,
+        "source": "Gross & Sadowski 2002, Table 1"
+      }
+    },
+    {
+      "name": "1-Propanol",
+      "m": 2.9997,
+      "sigma_A": 3.2522,
+      "epsilon_k_K": 233.4,
+      "source": "Gross & Sadowski 2002, Table 1",
+      "association": {
+        "scheme": "2B",
+        "kappa_ab": 0.015268,
+        "epsilon_ab_k_K": 2276.8,
+        "na": 1,
+        "nb": 1,
+        "source": "Gross & Sadowski 2002, Table 1"
+      }
+    },
+    {
+      "name": "n-Butanol",
+      "m": 2.7515,
+      "sigma_A": 3.6139,
+      "epsilon_k_K": 259.59,
+      "source": "Gross & Sadowski 2002, Table 1 (the paper's \"1-butanol\"; the packaged databank spells it \"n-Butanol\")",
+      "association": {
+        "scheme": "2B",
+        "kappa_ab": 0.006692,
+        "epsilon_ab_k_K": 2544.6,
+        "na": 1,
+        "nb": 1,
+        "source": "Gross & Sadowski 2002, Table 1 (the paper's \"1-butanol\"; the packaged databank spells it \"n-Butanol\")"
+      }
+    }
+  ]
+}
