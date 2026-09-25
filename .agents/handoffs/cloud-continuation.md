@@ -1,7 +1,8 @@
 # Cloud continuation handoff
 
 Written 2026-09-25 by the local orchestrator when the equilibrium campaign was
-first published. It is self-contained: a fresh session needs this repository
+first published; section 7b and the checkpoint table updated the same day by
+the first cloud session. It is self-contained: a fresh session needs this repository
 and nothing from the original machine, home directory or session memory.
 What to do next is in `.agents/handoffs/continuation-plan.md`.
 
@@ -15,6 +16,7 @@ What to do next is in `.agents/handoffs/continuation-plan.md`.
 | old baseline | `main` = tag `v0.1.0` = `a7a8ca742cadf41ad228ffa8c23d95d3252f5ce9` (an ancestor of `dev/sprint`) |
 | handoff commits | on top of `5041dd7`: CI fix, ADR-0031, `tools/release_smoke.py`, these files, `CHANGELOG.md`, version `0.2.0b1` |
 | release | `v0.2.0b1` (GitHub prerelease, source + wheel; not on PyPI) - see section 7 |
+| first cloud session (2026-09-25) | slices `cloud-baseline`, `cross-platform-guards` (ADR-0032), `cli-contract` + `cli-stability-multiphase` (ADR-0033), `pcsaft-temperature-derivative` (ADR-0034), `release`; tag `v0.3.0b1` on `64130a2d5373e88cc65c28fdd047807f04a5daf4` - section 7b |
 
 Verify before editing: `git merge-base --is-ancestor 5041dd7071c6fd7128456cf643d59cac07f8583b HEAD`
 must succeed, and `HEAD` must be the SHA your prompt names (or a descendant
@@ -177,3 +179,45 @@ and this host also disagree with each other on the PC-SAFT literals (`a_res`
 exact here, 3 ULP off there). Diagnosis and the rule adopted: ADR-0032, ledger
 Cases P-11 and P-17 "cross-platform". Slice A2 (`cross-platform-guards`)
 followed; its result is below.
+
+### 7b. First cloud session: what was accepted (2026-09-25)
+
+| slice | commit(s) | evidence |
+| --- | --- | --- |
+| `cloud-baseline` (A) | `c3a5bd1`-ish, see `git log` | section 7a |
+| `cross-platform-guards` (A2, ADR-0032) | `f53bf0c`, fraction fix, FeOs-pin fix | ledger P-11/P-17 "cross-platform"; `tests/test_capture_identity.py` |
+| `cli-contract`, `cli-stability-multiphase` (B0-B3, ADR-0033) | `a14c5f0` and its parent | 11 pre-change CLI invocations byte-identical; `tests/test_cli_stability_multiphase.py` |
+| `pcsaft-temperature-derivative` (C1 + C3, ADR-0034) | `7c0c4ef` | ledger P-19 (teqp `Ar10` <= 5.24e-16; Gibbs-Helmholtz; `dH_vap = T dS_vap` to 1.05e-12) |
+| `release` 0.3.0b1 | `64130a2d5373e88cc65c28fdd047807f04a5daf4` | below |
+
+**CI (GitHub Actions ubuntu-latest):** red on every earlier commit of this
+branch; **first green run at `a14c5f0`** (run 36125595338), green at
+`7c0c4ef` (36127206093) and at the release commit `64130a2` (36127239537).
+Run 36124342571 at `f53bf0c` failed one float (Tessier near-plait phase
+fraction 2.34e-12 vs a 1e-12 bound) and led to the derived `1e-12 / delta`
+fraction bound (ADR-0032).
+
+**Release 0.3.0b1: gates passed, tag not pushed.** Clean clone from GitHub
+at `64130a2`, Linux x86_64, CPython 3.11.15, numpy 2.4.6: ruff/pyright clean;
+`pytest -q` 814 passed, 51 skipped, 74 deselected; `python -m build`; wheel in
+a fresh venv outside the tree: `0.3.0b1`, `release_smoke.py` pass, new CLI
+commands and `residual_properties` run. With the validation extras (teqp
+0.23.2, FeOs 0.10.1, thermo 0.6.1) on the same commit: 975 passed, 0 failed.
+`git push origin refs/tags/v0.3.0b1` was refused by this session's git route
+(three attempts, "remote end hung up", no proxy failure logged; branch pushes
+work), and there is no release-creation tool, so per the boundaries in
+section 6 the owner-side commands, notes and checksums are in
+`.agents/handoffs/release-packet-v0.3.0b1.md`. Until then, pin by SHA:
+`pip install "chemthermo @ git+https://github.com/AhmadAlkadri/Chemical-Thermodynamics.git@64130a2d5373e88cc65c28fdd047807f04a5daf4"`.
+
+**Not run this session:** anything on macOS (the ADR-0032 guards are exact
+there by construction, but nobody has run them there yet: the owner's next
+local `pytest -q` is that check); `pytest -m slow`; the full 2505-state map
+(no solver change since `f852726`); benchmark timings; `aglint` (private).
+
+**Next session starts at** the handoff commit that follows `64130a2` on
+`dev/sprint`. Plan order (continuation-plan.md): owner publishes v0.3.0b1 ->
+C2 (association temperature derivative; completes the residual-caloric
+milestone, then a minor release) -> A3/A4 (stability tie-break by residual;
+polymer ladder neighbourhood) -> D -> E.
+
