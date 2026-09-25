@@ -126,29 +126,29 @@ Longer, model-specific limits are in the docs below.
 
 ## Documentation
 
-- [Installation and development setup](docs/installation.md)
-- [TP flash](docs/flash.md) - phase detection, flash modes, three phases, `kij`, NRTL
-- [Phase stability](docs/stability.md)
-- [PC-SAFT](docs/pcsaft.md) - parameters, association, polymers, residual properties, limits and their validation
-- [Command line](docs/cli.md)
-- [Extending with a new equation of state](docs/extending.md)
-- [Benchmarks and the robustness map](docs/benchmarks.md)
-- Runnable scripts: [`examples/`](examples/README.md); notebooks: [`notebooks/`](notebooks/README.md)
-- [Changelog](CHANGELOG.md)
+- [Installation and development setup](https://github.com/AhmadAlkadri/Chemical-Thermodynamics/blob/main/docs/installation.md)
+- [TP flash](https://github.com/AhmadAlkadri/Chemical-Thermodynamics/blob/main/docs/flash.md) - phase detection, flash modes, three phases, `kij`, NRTL
+- [Phase stability](https://github.com/AhmadAlkadri/Chemical-Thermodynamics/blob/main/docs/stability.md)
+- [PC-SAFT](https://github.com/AhmadAlkadri/Chemical-Thermodynamics/blob/main/docs/pcsaft.md) - parameters, association, polymers, residual properties, limits and their validation
+- [Command line](https://github.com/AhmadAlkadri/Chemical-Thermodynamics/blob/main/docs/cli.md)
+- [Extending with a new equation of state](https://github.com/AhmadAlkadri/Chemical-Thermodynamics/blob/main/docs/extending.md)
+- [Benchmarks and the robustness map](https://github.com/AhmadAlkadri/Chemical-Thermodynamics/blob/main/docs/benchmarks.md)
+- Runnable scripts: [`examples/`](https://github.com/AhmadAlkadri/Chemical-Thermodynamics/blob/main/examples/README.md); notebooks: [`notebooks/`](https://github.com/AhmadAlkadri/Chemical-Thermodynamics/blob/main/notebooks/README.md)
+- [Changelog](https://github.com/AhmadAlkadri/Chemical-Thermodynamics/blob/main/CHANGELOG.md)
 
 ## How it is validated and developed
 
 Every number quoted above has an entry in the validation ledger,
-[`.agents/brain/validation-cases.md`](.agents/brain/validation-cases.md), with
+[`.agents/brain/validation-cases.md`](https://github.com/AhmadAlkadri/Chemical-Thermodynamics/blob/main/.agents/brain/validation-cases.md), with
 its source, tolerance, achieved value and test. Design decisions are
-recorded as ADRs in [`.agents/brain/adr/`](.agents/brain/adr/). The tests that
+recorded as ADRs in [`.agents/brain/adr/`](https://github.com/AhmadAlkadri/Chemical-Thermodynamics/tree/main/.agents/brain/adr/). The tests that
 compare against teqp, FeOs and `thermo` run with `pip install -e
 ".[validation]"` and skip cleanly otherwise. A 2505-state robustness map
 (`python -m chemthermo.bench robustness`) sweeps every model family; its only
 refusals are 5 states of the deprecated gamma-phi path.
 
-Contributions: see [CONTRIBUTING.md](CONTRIBUTING.md).
+Contributions: see [CONTRIBUTING.md](https://github.com/AhmadAlkadri/Chemical-Thermodynamics/blob/main/CONTRIBUTING.md).
 
 ## Licence
 
-MIT - see [LICENSE](LICENSE).
+MIT - see [LICENSE](https://github.com/AhmadAlkadri/Chemical-Thermodynamics/blob/main/LICENSE).

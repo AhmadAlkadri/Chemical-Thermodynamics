@@ -1,19 +1,51 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=77", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "chemthermo"
 version = "0.3.0b1"
-description = "Chemical engineering thermodynamics utilities."
+description = "Phase equilibrium for chemical engineering: tangent-plane stability, multiphase TP flash, Peng-Robinson, PC-SAFT and NRTL."
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Ahmad Alkadri" }]
+keywords = [
+  "thermodynamics",
+  "phase equilibrium",
+  "flash",
+  "stability",
+  "PC-SAFT",
+  "Peng-Robinson",
+  "NRTL",
+  "chemical engineering",
+]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Science/Research",
+  "Intended Audience :: Education",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Topic :: Scientific/Engineering :: Chemistry",
+  "Topic :: Scientific/Engineering :: Physics",
+  "Typing :: Typed",
+]
 dependencies = [
   "numpy>=1.24",
   "pydantic>=2.0",
   "bibtexparser>=1.4.0,<2",
 ]
+
+[project.urls]
+Homepage = "https://github.com/AhmadAlkadri/Chemical-Thermodynamics"
+Documentation = "https://github.com/AhmadAlkadri/Chemical-Thermodynamics/tree/main/docs"
+Changelog = "https://github.com/AhmadAlkadri/Chemical-Thermodynamics/blob/main/CHANGELOG.md"
+Issues = "https://github.com/AhmadAlkadri/Chemical-Thermodynamics/issues"
 
 [project.scripts]
 chemthermo = "chemthermo.cli:main"
@@ -21,6 +53,7 @@ chemthermo = "chemthermo.cli:main"
 [project.optional-dependencies]
 dev = [
   "build>=1.2.2",
+  "twine>=5",
   "nbstripout>=0.7.1",
   "pytest>=7.4",
   "ruff==0.14.13",
@@ -53,6 +86,7 @@ package-dir = { "" = "src" }
 where = ["src"]
 
 [tool.setuptools.package-data]
+"chemthermo" = ["py.typed"]
 "chemthermo.data" = ["components.json", "references.bib"]
 "chemthermo.parameters" = ["data/activity/nrtl.json", "data/eos/pcsaft.json"]
 

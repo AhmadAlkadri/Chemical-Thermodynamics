@@ -7,6 +7,11 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Every version the package metadata advertises (pyproject classifiers).
+        python-version: ["3.11", "3.12", "3.13"]
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -14,7 +19,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: ${{ matrix.python-version }}
           cache: "pip"
 
       - name: Bootstrap venv + install dev dependencies
@@ -56,6 +61,12 @@ jobs:
 
       - name: Pytest
         run: .venv/bin/pytest -q
+
+      - name: Build sdist + wheel and check the PyPI metadata
+        run: |
+          .venv/bin/python -m build --outdir dist/
+          .venv/bin/twine check --strict dist/*
+          rm -rf dist/ build/
 
       - name: Non-editable install smoke
         run: .venv/bin/python tools/smoke_install.py --package .
