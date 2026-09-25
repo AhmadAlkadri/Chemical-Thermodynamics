@@ -357,3 +357,32 @@ def test_hexane_saturation_pressure_is_in_the_right_range_at_300_K() -> None:
     p_sat, _rho_l, _rho_v = _pure_saturation(eos, 300.0, 9500.0)
     assert 1.5e4 < p_sat < 3.0e4
     assert math.isfinite(p_sat)
+
+
+@pytest.mark.parametrize(
+    ("label", "components", "kij", "x", "temperature", "density"),
+    _STATES,
+    ids=[state[0] for state in _STATES],
+)
+def test_temperature_derivative_matches_teqp_ar10(
+    label: str,
+    components: tuple[str, ...],
+    kij: object,
+    x: list[float],
+    temperature: float,
+    density: float,
+) -> None:
+    """Case P-19: ``d(A^res/RT)/dT`` against teqp's ``get_Ar10 = -T d(alphar)/dT``.
+
+    The column Case P-1 recorded as "not compared" (ADR-0034). teqp gets it by
+    automatic differentiation of the same ``alphar``; chemthermo by a
+    hand-written chain rule, so they share no derivative code. Includes the
+    spinodal state, where ``Z < 0`` does not matter to a Helmholtz derivative.
+    """
+    eos = PCSAFTEOS(components=components, kij=kij)  # type: ignore[arg-type]
+    model = _teqp_model(components, eos.kij_matrix())
+    reference = -float(model.get_Ar10(temperature, density, np.array(x, dtype=float))) / temperature
+    derivative = eos.residual_helmholtz_temperature_derivative(
+        temperature_K=temperature, volume_m3=1.0 / density, composition=x
+    )
+    assert derivative == pytest.approx(reference, rel=1e-12, abs=1e-16)

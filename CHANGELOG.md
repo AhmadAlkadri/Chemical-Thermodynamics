@@ -17,6 +17,14 @@ source releases; **nothing is published to PyPI**.
   `cli_schema_version` stays 1 and every previously valid invocation prints
   byte-identical output. `examples/cli/stability_and_multiphase.sh`.
 
+- **PC-SAFT temperature derivative and residual properties** (non-associating):
+  `PCSAFTEOS.residual_helmholtz_temperature_derivative` and
+  `PCSAFTEOS.residual_properties` (`h_res`, `u_res`, `s_res_tv/tp`,
+  `g_res_tv/tp`, reduced). Checked against teqp `get_Ar10` (<= 5.2e-16 relative
+  over 14 states), Gibbs-Helmholtz through the fugacity route, and
+  `dH_vap = T dS_vap` at saturation. Associating mixtures raise `ModelError`.
+  ADR-0034; `examples/basic/pcsaft_residual_properties_demo.py`.
+
 ### Changed (tests and policy only; no library code)
 - Guards that compare against floats captured on macOS arm64 are exact there
   and, on any other platform, exact on every discrete field and bounded on
