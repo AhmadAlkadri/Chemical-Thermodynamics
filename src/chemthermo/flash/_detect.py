@@ -791,6 +791,28 @@ def _log_space_diagnostics(
 _LADDER_SEED_LABELS = ("stability-w", "stability-w", "stability-w-lever-rule")
 
 
+#: ADR-0036: two phases whose every ``ln x`` agrees to this are one phase -
+#: the trivial solution of the split equations. Measured on the diverged
+#: K-loop band: trivial pairs agree to <= 2e-15 in ``ln x``, the real tie
+#: line's phases differ by ~20 in ``ln x_polymer``.
+_TRIVIAL_LN_X = 1e-6
+
+
+def _is_trivial_pair(x_i: np.ndarray, x_ii: np.ndarray) -> bool:
+    """True when the two compositions are the same phase (ADR-0036).
+
+    The trivial solution satisfies the equal-fugacity equations exactly and,
+    because both phases carry the feed, the mass balance for *any* phase
+    fraction - so neither the residual nor ``0 < beta < 1`` can see it.
+    A component present in one phase and absent from the other makes the pair
+    distinct.
+    """
+    both = (x_i > 0.0) & (x_ii > 0.0)
+    if bool(np.any((x_i > 0.0) != (x_ii > 0.0))):
+        return False
+    return bool(np.max(np.abs(np.log(x_i[both]) - np.log(x_ii[both]))) <= _TRIVIAL_LN_X)
+
+
 def _walk_stability_seed_ladder(
     *,
     settings: FlashSettings,
@@ -839,7 +861,11 @@ def _walk_stability_seed_ladder(
             )
         except ModelError:
             continue
-        if candidate.residual <= settings.tol and 0.0 < candidate.beta < 1.0:
+        if (
+            candidate.residual <= settings.tol
+            and 0.0 < candidate.beta < 1.0
+            and not _is_trivial_pair(candidate.x_i, candidate.x_ii)
+        ):
             return candidate, _LADDER_SEED_LABELS[position], safeguard
     return None
 
@@ -901,7 +927,11 @@ def _phi_phi_log_space(
         if retry.residual < refined.residual:
             refined = retry
             safeguarded = True
-    if ladder is not None and (refined.residual > settings.tol or not 0.0 < refined.beta < 1.0):
+    if ladder is not None and (
+        refined.residual > settings.tol
+        or not 0.0 < refined.beta < 1.0
+        or _is_trivial_pair(refined.x_i, refined.x_ii)
+    ):
         # ADR-0028. Either the two calls above did not converge, or they
         # converged on the *trivial* solution - equal compositions, an exactly
         # zero residual and a phase fraction that collapses to ``0``, which the
@@ -1075,15 +1105,17 @@ def _phi_phi_second_order(
             )
             second_order_iterations += log_refined.iterations
 
-    if ladder is not None and residual > settings.tol:
-        # ADR-0028: the stationary point, not the K-loop's wreckage. Reached
-        # only where the state was about to raise below. The gate is the
-        # residual alone and deliberately not "or a phase fraction outside
-        # (0, 1)" as well: the collapsed-to-trivial outcome that needs the
-        # second half happens on the *other* log-space entry point
-        # (:func:`_phi_phi_log_space`), which carries it, and no state measured
-        # here reaches this line with a converged residual, so adding it would
-        # ship a branch nothing exercises (ADR-0002).
+    if ladder is not None and (
+        residual > settings.tol or not 0.0 < beta < 1.0 or _is_trivial_pair(x, y)
+    ):
+        # ADR-0028: the stationary point, not the K-loop's wreckage. ADR-0036
+        # widened the gate from "the residual" to "not a physical split": on
+        # the diverged K-loop band the linear-iterate retry above converges -
+        # residual ~1e-13 - on the *trivial* solution (both phases the feed,
+        # dG_split = 0), which passes a residual gate and was then refused
+        # downstream at 29 of 135 pressures within +-64 ULP of the Mw 53000 /
+        # 15 wt% / 8.1 MPa grid point (ledger Case P-17 "cross-platform").
+        # A split that is physical takes exactly the path it took before.
         walked = _walk_stability_seed_ladder(
             settings=settings,
             z=z,
