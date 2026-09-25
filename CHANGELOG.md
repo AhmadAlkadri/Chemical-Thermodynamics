@@ -4,7 +4,21 @@ Versions follow PEP 440 and are tagged `v<version>` on one tested commit
 (policy: `.agents/brain/adr/0031-versioned-releases.md`). Releases are GitHub
 source releases; **nothing is published to PyPI**.
 
-## Unreleased
+## 0.3.0b1 (2026-09-25) - prerelease
+
+The CLI reaches the equilibrium work, PC-SAFT gains residual caloric
+properties, and the test suite is green on Linux for the first time. A
+prerelease because the CLI contract (ADR-0033) and the two PC-SAFT methods
+(ADR-0034) are new. Validation now spans two platforms (macOS arm64 inherited
+at 0.2.0b1; Linux x86_64 on GitHub Actions and a cloud session for this
+release), but this release's new code was exercised on Linux only.
+There is no 0.2.0b2; its planned content (the cross-platform guards) is here.
+
+### Compatibility
+- Library: additive only (two new `PCSAFTEOS` methods). No existing number
+  moved: the new derivative is a separate function, and no solver was touched.
+- CLI: `cli_schema_version` stays 1; previously valid invocations print
+  byte-identical output (checked on 11 invocations).
 
 ### Added
 - **CLI `chemthermo stability-tp`**: tangent-plane stability of a feed with
