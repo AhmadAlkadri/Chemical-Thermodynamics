@@ -17,6 +17,9 @@ solver change or when a change could move a map bucket.
 
 ## A. Cloud baseline (first, every new environment)
 
+(Handoff SHA: the one named in your prompt; the release it contains is
+`v0.2.0b1` = `bd37068`. Start from the handoff SHA, not the tag.)
+
 1. `git fetch origin && git checkout <handoff SHA>`; verify
    `git merge-base --is-ancestor 5041dd7071c6fd7128456cf643d59cac07f8583b HEAD`.
    Never start from `main` (it is the Feb 2026 baseline, 121+ commits behind).
@@ -29,10 +32,39 @@ solver change or when a change could move a map bucket.
 4. Record results in section 7 of the handoff as "cloud baseline" with OS,
    Python, numpy versions. A cloud-only failure is recorded as such (with
    evidence), not assumed to invalidate the science.
-5. **Release checkpoint:** if the baseline is green in this second
-   environment and nothing else changed, promoting `0.2.0b1` to `0.2.0`
-   (ADR-0031 item 3) is allowed but optional; otherwise fold it into the B
-   release.
+5. Expect the 3 Linux failures of handoff section 7 on a Linux cloud host;
+   anything else failing is new information to record. Then do A2 before B.
+
+## A2. Cross-platform bit-identity guards (first implementation slice)
+
+CI on ubuntu-latest is red on 3 tests (handoff section 7): two bit-identity
+fixtures differ in the last ULP and one diagnostic count flips on a near-tied
+state. Verdicts agree. Goal: CI green on Linux **without weakening** what the
+guards protect.
+
+- Diagnose first: confirm each difference is floating-point platform noise
+  (libm/`exp`/`log`, BLAS/`linalg.solve`, summation order), not
+  nondeterminism on one platform (run each test twice on Linux, compare).
+- Keep exact bit-identity where the fixture's platform matches (record
+  platform/machine/numpy in the fixture) and on other platforms compare with
+  an explicit, justified bound (e.g. a few ULP / 1e-13 relative on floats)
+  plus **exact** equality of every discrete field (phase names and count,
+  statuses, verdicts, converged stage, iteration counts only if stable). Write
+  this as an ADR amending the bit-identity contract of ADR-0017/0023/0030.
+- The surface-count test: pin the verdicts exactly and make the surface
+  statement robust to exact ties (for example, count a state for a surface
+  only when its minimum beats the other surface's by a stated margin), with
+  the per-state reason recorded in ledger Case P-11.
+- Acceptance: GitHub Actions green on `ubuntu-latest`; the local/macOS run
+  still exact; ledger and ADR record the rule; no test deleted or marked
+  `slow`/`xfail` to get green.
+- **Release checkpoint:** once CI is green on Linux, `0.2.0b2` (or `0.2.0` if
+  nothing else changed and the owner-level policy in ADR-0031 item 3 is met).
+
+Also queued (docs hygiene, cheap, any time): make `aglint check --repo .`
+pass - fix the renamed paths it reports and decide whether `file::test`
+node ids are written differently or the linter configured; never delete
+evidence references to silence it.
 
 ## B. CLI exposure of the delivered equilibrium work (default next priority)
 
