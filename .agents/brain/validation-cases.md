@@ -3455,8 +3455,18 @@ reach the same stationary point (best `tpd` equal to <= 5e-16, trial
 compositions to <= 6e-13). On the other 57 the winner is decisive
 (19 vapour, 38 liquid; the two decisive two-surface gaps are 1.7e-02 and 1.0).
 
+- **GitHub runner, first run of the rule (run 36124342571 at `f53bf0c`):**
+  one violation - the Tessier (2000) near-plait feed's two phase fractions
+  moved 2.34e-12 (2.0x the 1e-12 bound); every other float and every discrete
+  field of all 155 states passed. That state has the fixture's shortest tie
+  line (`delta = max_i |x_i^I - x_i^II| = 0.0558`; next shortest 0.298), and
+  the lever rule amplifies composition noise by `1/delta` (~18x). Phase
+  fractions therefore get `atol = 1e-12 / delta` - a derived bound, 1.8e-11
+  for this state and <= 3.4e-12 for every other - checked to reject a 2.5e-11
+  move on this state.
 - **Rule adopted (ADR-0032):** exact on macOS arm64; elsewhere discrete fields
-  exact, floats to `atol = rtol = 1e-12` (flash fixture) and `atol = 5e-14`
+  exact, floats to `atol = rtol = 1e-12` (flash fixture; phase fractions
+  `1e-12 / delta`) and `atol = 5e-14`
   (PC-SAFT literals), and the surface statement is `{vapor: 19, liquid: 38,
   tie: 20}` with `TIE_MARGIN = 1e-10`, the 45/32 split still pinned on macOS.
 - **Negative control:** `tests/test_capture_identity.py` - a 1e-11 move, any

@@ -53,7 +53,15 @@ guards, 3 of 769 tests, and nothing else. Measured on a second Linux x86_64 host
      (fractions, K-values, `tpd` and `dG` in RT, residuals of those); 4x the
      worst measured move; equal to the tightest solver tolerance
      (`FlashSettings.second_order_tol`) and 1000x tighter than the 1e-09 audit
-     tolerance ADR-0021 used when this fixture was regenerated.
+     tolerance ADR-0021 used when this fixture was regenerated. **Phase
+     fractions** (and `vapor_fraction`) get `atol = 1e-12 / delta`, `delta`
+     the state's shortest tie line in the fixture (the smallest, over phase
+     pairs, of the largest composition difference): the lever rule divides
+     composition noise by the tie line's length. Derived after the first CI
+     run of this rule (run 36124342571) moved the Tessier near-plait feed's
+     fractions by 2.34e-12 (`delta = 0.056`; its bound is 1.8e-11); every
+     other multiphase state has `delta >= 0.30`, so its bound stays within
+     3.4e-12.
    - PC-SAFT literals: `atol = 5e-14`, `rtol = 0`. 14x the worst measured move;
      the size of the floor at which Case P-1 accepted the same quantities as
      equal to teqp (worst `|dZ|` 2.58e-14, `|d ln phi|` 2.66e-14). That the

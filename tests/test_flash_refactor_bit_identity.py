@@ -316,6 +316,39 @@ def test_flash_tp_is_bit_identical_to_the_v3_capture(
     # move measured over all 688 moved floats was 2.4e-13, and the tightest
     # solver tolerance (`second_order_tol`) is 1e-12, so a change to the
     # arithmetic that moves a converged answer by a solver tolerance still
-    # fails here. ADR-0032; ledger Case P-11 "cross-platform".
+    # fails here. Phase fractions are the one exception, by derivation rather
+    # than by fit: the lever rule beta = (z - x_II) / (x_I - x_II) divides a
+    # composition's noise by the tie line's length, so their bound is
+    # 1e-12 / delta, delta being the state's shortest tie line (the smallest,
+    # over phase pairs, of the largest composition difference) in the fixture.
+    # It matters for one state only - the Tessier near-plait feed, delta =
+    # 0.056, where the GitHub runner moved beta by 2.34e-12; every other
+    # multiphase state has delta >= 0.30. ADR-0032; ledger Case P-11
+    # "cross-platform".
     for label, expected in fixture.items():
-        assert_matches_capture(expected, computed[label], rtol=1e-12, atol=1e-12, label=label)
+        actual = dict(computed[label])
+        pinned = dict(expected)
+        fractions = {key: (pinned.pop(key), actual.pop(key)) for key in _FRACTION_KEYS}
+        assert_matches_capture(pinned, actual, rtol=1e-12, atol=1e-12, label=label)
+        fraction_atol = 1e-12 / _shortest_tie_line(expected["phases"])
+        assert_matches_capture(
+            {key: pair[0] for key, pair in fractions.items()},
+            {key: pair[1] for key, pair in fractions.items()},
+            rtol=1e-12,
+            atol=fraction_atol,
+            label=label,
+        )
+
+
+_FRACTION_KEYS = ("phase_fractions", "vapor_fraction")
+
+
+def _shortest_tie_line(phases: dict[str, list[float]]) -> float:
+    """Smallest, over phase pairs, of the largest composition difference; 1 for one phase."""
+    names = list(phases)
+    lengths = [
+        max(abs(a - b) for a, b in zip(phases[p], phases[q]))
+        for i, p in enumerate(names)
+        for q in names[i + 1 :]
+    ]
+    return min(lengths, default=1.0)
