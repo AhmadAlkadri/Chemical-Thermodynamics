@@ -1,6 +1,8 @@
 # Steering Brief
 
 ## What changed since last brief (files + bullets)
+- **Goal changed by the owner (2026-09-25): release readiness, not an open-ended sprint.** Target: an honest capability summary, a tidy public face, merge to `main`, and a pinned **0.4.0 (Beta)** the owner publishes to PyPI. Decisions (owner interview): short README + `docs/`; keep `.agents/` and `benchmarks/` but tidy; remove `chemthermo.vlle` (ADR-0037), keep deprecated gamma-phi. Plan items E and further science are paused until after 0.4.0.
+- `src/chemthermo/vlle/` and `tests/test_vlle_plugin.py` removed (ADR-0037); `AGENT/`, `AGENT.md`, empty `ROADMAP.md` removed; `CONTRIBUTING.md` added (slice `release-tidy`).
 - `src/chemthermo/flash/_detect.py`, `tests/test_pcsaft_polymer.py`, ADR-0036, ledger Case P-17 "ADR-0036" (slice `flash-trivial-split`; plan item A4)
   - **A diverged K-loop's retry could "converge" on the trivial split**, which every ladder gate accepted; 29 of 135 pressures around the Mw 53000 ladder state were refused. Now 0, same tie line. Full map before/after on one machine: 0 of 2505 states differ.
   - **First full robustness map on Linux:** identical buckets to macOS for all 2505 states.

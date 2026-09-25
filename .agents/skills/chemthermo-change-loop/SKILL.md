@@ -22,7 +22,7 @@ Use this skill for execution flow; do not redefine hard gates here.
 - Confirm scope policy remains consistent across docs: VLLE and PC-SAFT are in scope, and no thermodynamic capability class is categorically out of scope.
 
 2. Classify the change.
-- Treat edits touching `src/chemthermo/__init__.py`, `src/chemthermo/eos/__init__.py`, or `src/chemthermo/vlle/__init__.py` as public API-sensitive.
+- Treat edits touching `src/chemthermo/__init__.py`, or `src/chemthermo/eos/__init__.py` as public API-sensitive.
 - Treat changes to solver/model internals as invariant-sensitive (SI units, composition validation, deterministic flash behavior).
 - Treat notebook edits as hygiene-sensitive (strip outputs, keep runnable narrative).
 

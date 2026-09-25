@@ -418,8 +418,8 @@ def flash_tp(
             "flash_mode='vlle' is not a supported mode. Three-phase "
             "(vapor-liquid-liquid) equilibrium is discovered automatically: use "
             "flash_mode='modified-raoult' with FlashSettings(max_phases=3) (the "
-            "default) and see ADR-0011. chemthermo.vlle is deprecated; see "
-            "ADR-0013."
+            "default) and see ADR-0011. The chemthermo.vlle plugin package was "
+            "removed in 0.4.0 (ADR-0037)."
         )
     if mode not in FLASH_MODES:
         raise ModelError(f"Unsupported flash_mode '{flash_mode}'.")

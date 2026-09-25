@@ -188,4 +188,4 @@ of `chemthermo.vlle` as a "documented public subpackage" to "documented
 public, deprecated".
 
 ## Superseded by (optional)
-None.
+ADR-0037 (the package was removed in 0.4.0).
