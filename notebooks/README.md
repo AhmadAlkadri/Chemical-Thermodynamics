@@ -2,10 +2,6 @@
 
 These notebooks demonstrate TP flash calculations using the current public API.
 
-## Scope Policy
-
-VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capability class is categorically out of scope; implementation maturity may vary by module and release.
-
 ## Setup
 
 From the repo root:
