@@ -75,7 +75,7 @@ style audit of `refactor_bit_identity_v3.json` before regenerating it):
   `trial_composition` can carry a 3.3e-11 residual when a tied trial reached
   1e-16). Acceptance: reordering invariance of the *reported* composition to
   1e-12 on the three Tessier states; fixture audit shows only tie states move.
-- **A4 `polymer-ladder-neighbourhood`**: ledger Case P-17 "cross-platform" -
+- **A4 `polymer-ladder-neighbourhood`** (**done**, ADR-0036; 29 -> 0 refusals over 135 pressures): ledger Case P-17 "cross-platform" -
   Mw 53000 / 15 wt% / 8.1 MPa refuses at 1 of 17 pressures within +-8 ULP.
   Acceptance: a neighbourhood scan (e.g. +-64 ULP and +-1e-6 relative) of the
   ladder states converges everywhere to the same tie line, pinned as a test;

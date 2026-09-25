@@ -13,6 +13,13 @@ source releases; **nothing is published to PyPI**.
   and enthalpy (2.1e-15 with matched universal constants). ADR-0034 amendment,
   ledger Case P-20.
 
+### Fixed
+- `flash_tp` (phi-phi): a split whose two phases are identical (the trivial
+  solution) no longer counts as converged, so the stability-seed ladder runs.
+  Around the Mw 53000 polyethylene ladder state, 29 of 135 neighbouring
+  pressures (+-64 ULP) refused; now none does. The full 2505-state
+  robustness map is unchanged field for field. ADR-0036.
+
 ### Changed
 - `stability_tp`: on a `tpd` tie (within 1e-12) the reported minimizing trial
   is one converged at least 1000x better, when one exists; flagged by

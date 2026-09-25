@@ -1120,10 +1120,10 @@ P17_LADDER_LLE = {
 }
 
 #: Ladder states whose *route* (not answer) is decided by last-bit noise.
-#: Over the 17 pressures within +-8 ULP of 8.1 MPa, one Linux x86_64 host took
-#: the `stability-w` rung 12 times, the `linear-iterate` rung 3 times, the
-#: linear stage once, and refused once; every converged answer was this tie
-#: line to <= 4.7e-12. The 16400 g/mol state took `stability-w` 17 times of 17
+#: Over the 135 pressures within +-64 ULP (and +-1e-8..1e-6 relative) of
+#: 8.1 MPa, one Linux x86_64 host takes the `stability-w` rung 119 times and
+#: the `linear-iterate` rung 16 times since ADR-0036 (before it: 29 refusals);
+#: every answer is this tie line. The 16400 g/mol state took `stability-w` 17 times of 17
 #: and stays pinned everywhere. ADR-0032; ledger Case P-17 "cross-platform".
 P17_ROUTE_BY_NOISE = {(53000.0, 0.15, 8.1e6)}
 
@@ -1187,6 +1187,69 @@ def test_the_band_the_diverged_k_loop_used_to_end(
     assert float(diagnostics["fugacity_residual"]) < 1e-8
     assert float(diagnostics["delta_g_split_rt"]) < 0.0
     assert diagnostics["post_split_status"] == "stable"
+
+
+def _nudged(pressure_Pa: float, ulps: int) -> float:
+    for _ in range(abs(ulps)):
+        pressure_Pa = math.nextafter(pressure_Pa, math.inf if ulps > 0 else -math.inf)
+    return pressure_Pa
+
+
+def _assert_on_the_p17_tie_line(pressure_Pa: float) -> None:
+    mw_g_mol, weight_fraction, grid_pressure = 53000.0, 0.15, 8.1e6
+    rich_x, _, rich_fraction, _ = P17_LADDER_LLE[(mw_g_mol, weight_fraction, grid_pressure)]
+    result = ct.flash_tp(
+        _mixture(weight_fraction, mw_g_mol),
+        temperature_K=TEMPERATURE_K,
+        pressure_Pa=pressure_Pa,
+        eos=_eos(KIJ, mw_g_mol),
+    )
+    polymer_rich, _ = _phase_by_polymer(result)
+    assert sorted(result.phases) == ["liquid1", "liquid2"]
+    assert result.diagnostics["post_split_status"] == "stable"
+    # A nudge of a few ULP in P moves the true tie line by ~1e-15 relative;
+    # 1e-9 is the asserted agreement, far from the trivial pair (rich_x vs z).
+    assert result.phases[polymer_rich].composition.fractions == pytest.approx(rich_x, rel=1e-9)
+    assert result.phase_fractions[polymer_rich] == pytest.approx(rich_fraction, rel=1e-9)
+
+
+@pytest.mark.parametrize(
+    "ulps",
+    [
+        -6,  # refused: "a two-phase set converged to a non-positive phase fraction"
+        -10,  # refused: "the phi-phi split converged to a vapor fraction outside (0, 1)"
+        -19,  # refused: "the multiphase split did not converge"
+    ],
+)
+def test_the_ladder_state_neighbourhood_no_longer_refuses(ulps: int) -> None:
+    """ADR-0036, ledger Case P-17 "cross-platform": one of each refusal shape.
+
+    Before ADR-0036, 29 of the 135 pressures within +-64 ULP of the Mw 53000 /
+    15 wt% / 8.1 MPa ladder state refused (Linux x86_64): the linear-iterate
+    log-space retry converged on the *trivial* split, which passes a residual
+    gate. These three offsets refused on that host; on any host they must now
+    reach the pinned tie line.
+    """
+    _assert_on_the_p17_tie_line(_nudged(8.1e6, ulps))
+
+
+@pytest.mark.slow  # the full +-64 ULP scan; three of its refusals run by default above
+def test_the_whole_ladder_state_neighbourhood_reaches_one_tie_line() -> None:
+    """All 129 pressures within +-64 ULP and six at +-1e-8..1e-6 relative.
+
+    The relative offsets move the true tie line by up to ~2e-6 in the phase
+    fraction, so they are checked for convergence and phase count only.
+    """
+    for ulps in range(-64, 65):
+        _assert_on_the_p17_tie_line(_nudged(8.1e6, ulps))
+    for relative in (-1e-6, -1e-7, -1e-8, 1e-8, 1e-7, 1e-6):
+        result = ct.flash_tp(
+            _mixture(0.15, 53000.0),
+            temperature_K=TEMPERATURE_K,
+            pressure_Pa=8.1e6 * (1.0 + relative),
+            eos=_eos(KIJ, 53000.0),
+        )
+        assert sorted(result.phases) == ["liquid1", "liquid2"]
 
 
 @pytest.mark.slow  # another feed on a tie line the default run already solves

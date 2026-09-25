@@ -5649,6 +5649,51 @@ cross-platform slice, which changes no solver code).
   `"linear-iterate"` (`P17_ROUTE_BY_NOISE`), with every numeric assertion
   unchanged.
 
+### ADR-0036 (2026-09-25): the neighbourhood, measured and repaired
+
+The +-8 ULP probe above undercounted. Scanning **135** pressures - every one
+within +-64 ULP of 8.1 MPa plus +-1e-8, 1e-7, 1e-6 relative - on the cloud
+host (Linux x86_64, numpy 2.4.6):
+
+| state | before ADR-0036 | after |
+| --- | --- | --- |
+| Mw 53000, 15 wt%, 8.1 MPa | 88 `stability-w`, 16 `linear-iterate`, 2 other stage, **29 refused** (14 "vapor fraction outside (0, 1)", 14 "non-positive phase fraction", 1 "multiphase split did not converge") | **119 `stability-w`, 16 `linear-iterate`, 0 refused** |
+| Mw 16400, 5 wt%, 7.5 MPa | 135 converge (129 `stability-w`) | unchanged |
+
+Every converged answer is the pinned tie line (worst 1.8e-7 relative in the
+phase fraction within +-64 ULP; up to 1.8e-6 at +-1e-6 relative, where the
+true tie line moves). **Root cause:** the linear-iterate log-space retry,
+started from the diverged K-loop's wreckage, converged on the *trivial* split
+(both phases the feed to 2e-15 in `ln x`, `dG_split = 0`, residual ~1e-13,
+`beta` anywhere in (0, 1) because the mass balance holds for any `beta`), so
+the ADR-0028 ladder's residual / `beta` gates let it through and the state was
+refused downstream. ADR-0036 adds "the two phases differ" to what counts as a
+physical split at all three ladder gates.
+
+- **Changed states:** 2 of the 135 that converged before (via phase addition
+  from the trivial split) now take the ladder: 1.2e-13 / 6.5e-13 from the pin
+  before, 1.1e-12 after, same tie line.
+- **Dormancy elsewhere, same machine, before vs after:** the full 2505-state
+  map - **0 states differ in any field** (timing excluded); all 155
+  `refactor_bit_identity_v3.json` states and the 144-state PR grid bit for
+  bit.
+- **Cross-platform note:** that "before" sweep is the first full map on Linux.
+  Matched by `(system, state_index)`, all 2505 buckets equal the macOS record
+  `robustness_f852726.json` (714 single-liquid, 635 single-vapor, 632 VLE, 478
+  LLE, 29 VLLE, 12 LLL, 5 `rr-no-bracket`). 300 PR grid pressures differ from
+  the macOS ones by <= 2e-16 relative (a generated grid), so the records must
+  be matched by index, not by float key.
+- **Synthetic refusal test:** `tests/test_flash_phi_phi_second_order.py`'s
+  collapsed-split case (`x = y = z`, `beta = -0.2`) is now rescued by the
+  ladder to the real methane / ethane 240 K / 3 MPa VLE (phase fractions
+  4.0e-10 from the unpatched flash); the refusal message stays pinned with the
+  ladder disabled, and `test_a_collapsed_split_is_rescued_by_the_stability_seed_ladder`
+  pins the rescue.
+- **Tests:** `test_the_ladder_state_neighbourhood_no_longer_refuses` (three
+  offsets, one per refusal shape; fail on the pre-ADR-0036 code, pass after)
+  and `test_the_whole_ladder_state_neighbourhood_reaches_one_tie_line`
+  (`slow`, the full scan).
+
 ---
 
 ## Case P-18: The map's nine multiphase refusals, retired and each one checked

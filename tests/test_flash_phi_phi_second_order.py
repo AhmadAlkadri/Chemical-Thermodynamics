@@ -424,6 +424,10 @@ def test_a_converged_vapor_fraction_outside_the_unit_interval_raises(
         )
 
     monkeypatch.setattr(_detect, "_solve_k_loop", collapsed)
+    # Since ADR-0036 a collapsed split walks the stability-seed ladder, which
+    # rescues this state (see the test below); the refusal is what is left
+    # when the ladder finds nothing too, so that is what is pinned here.
+    monkeypatch.setattr(_detect, "_walk_stability_seed_ladder", lambda **kwargs: None)
 
     with pytest.raises(ct.ConvergenceError, match="outside \\(0, 1\\)") as excinfo:
         ct.flash_tp(mixture, temperature_K=240.0, pressure_Pa=3.0e6, eos=ct.PengRobinsonEOS())
@@ -431,3 +435,48 @@ def test_a_converged_vapor_fraction_outside_the_unit_interval_raises(
     assert "beta=-2.000000e-01" in message
     assert "tpd_min" in message
     assert "not a single-phase state" in message
+
+
+def test_a_collapsed_split_is_rescued_by_the_stability_seed_ladder(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """ADR-0036: the same SYNTHETIC collapse, now with the ladder available.
+
+    The collapsed pair (both phases the feed, ``beta = -0.2``) is the trivial
+    solution; since ADR-0036 it is not a physical split, so the ADR-0028
+    ladder runs from the tangent-plane stationary point and returns the real
+    tie line - the one the unpatched flash returns, to the flash tolerance.
+    """
+    from chemthermo.flash import _detect
+    from chemthermo.flash._split import _SplitSolution
+
+    mixture = ct.Mixture.from_database(["Methane", "Ethane"], [0.5, 0.5], normalize=True)
+    z = np.array(mixture.composition.fractions, dtype=float)
+    reference = ct.flash_tp(
+        mixture, temperature_K=240.0, pressure_Pa=3.0e6, eos=ct.PengRobinsonEOS()
+    )
+
+    def collapsed(*args: object, **kwargs: object) -> _SplitSolution:
+        return _SplitSolution(
+            x=z.copy(),
+            y=z.copy(),
+            vapor_fraction=-0.2,
+            K=np.ones_like(z),
+            ln_f_x=np.zeros_like(z),
+            ln_f_y=np.zeros_like(z),
+            iterations=3,
+            max_delta=0.0,
+            converged=True,
+            negative_flash_steps=3,
+        )
+
+    monkeypatch.setattr(_detect, "_solve_k_loop", collapsed)
+    rescued = ct.flash_tp(mixture, temperature_K=240.0, pressure_Pa=3.0e6, eos=ct.PengRobinsonEOS())
+    assert rescued.phase_names() == reference.phase_names() == ["liquid", "vapor"]
+    assert rescued.diagnostics["post_split_status"] == "stable"
+    assert rescued.diagnostics["log_space_seed"] == "stability-w"
+    for name in reference.phases:
+        assert rescued.phases[name].composition.fractions == pytest.approx(
+            reference.phases[name].composition.fractions, abs=1e-8
+        )
+    assert rescued.vapor_fraction == pytest.approx(reference.vapor_fraction, abs=1e-8)
