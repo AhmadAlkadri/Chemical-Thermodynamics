@@ -70,7 +70,7 @@ Queued by A2's diagnosis (do after B unless evidence reorders them; each is a
 solver change that moves captured numbers, so each needs the ADR-0017/0021
 style audit of `refactor_bit_identity_v3.json` before regenerating it):
 
-- **A3 `stability-tie-break`**: on an exact `tpd` tie, report the trial with
+- **A3 `stability-tie-break`** (**done**, ADR-0035, Case S-9): on an exact `tpd` tie, report the trial with
   the smaller stationarity residual (today trial order wins, so the reported
   `trial_composition` can carry a 3.3e-11 residual when a tied trial reached
   1e-16). Acceptance: reordering invariance of the *reported* composition to

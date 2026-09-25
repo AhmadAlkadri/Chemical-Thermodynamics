@@ -438,6 +438,36 @@ def test_results_are_invariant_under_component_reordering(
             assert reported_move < 1e-9
 
 
+def test_a_tpd_tie_is_reported_from_the_better_converged_trial(
+    tessier2000_payload: dict[str, Any],
+) -> None:
+    """ADR-0035: at (0.4, 0.6), 361 K, three trials tie on one stationary point.
+
+    One of them stopped at residual 3.3e-11 (inside ``tol = 1e-10``), the
+    others at ~1e-16. Before ADR-0035 whichever had the lowest ``tpd`` in the
+    last bit was reported, so the reported composition carried 8.4e-11 of
+    iteration error in one component order and not the other. Now a tied
+    trial converged 1000x better is reported instead, and both orders give
+    the same composition to 1e-12 (measured 4.4e-16).
+    """
+    forward_names, forward_model = _binary(tessier2000_payload, _PROPANOL, _WATER)
+    reverse_names, reverse_model = _binary(tessier2000_payload, _WATER, _PROPANOL)
+    forward = _stability(forward_names, forward_model, (0.4, 0.6), 361.0)
+    reverse = _stability(reverse_names, reverse_model, (0.6, 0.4), 361.0)
+
+    for result in (forward, reverse):
+        assert result.status == "unstable"
+        assert float(result.diagnostics["minimizing_trial_residual"]) < 1e-13
+    assert forward.trial_composition is not None and reverse.trial_composition is not None
+    move = max(
+        abs(a - b) for a, b in zip(forward.trial_composition, reversed(reverse.trial_composition))
+    )
+    assert move < 1e-12
+    # The key appears only where the rule acted, and names the rule.
+    for result in (forward, reverse):
+        assert result.diagnostics.get("minimizing_trial_tie_break", "residual") == "residual"
+
+
 def test_the_water_butanol_feed_sees_a_liquid_incipient_phase_from_a_vapor_feed(
     butanol_water,
 ) -> None:

@@ -264,6 +264,12 @@ _LN_W_MIN = -700.0
 _LN_W_MAX = 700.0
 _JACOBIAN_STEP = 1e-6
 _MIN_LINE_SEARCH_SCALE = 1e-12
+#: ADR-0035: two trials whose tpd differ by at most this (times max(1, |tpd|))
+#: reached the same stationary point. Measured ties: <= 5e-16.
+_TIE_TPD = 1e-12
+#: ADR-0035: a tied trial replaces the lowest-tpd one only when its
+#: stationarity residual is smaller by at least this factor.
+_TIE_RESIDUAL_ADVANTAGE = 1e3
 
 #: Admissible values of the ``vapor`` keyword.
 VAPOR_CANDIDATES = ("none", "ideal")
@@ -1018,6 +1024,21 @@ def _summarize(
         if best is None or trial.tpd < best.tpd:
             best = trial
 
+    # ADR-0035: several trials often stop at the *same* stationary point, and
+    # which of them has the lowest tpd is then last-bit noise. Report a tied
+    # trial instead only when it is converged decisively better (residual
+    # smaller by _TIE_RESIDUAL_ADVANTAGE); a residual ratio that large is a
+    # different stopping point of the iteration, not rounding, so the rule
+    # cannot itself flip on noise.
+    tie_broken_by_residual = False
+    if best is not None:
+        window = _TIE_TPD * max(1.0, abs(best.tpd))
+        tied = [trial for trial in non_trivial if abs(trial.tpd - best.tpd) <= window]
+        sharpest = min(tied, key=lambda trial: trial.residual)
+        if sharpest.residual * _TIE_RESIDUAL_ADVANTAGE < best.residual:
+            best = sharpest
+            tie_broken_by_residual = True
+
     if best is not None and best.tpd < -settings.tpd_tol:
         status = "unstable"
     elif converged:
@@ -1086,6 +1107,10 @@ def _summarize(
         diagnostics["feed_branch"] = feed_branch
     if best is not None:
         diagnostics["minimizing_trial"] = best.label
+        if tie_broken_by_residual:
+            # Conditional, like log_space_trial_count: its absence says the
+            # lowest-tpd trial was reported, as before ADR-0035.
+            diagnostics["minimizing_trial_tie_break"] = "residual"
         if best.log_space:
             # Conditional for the same reason as `log_space_trial_count`: its
             # absence is what a consumer reads as "the normalized `w` carries

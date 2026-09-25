@@ -176,7 +176,10 @@ class StabilityResult:
             quantity read from the logarithm rather than from ``sum_W``, so it
             survives a stationary point outside the exponential's range, and
             ``tm_at_stationary_point`` is then ``-inf`` rather than a number
-            (ADR-0025). ``log_space_trial_count`` appears only when at least
+            (ADR-0025). ``minimizing_trial_tie_break`` (``"residual"``)
+            appears only when the lowest-``tpd`` trial was passed over for a
+            tied one converged at least 1000x better (ADR-0035).
+            ``log_space_trial_count`` appears only when at least
             one trial had to normalize in logs; its absence is the statement
             that every trial ran the pre-ADR-0025 arithmetic.
 
