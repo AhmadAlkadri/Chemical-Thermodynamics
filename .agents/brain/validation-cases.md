@@ -5981,3 +5981,28 @@ as a speed-up: nine states that used to refuse early now solve.
 - **Test path:** `tests/test_pcsaft_temperature_derivative.py`,
   `tests/validation/test_pcsaft_association_vs_feos.py::test_residual_entropy_and_enthalpy_match_feos*`.
 
+---
+
+## Case S-9: A tpd tie reported from the better-converged trial (ADR-0035)
+
+- **Finding (2026-09-25, ADR-0032 diagnosis):** Tessier (2000) Problem 1
+  1-propanol / water NRTL, `z = (0.4, 0.6)`, 361 K, 1 atm, modified Raoult.
+  Three trials (`raoult-liquid`, `pure-1-Propanol`, `pure-Water`) reach one
+  stationary point, `tpd = -0.00433078`, equal to 1e-17; residuals 3.3e-16,
+  1.1e-16, **3.3e-11**. The forward component order reported `pure-Water`
+  (the loose one), the reverse order `pure-1-Propanol`: reported compositions
+  8.4e-11 apart. Which is lowest by `tpd` differs by machine.
+- **Rule:** ADR-0035 - within a `1e-12 * max(1, |tpd|)` tie, report a tied
+  trial whose residual is >= 1000x smaller.
+- **Achieved:** both orders report `pure-1-Propanol` (residuals 1.1e-16 and
+  3.3e-16); compositions agree to **4.4e-16** (asserted 1e-12); the forward
+  result carries `minimizing_trial_tie_break = "residual"`.
+- **Dormancy (bit for bit, same machine, before vs after):** all 155
+  `refactor_bit_identity_v3.json` states (every field), the 144-state PR
+  stability grid (status, `tpd_min`, composition, full diagnostics; 49 states
+  have tied trials, none has a 1000x residual advantage), and every state of
+  `python -m chemthermo.bench robustness --quick` (only the timing-ordered
+  `slowest_states` list differs).
+- **Test path:** `tests/test_stability_candidates.py::test_a_tpd_tie_is_reported_from_the_better_converged_trial`
+  and the per-trial reordering test.
+

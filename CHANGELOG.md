@@ -13,6 +13,12 @@ source releases; **nothing is published to PyPI**.
   and enthalpy (2.1e-15 with matched universal constants). ADR-0034 amendment,
   ledger Case P-20.
 
+### Changed
+- `stability_tp`: on a `tpd` tie (within 1e-12) the reported minimizing trial
+  is one converged at least 1000x better, when one exists; flagged by
+  `diagnostics["minimizing_trial_tie_break"] = "residual"`. Changes only such
+  ties (none on any captured state). ADR-0035.
+
 ## 0.3.0b1 (2026-09-25) - prerelease
 
 The CLI reaches the equilibrium work, PC-SAFT gains residual caloric
