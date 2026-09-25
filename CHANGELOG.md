@@ -1,8 +1,9 @@
 # Changelog
 
 Versions follow PEP 440 and are tagged `v<version>` on one tested commit
-(policy: `.agents/brain/adr/0031-versioned-releases.md`). Releases are GitHub
-source releases; **nothing is published to PyPI**.
+(policy: `.agents/brain/adr/0031-versioned-releases.md`). Releases up to
+0.3.0b1 were GitHub-only; from 0.4.0 the owner also publishes to PyPI by hand
+(ADR-0038).
 
 ## Unreleased
 

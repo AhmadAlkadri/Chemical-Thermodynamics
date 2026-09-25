@@ -389,6 +389,7 @@ Cheap checks
   - `.agents/brain/adr/0035-stability-tie-break-by-residual.md` (Adopted 2026-09-25; on a `tpd` tie within 1e-12 `stability_tp` reports a tied trial whose residual is >= 1000x smaller; conditional diagnostics key `minimizing_trial_tie_break`; dormant bit for bit on the 155 fixture states, the PR grid and the quick map)
   - `.agents/brain/adr/0036-flash-trivial-split-is-not-converged.md` (Adopted 2026-09-25; amends ADR-0028: a split whose two phases are the same (`ln x` equal to 1e-6) is not physical, so the stability-seed ladder runs; the Mw 53000 ladder state's +-64 ULP neighbourhood goes from 29 refusals to 0; full 2505-state map unchanged field for field)
   - `.agents/brain/adr/0037-remove-vlle-plugin-package.md` (Adopted 2026-09-25; deletes the ADR-0013-deprecated `chemthermo.vlle` package before the first PyPI release; `flash_mode="vlle"` still refused with a pointer; gamma-phi kept for the CLI v1 contract)
+  - `.agents/brain/adr/0038-pypi-publication.md` (Adopted 2026-09-25; amends ADR-0031 item 8: distribution `chemthermo` on PyPI from 0.4.0 (Beta), published by the owner by hand via TestPyPI then PyPI; no publishing automation or stored token)
 - ADR rules: one decision per ADR; keep under 1 page; include status and supersedes fields.
 
 ## 9) Roadmap: next 3 increments (vertical slices)
