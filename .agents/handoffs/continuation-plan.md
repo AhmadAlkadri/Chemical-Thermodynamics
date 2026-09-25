@@ -118,6 +118,9 @@ golden fixtures `tests/fixtures/cli/tp_flash_v1.json`,
   brain section 2 update.
 - **Release checkpoint:** `0.3.0b1` (or `0.3.0` if the contract is settled
   and gates pass in two environments) once B1-B3 are accepted.
+- **Status (2026-09-25):** B0-B3 implemented (ADR-0033; slices `cli-contract`,
+  `cli-stability-multiphase`). Not done from B: `modified-raoult` /
+  `gamma-gamma` from the CLI (ADR-0033 decision 7 defers them).
 
 ## C. PC-SAFT temperature derivatives and the properties they support
 

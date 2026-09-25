@@ -1,0 +1,109 @@
+{
+  "cli_schema_version": 1,
+  "command": "tp-flash",
+  "diagnostics": {
+    "converged": true,
+    "converged_stage": "successive-substitution",
+    "delta_g_split_rt": -0.2506064993289323,
+    "delta_g_vs_two_phase_rt": -0.002904525709007899,
+    "equilibrium_residual": 8.30340241009253e-09,
+    "feed_branch": "liquid",
+    "flash_mode": "phi-phi",
+    "incipient_phase": "liquid",
+    "iterations": 43,
+    "k_seed": "stability",
+    "mass_balance_residual": 5.551115123125783e-17,
+    "phase_count": 3,
+    "phase_detection": "tangent-plane",
+    "phase_label_method": "compressibility",
+    "phase_regime": "LLE",
+    "phase_set_history": "L -> LL -> LLL",
+    "phase_stability_liquid1": "stable",
+    "phase_stability_liquid2": "stable",
+    "phase_stability_liquid3": "stable",
+    "phase_stability_tpd_min_liquid1": -2.030607945456803e-15,
+    "phase_stability_tpd_min_liquid2": -7.582640909363739e-11,
+    "phase_stability_tpd_min_liquid3": -8.301141040072266e-09,
+    "phase_state": "three_phase",
+    "phases_added": 1,
+    "phases_removed": 0,
+    "post_split_checked": true,
+    "post_split_stable": true,
+    "post_split_status": "stable",
+    "post_split_tpd_min": -8.301141040072266e-09,
+    "rachford_rice_iterations": 87,
+    "second_order_iterations": 1,
+    "ssi_iterations": 42,
+    "stability_status": "unstable",
+    "stability_trials": 5,
+    "termination_reason": "tolerance_met",
+    "tpd_min": -1.868441490015353
+  },
+  "inputs": {
+    "components": [
+      "Water",
+      "Ethanol",
+      "n-Hexane"
+    ],
+    "normalize": false,
+    "pressure_Pa": 101325.0,
+    "temperature_K": 280.0,
+    "z_mole": [
+      0.2,
+      0.4,
+      0.4
+    ]
+  },
+  "result": {
+    "component_order": [
+      "Water",
+      "Ethanol",
+      "n-Hexane"
+    ],
+    "phase_fractions": {
+      "liquid1": 0.17343729861049728,
+      "liquid2": 0.13276126608438493,
+      "liquid3": 0.6938014353051178
+    },
+    "phase_names": [
+      "liquid1",
+      "liquid2",
+      "liquid3"
+    ],
+    "phases": {
+      "liquid1": {
+        "fractions": [
+          0.9988087221058589,
+          0.0011912778940878106,
+          5.324007536132975e-14
+        ]
+      },
+      "liquid2": {
+        "fractions": [
+          0.10277098734252062,
+          0.8598745315402576,
+          0.03735448111722189
+        ]
+      },
+      "liquid3": {
+        "fractions": [
+          0.01891795886419498,
+          0.41169611644509957,
+          0.5693859246907055
+        ]
+      }
+    },
+    "vapor_fraction": null
+  },
+  "solver": {
+    "algorithm": "tangent-plane+rachford-rice+fixed-point",
+    "eos": "peng_robinson",
+    "method": "phi-phi",
+    "settings": {
+      "damping": null,
+      "max_iter": 100,
+      "max_phases": 3,
+      "tol": 1e-08
+    }
+  }
+}

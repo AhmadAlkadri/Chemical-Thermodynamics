@@ -1,0 +1,65 @@
+{
+  "cli_schema_version": 1,
+  "command": "stability-tp",
+  "diagnostics": {
+    "active_component_count": 2,
+    "converged_trial_count": 4,
+    "feed_branch": "vapor",
+    "max_iter": 300,
+    "model_family": "eos",
+    "non_trivial_trial_count": 0,
+    "pressure_dependent": true,
+    "second_order_enabled": true,
+    "second_order_trial_count": 0,
+    "ssi_iterations_budget": 50,
+    "status": "stable",
+    "surface_fallback_evaluation_count": 4,
+    "surface_fallback_trial_count": 4,
+    "tol": 1e-10,
+    "tpd_tol": 1e-08,
+    "trial_count": 4,
+    "trial_surfaces": "vapor:1,liquid:3",
+    "trivial_tol": 1e-08,
+    "trivial_trial_count": 4
+  },
+  "inputs": {
+    "components": [
+      "Methane",
+      "Ethane"
+    ],
+    "normalize": false,
+    "pressure_Pa": 100000.0,
+    "temperature_K": 300.0,
+    "z_mole": [
+      0.5,
+      0.5
+    ]
+  },
+  "result": {
+    "component_order": [
+      "Methane",
+      "Ethane"
+    ],
+    "converged_trial_count": 4,
+    "feed_branch": "vapor",
+    "k_values": null,
+    "non_trivial_trial_count": 0,
+    "phase_branch": null,
+    "stability_scope": "bounded-trial-set",
+    "stable": true,
+    "status": "stable",
+    "tpd_min": 0.0,
+    "trial_composition": null,
+    "trial_count": 4
+  },
+  "solver": {
+    "eos": "peng_robinson",
+    "method": "tangent-plane",
+    "settings": {
+      "max_iter": 300,
+      "tol": 1e-10,
+      "tpd_tol": 1e-08,
+      "trivial_tol": 1e-08
+    }
+  }
+}

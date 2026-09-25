@@ -6,6 +6,17 @@ source releases; **nothing is published to PyPI**.
 
 ## Unreleased
 
+### Added
+- **CLI `chemthermo stability-tp`**: tangent-plane stability of a feed with
+  Peng-Robinson or PC-SAFT (`--eos`), JSON or text; `stable` is reported with
+  `stability_scope = "bounded-trial-set"`; an `inconclusive` verdict exits 3
+  with the payload printed. ADR-0033.
+- **CLI `tp-flash --eos {peng-robinson,pc-saft}` and `--max-phases N`**:
+  PC-SAFT flashes (packaged parameters, `kij = 0`, phi-phi) and an explicit
+  phase budget; three-phase answers use the existing name-keyed layout.
+  `cli_schema_version` stays 1 and every previously valid invocation prints
+  byte-identical output. `examples/cli/stability_and_multiphase.sh`.
+
 ### Changed (tests and policy only; no library code)
 - Guards that compare against floats captured on macOS arm64 are exact there
   and, on any other platform, exact on every discrete field and bounded on
