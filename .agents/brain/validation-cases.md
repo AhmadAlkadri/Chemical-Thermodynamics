@@ -5950,3 +5950,34 @@ as a speed-up: nine states that used to refuse early now solve.
 - **Test path:** `tests/test_pcsaft_temperature_derivative.py`,
   `tests/validation/test_pcsaft_vs_teqp.py::test_temperature_derivative_matches_teqp_ar10`.
 
+---
+
+## Case P-20: PC-SAFT association temperature derivative, against FeOs (ADR-0034 C2)
+
+- **Source:** FeOs 0.10.1 (Apache/MIT) `State.molar_entropy(Contributions.Residual)`
+  and `molar_enthalpy(Contributions.Residual)`, obtained by automatic
+  differentiation (dual numbers) of FeOs's Helmholtz energy; chemthermo's
+  association part is the Michelsen-Hendriks explicit partial
+  `-(rho/2) sum w w X X dDelta/dT` (`_pcsaft_association.temperature_derivative`).
+  FeOs's residual entropy is referred to the ideal gas at the same `T` and
+  volume - chemthermo's `s_res_tv` (probed: water 300 K / 55000, 1.4e-11 as
+  shipped).
+- **States:** the 18 Case P-6 states (pure water x5, ethanol x4, water /
+  ethanol x5, water / n-hexane x3, methanol / water / n-hexane x1), 2B scheme,
+  Gross & Sadowski (2002) parameters written in the test file.
+- **Expected / achieved:** matched universal constants (FeOs's 14-figure
+  table monkeypatched in): asserted 1e-12, achieved **<= 2.1e-15** in `S/R`
+  and `H/RT` over all 18. Published constants: asserted 1e-8, achieved 1.7e-11
+  (`S`) and 3.2e-10 (`H`) - the Case P-6 floor.
+- **Default-suite routes (no FeOs):** fourth-order central difference at five
+  associating states (worst 2.4e-12, asserted 1e-8); Gibbs-Helmholtz through
+  the density solver and `ln phi` for liquid water (300 K, 1 bar) and water /
+  ethanol 0.5/0.5 (320 K, 1 bar), asserted 1e-7; removing water's sites moves
+  the derivative by more than 10 % (negative control).
+- **Saturation consistency (example, not a test):** PC-SAFT water at 373.15 K,
+  own saturation `P = 100890.273 Pa` (FeOs agrees to 3.5e-10, Case P-7):
+  `dH_vap = 40.4850 kJ/mol = T dS_vap`. Measurement (about 40.65 kJ/mol) is a
+  remark, not compared.
+- **Test path:** `tests/test_pcsaft_temperature_derivative.py`,
+  `tests/validation/test_pcsaft_association_vs_feos.py::test_residual_entropy_and_enthalpy_match_feos*`.
+

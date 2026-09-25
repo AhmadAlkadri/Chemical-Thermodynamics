@@ -139,10 +139,10 @@ golden fixtures `tests/fixtures/cli/tp_flash_v1.json`,
 - Each slice: ledger case with independent route, golden example, ADR for the
   public method names.
 - **Status (2026-09-25):** C1 + C3 done for non-associating mixtures
-  (ADR-0034, Case P-19, slice `pcsaft-temperature-derivative`). C2
-  (association `T` derivative) is next in C: until it lands, both new methods
-  raise `ModelError` for an associating mixture. The "residual caloric
-  properties" minor-release milestone needs C2. **Release checkpoint:** a minor version once C1-C3
+  (ADR-0034, Case P-19, slice `pcsaft-temperature-derivative`). **C2 done**
+  (ADR-0034 amendment, Case P-20, slice
+  `pcsaft-association-temperature-derivative`): the residual caloric
+  properties milestone is complete -> release 0.4.0b1. **Release checkpoint:** a minor version once C1-C3
   form a coherent "residual caloric properties" milestone.
 
 ## D. Performance and validation cost (when measured)

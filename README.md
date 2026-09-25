@@ -1376,12 +1376,12 @@ from `chemthermo` if you prefer to build the block as an object.
   only; no PC-SAFT binary-interaction table ships with this package, and any
   `kij` used in the docs or examples (0.03 for methane / n-decane) is
   **illustrative**, not a literature-validated value.
-- **Temperature derivative and residual properties for non-associating
-  mixtures only** (ADR-0034): `residual_helmholtz_temperature_derivative` and
+- **Temperature derivative and residual properties** (ADR-0034, including
+  association since its C2 amendment): `residual_helmholtz_temperature_derivative` and
   `residual_properties` (`h_res`, `u_res`, `s_res_tv` / `s_res_tp`, `g_res_tv` /
   `g_res_tp`, reduced by `RT` or `R`; the suffix names the ideal-gas reference,
-  same `T` and volume or same `T` and pressure). An associating mixture raises
-  `ModelError`. **Residual only**: no total enthalpy, entropy or `Cp` (the
+  same `T` and volume or same `T` and pressure). Checked against FeOs for water,
+  ethanol and their mixtures (2.1e-15 with matched constants). **Residual only**: no total enthalpy, entropy or `Cp` (the
   databank has no ideal-gas heat capacities), no `Cp^res`, and no phase
   densities in `FlashResult` (compute them with `density_roots` at the
   converged composition).

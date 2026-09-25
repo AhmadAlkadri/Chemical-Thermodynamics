@@ -153,7 +153,8 @@ Limits stated, not hidden
 - No induced association (a non-associating component solvating with an
   associating one), because that needs a cross ``kappa`` that is not a function
   of the pure-component ones.
-- No temperature derivative, in line with the rest of the PC-SAFT package.
+- The temperature derivative (ADR-0034, C2 amendment) is Eq. (6) again,
+  :func:`temperature_derivative`: ``T`` enters only through ``Delta``.
 """
 
 from __future__ import annotations
@@ -576,6 +577,70 @@ class AssociationIsotherm:
         sensitivity = np.linalg.solve(jacobian, f_eta[..., None])[..., 0]
         a2 = q_eta_eta - (weights * f_eta * sensitivity).sum(axis=-1)
         return a, a1, a2
+
+
+def temperature_derivative(
+    setup: AssociationSetup,
+    *,
+    temperature_K: float,
+    epsilon_ab_k_K: np.ndarray,
+    d: np.ndarray,
+    dd_dt: np.ndarray,
+    rho_a3: float,
+    x: np.ndarray,
+    zeta_2: float,
+    eta: float,
+    dzeta2_dt: float,
+    dzeta3_dt: float,
+) -> float:
+    """``(d a_assoc / d T)_{rho, x}`` in 1/K, by Eq. (6) (ADR-0034 amendment).
+
+    Stationarity of ``Q`` makes this the explicit partial at frozen ``X``:
+
+        d a_assoc / dT = -(rho / 2) sum_{ab} w_a w_b X_a X_b dDelta_ab / dT
+
+    and ``Delta_ab = K_ab [exp(eps_ab / T) - 1] g_ab(c_ab, zeta_2, zeta_3)``
+    carries ``T`` in the Boltzmann factor and, through ``d_i(T)``, in the
+    contact value: ``c_ab`` directly, ``zeta_2`` and ``eta`` through the
+    moments. The site fractions are solved exactly as :class:`AssociationState`
+    solves them; no second solve and no sensitivity system is needed.
+
+    Args:
+        epsilon_ab_k_K: ``eps^AB/k`` per **component** (0 for a non-associating
+            one; only associating owners are read).
+        d, dd_dt: Segment diameters and their temperature derivatives, per
+            component.
+        dzeta2_dt, dzeta3_dt: ``d zeta_2 / dT`` and ``d eta / dT`` at fixed
+            ``rho, x``.
+    """
+    t = float(temperature_K)
+    weights = setup.weights(x)
+    g, dg_dz2, dg_dz3 = contact_values(pair_c=setup.pair_c, zeta_2=zeta_2, eta=eta)
+    delta = setup.pair_constant * g
+    x_sites = solve_site_fractions(rho=rho_a3, weights=weights, delta=delta)
+
+    owner = setup.topology.site_component
+    eps_site = epsilon_ab_k_K[owner]
+    eps_pair = 0.5 * (eps_site[:, None] + eps_site[None, :])
+    # d/dT ln(exp(eps/T) - 1) = -(eps/T^2) exp(eps/T) / (exp(eps/T) - 1);
+    # written with expm1 as build_setup is, so the ratio is exact near eps -> 0.
+    boltzmann_log_slope = -(eps_pair / (t * t)) * (1.0 + 1.0 / np.expm1(eps_pair / t))
+    dconstant_dt = setup.pair_constant * boltzmann_log_slope
+
+    d_site = d[owner]
+    dd_site = dd_dt[owner]
+    total = d_site[:, None] + d_site[None, :]
+    product = np.outer(d_site, d_site)
+    dc_dt = (np.outer(dd_site, d_site) + np.outer(d_site, dd_site)) / total - product * (
+        dd_site[:, None] + dd_site[None, :]
+    ) / total**2
+    u = 1.0 - eta
+    dg_dc = 3.0 * zeta_2 / u**2 + 4.0 * setup.pair_c * zeta_2**2 / u**3
+    dg_dt = dg_dc * dc_dt + dg_dz2 * dzeta2_dt + dg_dz3 * dzeta3_dt
+
+    ddelta_dt = dconstant_dt * g + setup.pair_constant * dg_dt
+    weighted_sites = weights * x_sites
+    return float(-0.5 * rho_a3 * (weighted_sites @ ddelta_dt @ weighted_sites))
 
 
 def _quadratic(weighted_sites: np.ndarray, matrix: np.ndarray) -> np.ndarray:

@@ -190,6 +190,7 @@ from ..validation import (
     validate_temperature,
 )
 from ._pcsaft_association import AssociationState, build_setup
+from ._pcsaft_association import temperature_derivative as assoc_temperature_derivative
 from ._pcsaft_density import DensityRoots, PCSAFTIsotherm, build_isotherm, solve_density_roots
 from .api import EOSProtocol
 from .registry import register_eos
@@ -512,8 +513,9 @@ def _temperature_derivative(
     sigma_A: np.ndarray,
     epsilon_k_K: np.ndarray,
     kij: np.ndarray,
+    association: Sequence[PCSAFTAssociationRecord | None] | None = None,
 ) -> float:
-    """``(d a_res / d T)_{rho, x}`` for hard chain + dispersion, in 1/K (ADR-0034).
+    """``(d a_res / d T)_{rho, x}`` in 1/K (ADR-0034 and its C2 amendment).
 
     A separate function rather than a new output of :func:`_evaluate`, so that
     no number :func:`_evaluate` produces can move. Temperature enters the
@@ -527,7 +529,10 @@ def _temperature_derivative(
 
     Everything else is the chain rule through the same gradients
     :func:`_evaluate` forms (``d a_hs / d zeta``, ``d g / d zeta_2,3``,
-    ``d f / d eta``).
+    ``d f / d eta``). When a component carries association sites, the
+    association term's derivative is added by
+    :func:`chemthermo.eos._pcsaft_association.temperature_derivative`
+    (Michelsen-Hendriks: an explicit partial at frozen site fractions).
     """
     t = temperature_K
     rho_a3 = density_mol_m3 * AVOGADRO_PER_MOL * 1e-30
@@ -607,7 +612,32 @@ def _temperature_derivative(
         + 2.0 * math.pi * i1 * m2es3 / t
         + 2.0 * math.pi * mbar * c1 * i2 * m2e2s3 / t
     )
-    return float(dahc_dt + rho_a3 * df_dt)
+    total = float(dahc_dt + rho_a3 * df_dt)
+
+    setup = (
+        None
+        if association is None
+        else build_setup(temperature_K=t, sigma_A=sigma_A, d=d, association=association)
+    )
+    if setup is None:
+        return total
+    epsilon_ab = np.array(
+        [0.0 if record is None else record.epsilon_ab_k_K for record in association or ()],
+        dtype=float,
+    )
+    return total + assoc_temperature_derivative(
+        setup,
+        temperature_K=t,
+        epsilon_ab_k_K=epsilon_ab,
+        d=d,
+        dd_dt=dd_dt,
+        rho_a3=rho_a3,
+        x=x,
+        zeta_2=z2,
+        eta=eta,
+        dzeta2_dt=float(dzeta_dt[2]),
+        dzeta3_dt=float(dzeta_dt[3]),
+    )
 
 
 @dataclass(frozen=True)
@@ -708,24 +738,13 @@ class PCSAFTEOS(EquationOfState, EOSProtocol):
     ) -> float:
         """Return ``d(A^res / (R T)) / dT`` at fixed molar volume and composition.
 
-        Analytic, in 1/K (ADR-0034). teqp's ``get_Ar10`` is
-        ``-T`` times this number.
-
-        Raises:
-            ModelError: when a component associates. The association
-                contribution's temperature derivative is not implemented yet
-                (ADR-0034); a hard-chain + dispersion number returned for an
-                associating mixture would be wrong without saying so.
+        Analytic, in 1/K (ADR-0034), including the association term for a
+        mixture with association sites (Michelsen-Hendriks, no extra solve).
+        teqp's ``get_Ar10`` is ``-T`` times this number.
         """
         volume = float(volume_m3)
         if not math.isfinite(volume) or volume <= 0.0:
             raise InputRangeError(f"Molar volume must be positive and finite (got {volume_m3!r}).")
-        if self.associates():
-            raise ModelError(
-                "The temperature derivative of the PC-SAFT association term is not "
-                "implemented; residual_helmholtz_temperature_derivative supports "
-                "non-associating mixtures only (ADR-0034)."
-            )
         temperature = validate_temperature(temperature_K)
         m, sigma_A, epsilon_k_K = self.component_parameters()
         x = self._composition(composition, None)
@@ -737,6 +756,7 @@ class PCSAFTEOS(EquationOfState, EOSProtocol):
             sigma_A=sigma_A,
             epsilon_k_K=epsilon_k_K,
             kij=self.kij_matrix(),
+            association=self.association_parameters(),
         )
 
     def residual_properties(
@@ -771,10 +791,8 @@ class PCSAFTEOS(EquationOfState, EOSProtocol):
         neither is provided.
 
         Raises:
-            ModelError: for an associating mixture (see
-                :meth:`residual_helmholtz_temperature_derivative`), or where
-                ``Z <= 0`` (inside the spinodal), since the ``*_tp`` values
-                need ``ln Z``.
+            ModelError: where ``Z <= 0`` (inside the spinodal), since the
+                ``*_tp`` values need ``ln Z``.
         """
         density = _validated_density(density_mol_m3)
         state = self._state(temperature_K, density, composition)

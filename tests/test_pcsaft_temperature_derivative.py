@@ -2,7 +2,7 @@
 
 Default-suite checks that need no optional dependency: central finite
 differences of ``residual_helmholtz`` in temperature, a negative control, the
-refusal for associating mixtures, and the input contract. The external check
+association term (C2), and the input contract. The external check
 against teqp's ``get_Ar10`` lives in ``tests/validation/test_pcsaft_vs_teqp.py``.
 """
 
@@ -64,13 +64,45 @@ def test_is_not_vacuous() -> None:
     assert abs(b - a) / abs(a) > 1e-3
 
 
-def test_an_associating_mixture_is_refused_not_approximated() -> None:
-    eos = PCSAFTEOS(components=("Water", "n-Hexane"))
+#: Associating states (2B water / ethanol, Gross & Sadowski 2002): dense and
+#: gas-like water, liquid ethanol, a cross-associating binary and water with an
+#: inert. Before the C2 amendment of ADR-0034 these raised ``ModelError``.
+ASSOCIATING_STATES = [
+    (("Water",), [1.0], 300.0, 55000.0),
+    (("Water",), [1.0], 373.15, 100.0),
+    (("Ethanol",), [1.0], 350.0, 15928.6188),
+    (("Water", "Ethanol"), [0.5, 0.5], 320.0, 25401.3411),
+    (("Water", "n-Hexane"), [0.3, 0.7], 298.15, 10229.0998),
+]
+
+
+@pytest.mark.parametrize(("components", "x", "temperature", "density"), ASSOCIATING_STATES)
+def test_the_association_term_matches_a_central_difference(
+    components: tuple[str, ...], x: list[float], temperature: float, density: float
+) -> None:
+    eos = PCSAFTEOS(components=components)
     assert eos.associates()
-    with pytest.raises(ModelError, match="association"):
-        eos.residual_helmholtz_temperature_derivative(
-            temperature_K=300.0, volume_m3=1.0 / 20000.0, composition=[0.5, 0.5]
-        )
+    derivative = eos.residual_helmholtz_temperature_derivative(
+        temperature_K=temperature, volume_m3=1.0 / density, composition=x
+    )
+    assert derivative == pytest.approx(
+        _central_difference(eos, x, temperature, density), rel=1e-8, abs=1e-14
+    )
+
+
+def test_the_association_contribution_is_not_vacuous() -> None:
+    """Dropping association sites changes the derivative far beyond the FD tolerance."""
+    water = PCSAFTEOS(components=("Water",))
+    inert = PCSAFTEOS(
+        components=("Water",),
+        parameters=PCSAFTParameters.from_records(
+            [PCSAFTRecord(name="Water", m=1.0656, sigma_A=3.0007, epsilon_k_K=366.51)]
+        ),
+    )
+    kwargs = dict(temperature_K=300.0, volume_m3=1.0 / 55000.0, composition=[1.0])
+    with_sites = water.residual_helmholtz_temperature_derivative(**kwargs)  # type: ignore[arg-type]
+    without = inert.residual_helmholtz_temperature_derivative(**kwargs)  # type: ignore[arg-type]
+    assert abs(with_sites - without) / abs(with_sites) > 0.1
 
 
 @pytest.mark.parametrize("volume", [0.0, -1e-4, float("nan")])
@@ -91,6 +123,9 @@ TP_STATES = [
     (("n-Hexane",), [1.0], 300.0, 1.0e6, "liquid"),
     (("Methane", "n-Hexane"), [0.8, 0.2], 350.0, 2.0e6, "vapor"),
     (("Methane", "n-Decane"), [0.3, 0.7], 350.0, 5.0e6, "liquid"),
+    # Associating (ADR-0034 C2 amendment): liquid water, and water / ethanol.
+    (("Water",), [1.0], 300.0, 1.0e5, "liquid"),
+    (("Water", "Ethanol"), [0.5, 0.5], 320.0, 1.0e5, "liquid"),
 ]
 
 
@@ -154,14 +189,10 @@ def test_a_dilute_gas_has_vanishing_residual_properties() -> None:
         assert abs(props[key]) < 1e-6, key
 
 
-def test_residual_properties_refuse_inside_the_spinodal_and_for_association() -> None:
+def test_residual_properties_refuse_inside_the_spinodal() -> None:
     with pytest.raises(ModelError, match="spinodal"):
         PCSAFTEOS(components=("Methane", "n-Hexane")).residual_properties(
             temperature_K=300.0, density_mol_m3=8000.0, composition=[0.2, 0.8]
-        )
-    with pytest.raises(ModelError, match="association"):
-        PCSAFTEOS(components=("Water",)).residual_properties(
-            temperature_K=300.0, density_mol_m3=100.0, composition=[1.0]
         )
 
 
