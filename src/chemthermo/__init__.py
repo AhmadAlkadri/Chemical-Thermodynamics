@@ -32,7 +32,7 @@ from .stability import StabilityResult, StabilitySettings, StabilityTrial, stabi
 from .units import PA_PER_BAR, STANDARD_P_PA
 from .validation import validate_fractions, validate_pressure, validate_temperature
 
-__version__ = "0.2.0b1"
+__version__ = "0.3.0b1"
 
 __all__ = [
     "ChemThermoError",
