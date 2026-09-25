@@ -166,6 +166,41 @@ in *this* grid refuses" (or "this is what *this* grid refuses"), not as a
 coverage claim - and note that regenerating the record at a new commit means a
 new file, so the superseded JSON is pruned and its `.md` summary kept.
 
+## Releases (ADR-0031)
+
+Policy is ADR-0031; this is the procedure. `X.Y.Z` below is the version being
+released, `SHA` the full commit the gates ran on.
+
+1. On the release commit: set `version` in `pyproject.toml` and `__version__`
+   in `src/chemthermo/__init__.py` to `X.Y.Z`, add its `CHANGELOG.md` section,
+   commit (`Slice: release`), push the branch.
+2. Gate from a clean clone fetched from GitHub, never the working checkout:
+
+```bash
+git clone --branch <branch> https://github.com/AhmadAlkadri/Chemical-Thermodynamics.git rel && cd rel
+git rev-parse HEAD            # must equal SHA
+python3.11 -m venv .venv && .venv/bin/pip install -e ".[dev]"
+.venv/bin/ruff format --check src tests && .venv/bin/ruff check src tests
+.venv/bin/pyright && .venv/bin/pytest -q
+.venv/bin/python -m build --outdir dist/
+python3.11 -m venv /tmp/wheel-venv && /tmp/wheel-venv/bin/pip install dist/chemthermo-X.Y.Z-py3-none-any.whl
+cd /tmp && /tmp/wheel-venv/bin/python -c "import chemthermo; print(chemthermo.__version__)"
+/tmp/wheel-venv/bin/chemthermo tp-flash --help
+shasum -a 256 dist/*
+```
+
+   plus a stability/flash smoke from the installed wheel (see
+   `.agents/handoffs/cloud-continuation.md` for the one used at `v0.2.0b1`).
+3. Tag and publish (never `--tags`, never `-f`):
+
+```bash
+git tag -a vX.Y.Z SHA -m "chemthermo X.Y.Z"
+git push origin refs/tags/vX.Y.Z
+gh release create vX.Y.Z --verify-tag --title "chemthermo X.Y.Z" \
+   --notes-file notes.md [--prerelease] dist/*
+git ls-remote origin 'refs/tags/vX.Y.Z^{}'   # must print SHA
+```
+
 ## Slice evidence
 
 For every thin vertical slice report, include:
