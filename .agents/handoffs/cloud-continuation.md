@@ -114,6 +114,42 @@ checkpoints; claims proportional to validation; never broaden expected
 failures or weaken tolerances to go green; end every session committed,
 pushed, and with this file (or a successor) updated.
 
-## 7. Release and fresh verification record
+## 7. Release and fresh verification record (2026-09-25)
 
-Recorded after publication; see the section appended below.
+**Release `v0.2.0b1`** (GitHub prerelease, not PyPI):
+<https://github.com/AhmadAlkadri/Chemical-Thermodynamics/releases/tag/v0.2.0b1>.
+Annotated tag peels to `bd370681056baf487f0419a6dd05213b2d83932c` (verified by
+`git ls-remote` and the GitHub commits API). Assets and SHA-256:
+`chemthermo-0.2.0b1-py3-none-any.whl` `6096deaaabf6590ea0ec0603ca7990b632ae82f6234bdd17e28c9964122d6f55`,
+`chemthermo-0.2.0b1.tar.gz` `8f2d6c833740c046961c89d605fd96c3c569fd5220dcfe3ba4e1cf14b205fc1d`.
+Pins: `pip install "chemthermo @ git+https://github.com/AhmadAlkadri/Chemical-Thermodynamics.git@v0.2.0b1"`
+or `...@bd370681056baf487f0419a6dd05213b2d83932c`.
+
+**Fresh, clean clone from GitHub at `bd37068`**, macOS 27.0 arm64 (the
+development machine, so not independent cross-platform validation), CPython
+3.11.6, numpy 2.4.6, validation extras not installed:
+
+| check | result |
+| --- | --- |
+| ruff format / ruff check / pyright | clean / clean / 0 errors |
+| `pytest -q` | 769 passed, 51 skipped, 74 deselected, 2:57 |
+| `tools/smoke_install.py --package .`, golden path | pass |
+| `chemthermo.bench robustness --quick` | 224 states, 219 verdicts, 5 by-design `rr-no-bracket` refusals |
+| `python -m build`; wheel and sdist in fresh venvs outside the tree | 4 data files packaged; `tools/release_smoke.py --expect-version 0.2.0b1` pass |
+| `pip install ...@v0.2.0b1` from GitHub + smoke | pass |
+| `aglint check --repo .` (agentslint v0.3.0) | **66 P0**, pre-existing: mostly `file::test_name` references and renamed paths in ADRs/ledger/steering |
+
+**GitHub Actions, ubuntu-latest, Python 3.11, run 36121300741 on `bd37068`**:
+install, ruff, pyright pass; **pytest 3 failed / 766 passed** (8:06):
+
+- `tests/test_flash_refactor_bit_identity.py::test_flash_tp_is_bit_identical_to_the_v3_capture` (last-ULP, first at `gamma-gamma-binary|z1=0.05`)
+- `tests/test_pcsaft_association.py::test_non_associating_values_are_bit_identical[hexane_300_7700-7700.0]` (`-5.783742760059242` vs `-5.783742760059239`)
+- `tests/test_stability_eos_surfaces.py::test_the_peng_robinson_grid_still_reaches_a_verdict_everywhere` (verdicts identical 47/97; `minimizing_trial_surface` counts liquid 46 / vapor 31 vs pinned 45 / 32)
+
+No verdict differs. The bit-identity pins were captured on macOS arm64 and
+are same-platform refactoring guards. Nothing was relaxed; see plan slice A2.
+The CI run before the handoff (`5041dd7`, run 36120860309) never reached the
+tests (private `agentslint` install), so this is the branch's first CI test run.
+
+Not rerun in this session (inherited): validation extras (teqp/FeOs/thermo),
+`pytest -m slow`, the full 2505-state map, benchmark timings.

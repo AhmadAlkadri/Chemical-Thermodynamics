@@ -29,7 +29,7 @@ CI (`.github/workflows/ci.yml`) runs tests on every push and publishes nothing.
    (GitHub Actions, or a cloud session) reproduces the gates.
 4. **One version, three places.** `pyproject.toml` `version`,
    `chemthermo.__version__` (pinned together by
-   `tests/test_import.py::test_version_matches_installed_metadata`) and the tag
+   `test_version_matches_installed_metadata` in `tests/test_import.py`) and the tag
    must agree on the tagged commit, and `CHANGELOG.md` has that version's
    section. Between releases the version stays at the last released value.
 5. **A tag names one tested commit, forever.** Annotated tag on the exact

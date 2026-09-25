@@ -196,8 +196,7 @@ shasum -a 256 dist/*
 ```bash
 git tag -a vX.Y.Z SHA -m "chemthermo X.Y.Z"
 git push origin refs/tags/vX.Y.Z
-gh release create vX.Y.Z --verify-tag --title "chemthermo X.Y.Z" \
-   --notes-file notes.md [--prerelease] dist/*
+gh release create vX.Y.Z --verify-tag --title "chemthermo X.Y.Z" --notes-file notes.md dist/*  # add --prerelease for X.Y.ZbN
 git ls-remote origin 'refs/tags/vX.Y.Z^{}'   # must print SHA
 ```
 
