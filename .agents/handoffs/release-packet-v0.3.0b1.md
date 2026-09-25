@@ -1,3 +1,5 @@
+> **Published 2026-09-25:** tag `v0.3.0b1` (peels to `64130a2`) and the GitHub prerelease https://github.com/AhmadAlkadri/Chemical-Thermodynamics/releases/tag/v0.3.0b1 were published from the owner's macOS arm64 machine. See cloud-continuation.md section 7c. The attached artifacts' checksums are recorded there and supersede the ones below.
+
 # Release packet: chemthermo 0.3.0b1 (prerelease)
 
 Prepared 2026-09-25 by the first cloud session. **Neither the tag nor the

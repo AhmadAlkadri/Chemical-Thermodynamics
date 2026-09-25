@@ -221,3 +221,66 @@ C2 (association temperature derivative; completes the residual-caloric
 milestone, then a minor release) -> A3/A4 (stability tie-break by residual;
 polymer ladder neighbourhood) -> D -> E.
 
+
+### 7c. Local publication (owner machine, 2026-09-25)
+
+The owner-side Claude Code session published v0.3.0b1 from a local machine,
+following `.agents/handoffs/release-packet-v0.3.0b1.md`.
+
+**Preflight:** `origin/dev/sprint` was at `d4fc0e1`; `64130a2` is an ancestor
+of it; no `v0.3.0b1*` tag existed on the remote; `gh` was authenticated with
+`repo` scope and admin permission.
+
+**macOS arm64 check at `64130a2` (the capture platform of ADR-0032): pass.**
+Fresh clone from GitHub, checked out at
+`64130a2d5373e88cc65c28fdd047807f04a5daf4`, `python3.11 -m venv` +
+`pip install -e ".[dev]"`. Environment: macOS 27.0 (Darwin), `uname -m` =
+arm64, CPython 3.11.6 (conda-forge build), numpy 2.4.6. In this environment
+`tests/_capture_identity.on_capture_platform()` returns `True`, so the guards
+ran in their exact mode.
+
+| check | result |
+| --- | --- |
+| ruff format --check / ruff check (src, tests) | 140 files already formatted / all checks passed |
+| pyright | 0 errors, 0 warnings |
+| `pytest -q` | **814 passed**, 51 skipped, 74 deselected, 0 failed (2:57) |
+| `tests/test_flash_refactor_bit_identity.py` | 1 passed |
+| `tests/test_stability_eos_surfaces.py::test_the_peng_robinson_grid_still_reaches_a_verdict_everywhere` | 1 passed |
+| `tests/test_pcsaft_association.py` | 117 passed |
+| `tests/test_pcsaft_polymer.py` | 34 passed, 18 deselected |
+
+The counts match the Linux clean-clone run in 7b exactly, and the
+capture-platform exact checks pass.
+
+**Build and wheel smoke (same clone):** `python -m build --outdir dist/`;
+the wheel was installed into a fresh venv outside the tree. From outside the
+tree, `tools/release_smoke.py --expect-version 0.3.0b1` passed (PR single
+phase, PR VLE, PR three liquids, PC-SAFT VLE), and
+`chemthermo stability-tp --components Methane,n-Hexane --z 0.5,0.5
+--temperature-k 300 --pressure-pa 2e6 --eos pc-saft --format json` exited 0
+with `status = unstable` (minimizing trial `wilson-vapor`, tpd -1.293).
+
+**Tag:** annotated `v0.3.0b1`, pushed as `refs/tags/v0.3.0b1`;
+`git ls-remote origin 'refs/tags/v0.3.0b1^{}'` peels to
+`64130a2d5373e88cc65c28fdd047807f04a5daf4`.
+
+**Release:** GitHub prerelease "chemthermo 0.3.0b1",
+https://github.com/AhmadAlkadri/Chemical-Thermodynamics/releases/tag/v0.3.0b1
+(`isPrerelease: true`). The notes are the packet from "## chemthermo 0.3.0b1"
+on, with the macOS row added to the validation table, the artifact checksums
+replaced, and the "nobody has run the ADR-0032 guards on macOS arm64"
+limitation removed because it no longer holds. Attached assets, whose SHA-256
+matches the GitHub-reported digests:
+
+```
+a931ac7166dd7637eeb6484f345e7930378db3c623c1d067438edf56ba0cb758  chemthermo-0.3.0b1-py3-none-any.whl  (292924 bytes)
+ce59c250ee049787326e5c125ad24cdf2e9a4947746d6ec6148cd96c647f5ca0  chemthermo-0.3.0b1.tar.gz  (490832 bytes)
+```
+
+These differ from the cloud-build checksums in the packet because rebuilt
+artifacts are not byte-identical across machines. The attached files are the
+reference.
+
+**Failed:** nothing. **Skipped:** the validation extras,
+`pytest -m slow`, the robustness map, and benchmark timings were not rerun
+on macOS for this release. PyPI publication is out of scope.
