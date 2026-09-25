@@ -184,9 +184,9 @@ followed; its result is below.
 
 | slice | commit(s) | evidence |
 | --- | --- | --- |
-| `cloud-baseline` (A) | `c3a5bd1`-ish, see `git log` | section 7a |
-| `cross-platform-guards` (A2, ADR-0032) | `f53bf0c`, fraction fix, FeOs-pin fix | ledger P-11/P-17 "cross-platform"; `tests/test_capture_identity.py` |
-| `cli-contract`, `cli-stability-multiphase` (B0-B3, ADR-0033) | `a14c5f0` and its parent | 11 pre-change CLI invocations byte-identical; `tests/test_cli_stability_multiphase.py` |
+| `cloud-baseline` (A) | `67ce78e` | section 7a |
+| `cross-platform-guards` (A2, ADR-0032) | `f53bf0c`, `dd821be`, `2279951` | ledger P-11/P-17 "cross-platform"; `tests/test_capture_identity.py` |
+| `cli-contract`, `cli-stability-multiphase` (B0-B3, ADR-0033) | `8620fa3`, `a14c5f0` | 11 pre-change CLI invocations byte-identical; `tests/test_cli_stability_multiphase.py` |
 | `pcsaft-temperature-derivative` (C1 + C3, ADR-0034) | `7c0c4ef` | ledger P-19 (teqp `Ar10` <= 5.24e-16; Gibbs-Helmholtz; `dH_vap = T dS_vap` to 1.05e-12) |
 | `release` 0.3.0b1 | `64130a2d5373e88cc65c28fdd047807f04a5daf4` | below |
 
