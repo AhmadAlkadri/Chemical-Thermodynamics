@@ -43,9 +43,9 @@ def test_flash_tp_vlle_mode_points_to_modified_raoult(recwarn: pytest.WarningsRe
 
     Three-phase equilibrium is discovered automatically by `"modified-raoult"`
     with `FlashSettings(max_phases=3)` (ADR-0011); the out-of-tree
-    `chemthermo_vlle` plugin is no longer the way to get it (ADR-0013). This
-    call does not import `chemthermo.vlle`, so it must not emit its
-    `DeprecationWarning`.
+    `chemthermo_vlle` plugin is no longer the way to get it (ADR-0013), and
+    the `chemthermo.vlle` package itself was removed in 0.4.0 (ADR-0037).
+    The call emits no `DeprecationWarning`.
     """
     mix = ct.Mixture.from_database(["Methane"], [1.0])
     with pytest.raises(
@@ -58,8 +58,16 @@ def test_flash_tp_vlle_mode_points_to_modified_raoult(recwarn: pytest.WarningsRe
     assert "modified-raoult" in message
     assert "FlashSettings(max_phases=3)" in message
     assert "ADR-0011" in message
-    assert "chemthermo.vlle is deprecated" in message
-    assert "ADR-0013" in message
+    assert "chemthermo.vlle plugin package was removed in 0.4.0" in message
+    assert "ADR-0037" in message
     assert "chemthermo_vlle plugin" not in message
     assert "Install chemthermo_vlle" not in message
     assert not [w for w in recwarn.list if issubclass(w.category, DeprecationWarning)]
+
+
+def test_the_removed_vlle_package_is_gone() -> None:
+    """ADR-0037: `chemthermo.vlle` (deprecated by ADR-0013) was removed in 0.4.0."""
+    import importlib
+
+    with pytest.raises(ModuleNotFoundError):
+        importlib.import_module("chemthermo.vlle")
