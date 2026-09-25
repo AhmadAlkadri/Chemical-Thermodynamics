@@ -1,0 +1,63 @@
+{
+  "cli_schema_version": 1,
+  "command": "tp-flash",
+  "diagnostics": {
+    "converged": true,
+    "feed_branch": "vapor",
+    "flash_mode": "phi-phi",
+    "iterations": 0,
+    "phase_count": 1,
+    "phase_detection": "tangent-plane",
+    "phase_label_method": "compressibility",
+    "phase_regime": "single-phase",
+    "phase_state": "vapor",
+    "stability_status": "stable",
+    "stability_trials": 4,
+    "termination_reason": "feed_stable_tangent_plane",
+    "tpd_min": 0.0
+  },
+  "inputs": {
+    "components": [
+      "Methane",
+      "Ethane"
+    ],
+    "normalize": false,
+    "pressure_Pa": 100000.0,
+    "temperature_K": 300.0,
+    "z_mole": [
+      0.5,
+      0.5
+    ]
+  },
+  "result": {
+    "component_order": [
+      "Methane",
+      "Ethane"
+    ],
+    "phase_fractions": {
+      "vapor": 1.0
+    },
+    "phase_names": [
+      "vapor"
+    ],
+    "phases": {
+      "vapor": {
+        "fractions": [
+          0.5,
+          0.5
+        ]
+      }
+    },
+    "vapor_fraction": 1.0
+  },
+  "solver": {
+    "algorithm": "tangent-plane+rachford-rice+fixed-point",
+    "eos": "pc_saft",
+    "method": "phi-phi",
+    "settings": {
+      "damping": null,
+      "max_iter": 100,
+      "tol": 1e-08
+    }
+  }
+}

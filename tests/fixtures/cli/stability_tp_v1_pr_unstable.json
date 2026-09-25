@@ -1,0 +1,82 @@
+{
+  "cli_schema_version": 1,
+  "command": "stability-tp",
+  "diagnostics": {
+    "active_component_count": 2,
+    "converged_trial_count": 4,
+    "feed_branch": "liquid",
+    "ln_sum_W": 1.2558032670054033,
+    "max_iter": 300,
+    "minimizing_trial": "wilson-vapor",
+    "minimizing_trial_iterations": 6,
+    "minimizing_trial_residual": 1.872280108727864e-12,
+    "minimizing_trial_second_order_iterations": 0,
+    "minimizing_trial_ssi_iterations": 6,
+    "minimizing_trial_stage": "successive-substitution",
+    "minimizing_trial_surface": "vapor",
+    "model_family": "eos",
+    "non_trivial_trial_count": 2,
+    "pressure_dependent": true,
+    "second_order_enabled": true,
+    "second_order_trial_count": 0,
+    "ssi_iterations_budget": 50,
+    "status": "unstable",
+    "sum_W": 3.51065723716716,
+    "surface_fallback_evaluation_count": 4,
+    "surface_fallback_trial_count": 4,
+    "tm_at_stationary_point": -2.51065723716716,
+    "tol": 1e-10,
+    "tpd_from_sum_W": -1.2558032670054033,
+    "tpd_tol": 1e-08,
+    "trial_count": 4,
+    "trial_surfaces": "vapor:1,liquid:3",
+    "trivial_tol": 1e-08,
+    "trivial_trial_count": 2
+  },
+  "inputs": {
+    "components": [
+      "Methane",
+      "n-Hexane"
+    ],
+    "normalize": false,
+    "pressure_Pa": 2000000.0,
+    "temperature_K": 300.0,
+    "z_mole": [
+      0.5,
+      0.5
+    ]
+  },
+  "result": {
+    "component_order": [
+      "Methane",
+      "n-Hexane"
+    ],
+    "converged_trial_count": 4,
+    "feed_branch": "liquid",
+    "k_values": [
+      1.9939542255790859,
+      0.006045774420914226
+    ],
+    "non_trivial_trial_count": 2,
+    "phase_branch": "vapor",
+    "stability_scope": "bounded-trial-set",
+    "stable": false,
+    "status": "unstable",
+    "tpd_min": -1.2558032670054033,
+    "trial_composition": [
+      0.9969771127895429,
+      0.003022887210457113
+    ],
+    "trial_count": 4
+  },
+  "solver": {
+    "eos": "peng_robinson",
+    "method": "tangent-plane",
+    "settings": {
+      "max_iter": 300,
+      "tol": 1e-10,
+      "tpd_tol": 1e-08,
+      "trivial_tol": 1e-08
+    }
+  }
+}

@@ -1,0 +1,87 @@
+{
+  "cli_schema_version": 1,
+  "command": "tp-flash",
+  "diagnostics": {
+    "converged": true,
+    "delta_g_split_rt": -0.4232013159455228,
+    "feed_branch": "liquid",
+    "flash_mode": "phi-phi",
+    "fugacity_residual": 4.662035896219052e-10,
+    "incipient_phase": "vapor",
+    "iterations": 7,
+    "k_max": 8.977113437365489,
+    "k_min": 0.018122710267445264,
+    "k_seed": "stability",
+    "mass_balance_residual": 1.2523315717771766e-13,
+    "max_delta_k": 4.179963042361123e-09,
+    "phase_count": 2,
+    "phase_detection": "tangent-plane",
+    "phase_label_method": "compressibility",
+    "phase_regime": "VLE",
+    "phase_stability_liquid": "stable",
+    "phase_stability_tpd_min_liquid": -4.576533441736735e-10,
+    "phase_stability_tpd_min_vapor": -5.746676827794804e-12,
+    "phase_stability_vapor": "stable",
+    "phase_state": "two_phase",
+    "post_split_checked": true,
+    "post_split_stable": true,
+    "post_split_status": "stable",
+    "post_split_tpd_min": -4.576533441736735e-10,
+    "stability_status": "unstable",
+    "stability_trials": 4,
+    "termination_reason": "tolerance_met",
+    "tpd_min": -1.2930848105828199
+  },
+  "inputs": {
+    "components": [
+      "Methane",
+      "n-Hexane"
+    ],
+    "normalize": false,
+    "pressure_Pa": 2000000.0,
+    "temperature_K": 300.0,
+    "z_mole": [
+      0.5,
+      0.5
+    ]
+  },
+  "result": {
+    "component_order": [
+      "Methane",
+      "n-Hexane"
+    ],
+    "phase_fractions": {
+      "liquid": 0.5534507118672991,
+      "vapor": 0.4465492881327009
+    },
+    "phase_names": [
+      "liquid",
+      "vapor"
+    ],
+    "phases": {
+      "liquid": {
+        "fractions": [
+          0.10959686421153975,
+          0.8904031357884603
+        ]
+      },
+      "vapor": {
+        "fractions": [
+          0.9838634819478537,
+          0.016136518052146366
+        ]
+      }
+    },
+    "vapor_fraction": 0.4465492881327009
+  },
+  "solver": {
+    "algorithm": "tangent-plane+rachford-rice+fixed-point",
+    "eos": "pc_saft",
+    "method": "phi-phi",
+    "settings": {
+      "damping": null,
+      "max_iter": 100,
+      "tol": 1e-08
+    }
+  }
+}

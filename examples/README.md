@@ -8,6 +8,12 @@ VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capa
 
 ## Scripts
 
+- `examples/cli/stability_and_multiphase.sh`
+  - The ADR-0033 command line: `stability-tp` (stable, unstable, PC-SAFT),
+    `tp-flash --eos pc-saft`, three liquids with `--max-phases`, and the
+    exit code 3 refusal when the phase budget is too small. Run with
+    `bash examples/cli/stability_and_multiphase.sh` (`PYTHON=...` picks the
+    interpreter); smoke-tested by `tests/test_examples.py`.
 - `examples/database/01_component_database_demo.py`
   - Inspects canonical packaged runtime DB metadata and sample records.
 - `examples/basic/citation_demo.py`
