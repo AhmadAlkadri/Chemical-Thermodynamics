@@ -200,6 +200,13 @@ gh release create vX.Y.Z --verify-tag --title "chemthermo X.Y.Z" --notes-file no
 git ls-remote origin 'refs/tags/vX.Y.Z^{}'   # must print SHA
 ```
 
+4. **PyPI (owner only, ADR-0038).** From a clean clone of the tag, after the
+   GitHub release: `python -m build --outdir dist/`, `twine check --strict dist/*`,
+   `twine upload --repository testpypi dist/*`, install from TestPyPI into a
+   fresh venv and run `tools/release_smoke.py --expect-version X.Y.Z`, then
+   `twine upload dist/*`. Agents never upload and never store a token; they
+   prepare `.agents/handoffs/release-packet-vX.Y.Z.md` instead.
+
 ## Slice evidence
 
 For every thin vertical slice report, include:
