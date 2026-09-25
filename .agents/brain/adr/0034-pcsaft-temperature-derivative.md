@@ -50,6 +50,22 @@ mixing rules (A.12-A.13). The association term (2002) adds a third, through
 - Unblocks the Venkatarathnam-Oellrich criterion ADR-0017 rejected only once
   C4 (`d ln phi / dT`) exists.
 
+## Amendment (C2, 2026-09-25): association included
+The association term's temperature derivative is now added
+(`_pcsaft_association.temperature_derivative`), so both methods work for
+associating mixtures and the `ModelError` of decision 3 is removed for them
+(the `Z <= 0` refusal stays). Michelsen-Hendriks stationarity makes it the
+explicit partial at frozen site fractions,
+`-(rho/2) sum w_a w_b X_a X_b dDelta_ab/dT`, with `T` in the Boltzmann factor
+`exp(eps_ab/kT) - 1` and, through `d_i(T)`, in the contact value (`c_ij`,
+`zeta_2`, `eta`); no sensitivity solve. Validation (ledger Case P-20):
+FeOs residual entropy (same `T, V` reference) and enthalpy at the 18 Case P-6
+states, **2.1e-15** worst with matched universal constants (asserted 1e-12),
+1.7e-11 / 3.2e-10 with the published ones; central differences 1e-8 at five
+associating states; Gibbs-Helmholtz through `ln phi` for liquid water and
+water / ethanol. Still not provided: `Cp^res`, `d ln phi/dT`, total caloric
+properties.
+
 ## Supersedes (optional)
 None. Discharges the "no temperature derivative" gap of ADR-0014 for
 non-associating mixtures.

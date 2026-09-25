@@ -4,6 +4,15 @@ Versions follow PEP 440 and are tagged `v<version>` on one tested commit
 (policy: `.agents/brain/adr/0031-versioned-releases.md`). Releases are GitHub
 source releases; **nothing is published to PyPI**.
 
+## Unreleased
+
+### Added
+- PC-SAFT **association** temperature derivative: `residual_helmholtz_temperature_derivative`
+  and `residual_properties` now work for water, alcohols and their mixtures
+  (they raised `ModelError` in 0.3.0b1). Checked against FeOs residual entropy
+  and enthalpy (2.1e-15 with matched universal constants). ADR-0034 amendment,
+  ledger Case P-20.
+
 ## 0.3.0b1 (2026-09-25) - prerelease
 
 The CLI reaches the equilibrium work, PC-SAFT gains residual caloric

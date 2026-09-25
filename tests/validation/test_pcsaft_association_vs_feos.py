@@ -751,3 +751,73 @@ def test_water_hexane_liquid_liquid_split_above_the_vapour_root() -> None:
     # model is orders of magnitude away on both. Nothing asserts them.
     assert 0.0 < water_rich[1] < 1e-3
     assert 0.0 < hexane_rich[0] < 1e-1
+
+
+# ---------------------------------------------------------------------------
+# Case P-20: residual entropy and enthalpy with association (ADR-0034, C2)
+# ---------------------------------------------------------------------------
+
+
+def _feos_residual_s_h(
+    names: Sequence[str], temperature: float, density: float, x: Sequence[float]
+):
+    """FeOs's residual ``S/R`` (same ``T, V`` reference) and ``H/RT``."""
+    state = _feos_state(names, temperature, density, x)
+    entropy = state.molar_entropy(Contributions.Residual) / (si.JOULE / si.MOL / si.KELVIN)
+    enthalpy = state.molar_enthalpy(Contributions.Residual) / (si.JOULE / si.MOL)
+    return entropy / R_J_PER_MOL_K, enthalpy / (R_J_PER_MOL_K * temperature)
+
+
+@pytest.mark.parametrize(
+    ("label", "components", "x", "temperature", "density"),
+    PURE_STATES + MIXTURE_STATES,
+    ids=[state[0] for state in PURE_STATES + MIXTURE_STATES],
+)
+def test_residual_entropy_and_enthalpy_match_feos(
+    matched_constants: None,
+    label: str,
+    components: tuple[str, ...],
+    x: list[float],
+    temperature: float,
+    density: float,
+) -> None:
+    """Case P-20: ``s_res_tv`` and ``h_res`` against FeOs, matched constants.
+
+    FeOs's ``Contributions.Residual`` entropy is referred to the ideal gas at
+    the same ``T`` and volume, i.e. chemthermo's ``s_res_tv``. FeOs obtains
+    the temperature derivative by automatic differentiation (dual numbers);
+    chemthermo's association part is the Michelsen-Hendriks explicit partial.
+    Measured worst over these 18 states: 2.1e-15 (S) and 2.1e-15 (H).
+    """
+    entropy, enthalpy = _feos_residual_s_h(components, temperature, density, x)
+    props = PCSAFTEOS(components=components).residual_properties(
+        temperature_K=temperature, density_mol_m3=density, composition=x
+    )
+    assert props["s_res_tv"] == pytest.approx(entropy, rel=1e-12, abs=1e-12)
+    assert props["h_res"] == pytest.approx(enthalpy, rel=1e-12, abs=1e-12)
+
+
+@pytest.mark.parametrize(
+    ("label", "components", "x", "temperature", "density"),
+    PURE_STATES + MIXTURE_STATES,
+    ids=[state[0] for state in PURE_STATES + MIXTURE_STATES],
+)
+def test_residual_entropy_and_enthalpy_match_feos_as_shipped(
+    label: str,
+    components: tuple[str, ...],
+    x: list[float],
+    temperature: float,
+    density: float,
+) -> None:
+    """The same with the published constants; the tables' difference is the floor.
+
+    Measured worst: 1.7e-11 in S/R, 3.2e-10 in H/RT.
+    """
+    entropy, enthalpy = _feos_residual_s_h(components, temperature, density, x)
+    props = PCSAFTEOS(components=components).residual_properties(
+        temperature_K=temperature, density_mol_m3=density, composition=x
+    )
+    assert props["s_res_tv"] == pytest.approx(
+        entropy, rel=DISPERSION_LIMITED, abs=DISPERSION_LIMITED
+    )
+    assert props["h_res"] == pytest.approx(enthalpy, rel=DISPERSION_LIMITED, abs=DISPERSION_LIMITED)
