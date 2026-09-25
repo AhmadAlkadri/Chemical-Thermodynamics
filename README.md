@@ -1376,9 +1376,24 @@ from `chemthermo` if you prefer to build the block as an object.
   only; no PC-SAFT binary-interaction table ships with this package, and any
   `kij` used in the docs or examples (0.03 for methane / n-decane) is
   **illustrative**, not a literature-validated value.
-- **No temperature derivative**, so no residual enthalpy or entropy, and no
-  phase densities in `FlashResult` (compute them with `density_roots` at the
-  converged composition). That includes the association term.
+- **Temperature derivative and residual properties for non-associating
+  mixtures only** (ADR-0034): `residual_helmholtz_temperature_derivative` and
+  `residual_properties` (`h_res`, `u_res`, `s_res_tv` / `s_res_tp`, `g_res_tv` /
+  `g_res_tp`, reduced by `RT` or `R`; the suffix names the ideal-gas reference,
+  same `T` and volume or same `T` and pressure). An associating mixture raises
+  `ModelError`. **Residual only**: no total enthalpy, entropy or `Cp` (the
+  databank has no ideal-gas heat capacities), no `Cp^res`, and no phase
+  densities in `FlashResult` (compute them with `density_roots` at the
+  converged composition).
+
+  ```python
+  from chemthermo.eos import PCSAFTEOS
+
+  eos = PCSAFTEOS(components=("n-Hexane",))
+  rho = max(eos.density_roots(temperature_K=300.0, pressure_Pa=1.0e6, composition=[1.0]))
+  props = eos.residual_properties(temperature_K=300.0, density_mol_m3=rho, composition=[1.0])
+  props["h_res"] * 8.314462618 * 300.0   # H^res in J/mol, about -31.5 kJ/mol
+  ```
 - Validated against [teqp](https://github.com/usnistgov/teqp) (NIST, MIT,
   automatic differentiation) to better than 3e-14 in `A^res/RT`, `Z` and
   `ln phi` over fourteen states; against its `pure_VLE_T` saturation solver for

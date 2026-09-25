@@ -503,6 +503,113 @@ def _evaluate(
     )
 
 
+def _temperature_derivative(
+    *,
+    temperature_K: float,
+    density_mol_m3: float,
+    x: np.ndarray,
+    m: np.ndarray,
+    sigma_A: np.ndarray,
+    epsilon_k_K: np.ndarray,
+    kij: np.ndarray,
+) -> float:
+    """``(d a_res / d T)_{rho, x}`` for hard chain + dispersion, in 1/K (ADR-0034).
+
+    A separate function rather than a new output of :func:`_evaluate`, so that
+    no number :func:`_evaluate` produces can move. Temperature enters the
+    non-associating model in exactly two places:
+
+    - the segment diameter, Eq. A.9: ``d_i = sigma_i (1 - 0.12 exp(-3 eps_i/T))``,
+      so ``d d_i / dT = -0.36 sigma_i (eps_i / T^2) exp(-3 eps_i / T)``, which
+      moves every ``zeta_n`` (Eq. A.8) and the contact values ``g_ii`` (A.7);
+    - ``eps_ij / (k T)`` in the dispersion mixing rules, A.12-A.13, so
+      ``m2es3 ~ 1/T`` and ``m2e2s3 ~ 1/T^2``.
+
+    Everything else is the chain rule through the same gradients
+    :func:`_evaluate` forms (``d a_hs / d zeta``, ``d g / d zeta_2,3``,
+    ``d f / d eta``).
+    """
+    t = temperature_K
+    rho_a3 = density_mol_m3 * AVOGADRO_PER_MOL * 1e-30
+    boltz = np.exp(-3.0 * epsilon_k_K / t)
+    d = sigma_A * (1.0 - 0.12 * boltz)
+    dd_dt = -0.36 * sigma_A * epsilon_k_K / (t * t) * boltz
+    mbar = float(x @ m)
+    m_minus_1 = m - 1.0
+    xm = x * m
+
+    powers = _POWERS_ZETA[:, None]
+    zeta = (math.pi / 6.0) * rho_a3 * (xm[None, :] * d[None, :] ** powers).sum(axis=1)
+    # d(d^n)/dT = n d^(n-1) dd/dT; the n = 0 row is identically zero.
+    dpow = powers * np.where(powers > 0, d[None, :] ** np.maximum(powers - 1, 0), 0.0)
+    dzeta_dt = (math.pi / 6.0) * rho_a3 * (xm[None, :] * dpow * dd_dt[None, :]).sum(axis=1)
+    z0, z1, z2, z3 = (float(value) for value in zeta)
+    eta = z3
+    if not (0.0 < eta < 1.0):
+        raise ModelError(
+            f"PC-SAFT packing fraction eta = {eta!r} is outside (0, 1); the model has no "
+            "meaning at this density."
+        )
+    u = 1.0 - eta
+    ln_u = math.log(u)
+
+    a_hs = (3.0 * z1 * z2 / u + z2**3 / (z3 * u * u) + (z2**3 / z3**2 - z0) * ln_u) / z0
+    dahs_dzeta = np.array(
+        [
+            -a_hs / z0 - ln_u / z0,
+            3.0 * z2 / u / z0,
+            (3.0 * z1 / u + 3.0 * z2**2 / (z3 * u * u) + 3.0 * z2**2 / z3**2 * ln_u) / z0,
+            (
+                3.0 * z1 * z2 / (u * u)
+                + z2**3 * (2.0 / (z3 * u**3) - 1.0 / (z3**2 * u * u))
+                - 2.0 * z2**3 * ln_u / z3**3
+                - (z2**3 / z3**2 - z0) / u
+            )
+            / z0,
+        ],
+        dtype=float,
+    )
+    dahs_dt = float(dahs_dzeta @ dzeta_dt)
+
+    c_ii = 0.5 * d
+    dc_dt = 0.5 * dd_dt
+    g_ii = 1.0 / u + c_ii * 3.0 * z2 / u**2 + c_ii**2 * 2.0 * z2**2 / u**3
+    dg_dc = 3.0 * z2 / u**2 + 4.0 * c_ii * z2**2 / u**3
+    dg_dz2 = 3.0 * c_ii / u**2 + 4.0 * c_ii**2 * z2 / u**3
+    dg_dz3 = 1.0 / u**2 + 6.0 * c_ii * z2 / u**3 + 6.0 * c_ii**2 * z2**2 / u**4
+    dg_dt = dg_dc * dc_dt + dg_dz2 * dzeta_dt[2] + dg_dz3 * dzeta_dt[3]
+    dahc_dt = mbar * dahs_dt - float(np.sum(x * m_minus_1 * dg_dt / g_ii))
+
+    sigma_ij3 = (0.5 * (sigma_A[:, None] + sigma_A[None, :])) ** 3
+    eps_over_kt = np.sqrt(np.outer(epsilon_k_K, epsilon_k_K)) * (1.0 - kij) / t
+    weights = np.outer(xm, xm)
+    m2es3 = float(np.sum(weights * eps_over_kt * sigma_ij3))
+    m2e2s3 = float(np.sum(weights * eps_over_kt**2 * sigma_ij3))
+
+    ratio_1 = (mbar - 1.0) / mbar
+    ratio_2 = ratio_1 * (mbar - 2.0) / mbar
+    a_bar = A_UNIVERSAL[0] + ratio_1 * A_UNIVERSAL[1] + ratio_2 * A_UNIVERSAL[2]
+    b_bar = B_UNIVERSAL[0] + ratio_1 * B_UNIVERSAL[1] + ratio_2 * B_UNIVERSAL[2]
+    eta_powers = eta**_POWERS_ETA
+    eta_powers_shifted = np.concatenate(([0.0], eta ** _POWERS_ETA[:-1]))
+    i1 = float(a_bar @ eta_powers)
+    i2 = float(b_bar @ eta_powers)
+    i1_deta = float((a_bar * _POWERS_ETA) @ eta_powers_shifted)
+    i2_deta = float((b_bar * _POWERS_ETA) @ eta_powers_shifted)
+    c1, c1_deta, _ = _c1_terms(eta, mbar)
+
+    f_deta = (
+        -2.0 * math.pi * i1_deta * m2es3 - math.pi * mbar * (c1_deta * i2 + c1 * i2_deta) * m2e2s3
+    )
+    # f = -2 pi I1 m2es3 - pi mbar C1 I2 m2e2s3, with m2es3 ~ 1/T, m2e2s3 ~ 1/T^2.
+    df_dt = (
+        f_deta * float(dzeta_dt[3])
+        + 2.0 * math.pi * i1 * m2es3 / t
+        + 2.0 * math.pi * mbar * c1 * i2 * m2e2s3 / t
+    )
+    return float(dahc_dt + rho_a3 * df_dt)
+
+
 @dataclass(frozen=True)
 class PCSAFTEOS(EquationOfState, EOSProtocol):
     """PC-SAFT equation of state (ADR-0014, ADR-0015, ADR-0018).
@@ -591,6 +698,109 @@ class PCSAFTEOS(EquationOfState, EOSProtocol):
         if not math.isfinite(volume) or volume <= 0.0:
             raise InputRangeError(f"Molar volume must be positive and finite (got {volume_m3!r}).")
         return self._state(temperature_K, 1.0 / volume, composition).a_res
+
+    def residual_helmholtz_temperature_derivative(
+        self,
+        *,
+        temperature_K: float,
+        volume_m3: float,
+        composition: Sequence[float],
+    ) -> float:
+        """Return ``d(A^res / (R T)) / dT`` at fixed molar volume and composition.
+
+        Analytic, in 1/K (ADR-0034). teqp's ``get_Ar10`` is
+        ``-T`` times this number.
+
+        Raises:
+            ModelError: when a component associates. The association
+                contribution's temperature derivative is not implemented yet
+                (ADR-0034); a hard-chain + dispersion number returned for an
+                associating mixture would be wrong without saying so.
+        """
+        volume = float(volume_m3)
+        if not math.isfinite(volume) or volume <= 0.0:
+            raise InputRangeError(f"Molar volume must be positive and finite (got {volume_m3!r}).")
+        if self.associates():
+            raise ModelError(
+                "The temperature derivative of the PC-SAFT association term is not "
+                "implemented; residual_helmholtz_temperature_derivative supports "
+                "non-associating mixtures only (ADR-0034)."
+            )
+        temperature = validate_temperature(temperature_K)
+        m, sigma_A, epsilon_k_K = self.component_parameters()
+        x = self._composition(composition, None)
+        return _temperature_derivative(
+            temperature_K=temperature,
+            density_mol_m3=1.0 / volume,
+            x=x,
+            m=m,
+            sigma_A=sigma_A,
+            epsilon_k_K=epsilon_k_K,
+            kij=self.kij_matrix(),
+        )
+
+    def residual_properties(
+        self,
+        *,
+        temperature_K: float,
+        density_mol_m3: float,
+        composition: Sequence[float],
+    ) -> dict[str, float]:
+        """Reduced residual properties at ``(T, molar density, x)`` (ADR-0034).
+
+        All values are dimensionless; multiply by ``R T`` (energies) or ``R``
+        (entropy) for SI. A residual property is the real fluid's value minus
+        an ideal gas's, and **which** ideal gas matters for ``S`` and ``G``:
+
+        - ``*_tv`` keys: ideal gas at the same ``T`` and molar volume;
+        - ``*_tp`` keys: ideal gas at the same ``T`` and pressure (the usual
+          tabulated departure function). They differ by ``ln Z``.
+
+        ``U`` and ``H`` are the same for both references (an ideal gas's
+        energy depends on ``T`` only).
+
+        Keys: ``"a_res"`` (``A^res/RT``), ``"z"``, ``"u_res"``
+        (``-T da/dT``), ``"h_res"`` (``u_res + Z - 1``), ``"s_res_tv"``
+        (``-a - T da/dT``), ``"s_res_tp"`` (``s_res_tv + ln Z``),
+        ``"g_res_tv"`` (``a + Z - 1``), ``"g_res_tp"`` (``g_res_tv - ln Z``,
+        equal to ``sum_i x_i ln phi_i``).
+
+        These are **residual** properties only. Total enthalpy, entropy or
+        heat capacity also need ideal-gas heat capacities, which the databank
+        does not carry, and ``Cp^res`` needs a second temperature derivative;
+        neither is provided.
+
+        Raises:
+            ModelError: for an associating mixture (see
+                :meth:`residual_helmholtz_temperature_derivative`), or where
+                ``Z <= 0`` (inside the spinodal), since the ``*_tp`` values
+                need ``ln Z``.
+        """
+        density = _validated_density(density_mol_m3)
+        state = self._state(temperature_K, density, composition)
+        z = 1.0 + state.z_minus_one
+        if z <= 0.0:
+            raise ModelError(
+                f"Z = {z!r} <= 0 at this density (inside the spinodal); the constant-pressure "
+                "residual properties need ln Z and do not exist here."
+            )
+        t_da_dt = float(temperature_K) * self.residual_helmholtz_temperature_derivative(
+            temperature_K=temperature_K, volume_m3=1.0 / density, composition=composition
+        )
+        a = state.a_res
+        ln_z = math.log(z)
+        s_tv = -a - t_da_dt
+        g_tv = a + state.z_minus_one
+        return {
+            "a_res": a,
+            "z": z,
+            "u_res": -t_da_dt,
+            "h_res": -t_da_dt + state.z_minus_one,
+            "s_res_tv": s_tv,
+            "s_res_tp": s_tv + ln_z,
+            "g_res_tv": g_tv,
+            "g_res_tp": g_tv - ln_z,
+        }
 
     def residual_helmholtz_terms(
         self,

@@ -5908,3 +5908,45 @@ as a speed-up: nine states that used to refuse early now solve.
   the pins).
 - **Script:** `python -m chemthermo.bench robustness --out record.json
   --summary-out record.md`.
+
+---
+
+## Case P-19: PC-SAFT temperature derivative and residual properties (ADR-0034)
+
+- **Source:** teqp 0.23.2 (NIST, MIT) `get_Ar10 = -T (d alphar / dT)_{rho,x}`,
+  automatic differentiation of the same Gross & Sadowski (2001) `alphar`;
+  chemthermo's is a hand-written chain rule (`_temperature_derivative`), so the
+  two share no derivative code. Fills the column Case P-1 left "Not compared".
+- **Assumptions:** non-associating PC-SAFT; `kij` only. Associating mixtures
+  are refused (`ModelError`), not approximated.
+- **Components / units:** the 14 Case P-1 states (pure n-hexane, four binaries
+  incl. `kij = 0.03`, two ternaries, and one state inside the spinodal); for
+  the residual properties n-hexane liquid 300 K / 1 MPa, methane / n-hexane
+  0.8/0.2 vapour 350 K / 2 MPa, methane / n-decane 0.3/0.7 liquid 350 K / 5 MPa.
+- **Expected outcome and tolerance:** teqp agreement 1e-12 relative;
+  fourth-order central difference of `residual_helmholtz` in `T` at 6 states,
+  1e-8; `g_res_tp == sum_i x_i ln phi_i` to 1e-12; Gibbs-Helmholtz
+  `h_res = -T d(sum x ln phi)/dT` at fixed `P` (density re-solved at each `T`,
+  fourth-order stencil) to 1e-7; `s_res_tp - s_res_tv = ln Z` and
+  `g = h - s` in both references to 1e-13; all residuals below 1e-6 at
+  `rho = 1e-3 mol/m^3`.
+- **Achieved (2026-09-25, Linux x86_64, numpy 2.4.6):** teqp worst
+  **5.24e-16** relative over the 14 states; central difference worst
+  1.13e-11; `g_res_tp` vs `ln phi` <= 8.9e-16; Gibbs-Helmholtz 1.7e-12
+  (hexane liquid, `h_res = -12.6406`), 3.4e-11 (methane / n-hexane vapour,
+  `-0.26962`), 5.1e-12 (methane / n-decane liquid, `-11.5219`).
+- **Saturation consistency:** at n-hexane's PC-SAFT saturation pressure at
+  300 K (teqp `pure_VLE_T`, Case P-2), `dH_vap/RT = 12.638931507857` and
+  `dS_vap/R = 12.638931507871` from the two roots - equal to **1.05e-12**
+  (asserted 1e-9), as `dG_vap = 0` requires; `dH_vap = 31.526 kJ/mol`
+  (`examples/basic/pcsaft_residual_properties_demo.py`). Not compared with
+  measurement.
+- **Negative control:** a 1 % change in n-hexane's `eps/k` moves the derivative
+  by more than 1e-3 relative (asserted).
+- **Independent route:** teqp (external, autodiff); the fugacity route
+  (density solver + composition derivatives) for Gibbs-Helmholtz.
+- **Not claimed:** association (plan C2), `Cp^res`, `d ln phi / dT` (C4),
+  total caloric properties (no ideal-gas `Cp` data).
+- **Test path:** `tests/test_pcsaft_temperature_derivative.py`,
+  `tests/validation/test_pcsaft_vs_teqp.py::test_temperature_derivative_matches_teqp_ar10`.
+
