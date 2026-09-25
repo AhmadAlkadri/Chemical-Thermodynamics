@@ -4,6 +4,23 @@ Versions follow PEP 440 and are tagged `v<version>` on one tested commit
 (policy: `.agents/brain/adr/0031-versioned-releases.md`). Releases are GitHub
 source releases; **nothing is published to PyPI**.
 
+## Unreleased
+
+### Changed (tests and policy only; no library code)
+- Guards that compare against floats captured on macOS arm64 are exact there
+  and, on any other platform, exact on every discrete field and bounded on
+  floats (1e-12 flash fixture, 5e-14 PC-SAFT literals); last-bit ties are
+  counted as ties. Makes the Linux CI and cloud runs green without weakening
+  the capture-platform check. ADR-0032; ledger Cases P-11 and P-17.
+
+### Known limitations found
+- One polymer ladder state (Mw 53000, 15 wt%, 8.1 MPa) refuses at 1 of 17
+  pressures within +-8 ULP of the grid point, and its solver route depends on
+  the last bit; every converged answer is the same tie line.
+- `stability_tp` breaks an exact `tpd` tie by trial order, so the reported
+  `trial_composition` can be the less-converged of two tied trials (good to
+  the stationarity tolerance, 1e-10 residual).
+
 ## 0.2.0b1 (2026-09-25) - prerelease
 
 First release of the phase-equilibrium campaign (121 commits and 38

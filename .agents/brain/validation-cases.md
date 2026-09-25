@@ -3437,6 +3437,34 @@ recorded in Case P-10; the binary window is Case P-9.
   `--full` for both offsets, the matched-constants comparison, the two
   41-point scans, the bisected boundary and the Peng-Robinson grid).
 
+### Cross-platform (ADR-0032, 2026-09-25)
+
+The pins above were captured on macOS arm64. On the first Linux runs
+(GitHub Actions `ubuntu-latest` run 36121300741, and the cloud-baseline host:
+Linux 6.18 x86_64, CPython 3.11.15, numpy 2.4.6) three captured-value guards
+failed and nothing else did:
+
+| guard | Linux measurement | discrete fields |
+| --- | --- | --- |
+| `refactor_bit_identity_v3.json`, 155 states | deterministic run to run; 83 states / 688 floats move; worst 2.44e-13 absolute (`k_min`); compositions <= 1.2e-14, phase fractions <= 2.1e-13, `tpd_min` <= 3.6e-15 | all identical: phase names, key sets, statuses, stages, iteration counts |
+| PC-SAFT n-hexane literals (Cases P-1/P-3) | cloud host: `Z(7700)` 32 ULP (3.5e-15), `ln phi(7700)` 2 ULP, rest exact; CI runner: `a_res(7700)` 3 ULP | n/a |
+| grid `minimizing_trial_surface` count | liquid/vapour 45/32 (macOS), 46/31 (CI), 47/30 (cloud) | verdicts 47/97 identical |
+
+The surface count is last-bit-decided on 20 of its 77 states: both surfaces
+reach the same stationary point (best `tpd` equal to <= 5e-16, trial
+compositions to <= 6e-13). On the other 57 the winner is decisive
+(19 vapour, 38 liquid; the two decisive two-surface gaps are 1.7e-02 and 1.0).
+
+- **Rule adopted (ADR-0032):** exact on macOS arm64; elsewhere discrete fields
+  exact, floats to `atol = rtol = 1e-12` (flash fixture) and `atol = 5e-14`
+  (PC-SAFT literals), and the surface statement is `{vapor: 19, liquid: 38,
+  tie: 20}` with `TIE_MARGIN = 1e-10`, the 45/32 split still pinned on macOS.
+- **Negative control:** `tests/test_capture_identity.py` - a 1e-11 move, any
+  discrete change, a key added or removed, and a non-finite mismatch all fail
+  the bounded comparison; a last-bit move passes.
+- **Not claimed:** bit-identity on Linux. The in-process A/B guards
+  (ADR-0023/0030) remain exact on every platform.
+
 ---
 
 ## Case P-12: PC-SAFT properties for a polymer, against FeOs
@@ -5577,6 +5605,39 @@ deprecated path's documented, by-design behaviour, included so the map's
 - **Script:** `python -m chemthermo.bench robustness --quick` (~14 s) and
   `python -m chemthermo.bench robustness --out record.json --summary-out record.md`
   (~37 min); `--family NAME` runs one family; `--list` prints the grid.
+
+### Cross-platform (ADR-0032, 2026-09-25): the ladder's *route* is last-bit noise
+
+On the cloud-baseline host (Linux 6.18 x86_64, CPython 3.11.15, numpy 2.4.6)
+`test_the_band_the_diverged_k_loop_used_to_end[53000.0-0.15-8100000.0]`
+failed on one assertion only: `log_space_seed` was `"linear-iterate"` (the
+ADR-0024 retry from the linear stage's iterate) where macOS arm64 and the
+GitHub Actions runner give `"stability-w"` (the ADR-0028 ladder). Every other
+assertion held: the same tie line to 1.30e-12 relative (asserted 1e-11),
+post-split stable, residuals inside their bounds.
+
+Probed on that host over the 17 pressures within +-8 ULP of 8.1 MPa (same
+chain, same feed):
+
+| state | `stability-w` | `linear-iterate` | linear stage converged | `ConvergenceError` | worst fraction move among converged |
+| --- | --- | --- | --- | --- | --- |
+| Mw 53000, 15 wt%, 8.1 MPa | 12 | 3 | 1 | **1** | 4.73e-12 |
+| Mw 16400, 5 wt%, 7.5 MPa | 17 (safeguard on) | 0 | 0 | 0 | 9.38e-12 |
+
+Reading: the successive-substitution loop diverges here (`max_delta_k` 1e+89
+to 1e+128), so the iterate it leaves - and therefore which rung finishes the
+job first - is chaotic in the last bit of the input. The **answer** is not:
+every converged outcome is the same tie line. The refusal one ULP-step away
+is a **new robustness finding**: the map's "0 refusals in `polymer`" is true
+of its grid points on the machines measured, not of their neighbourhoods.
+Queued in `.agents/handoffs/continuation-plan.md` (not fixed in the
+cross-platform slice, which changes no solver code).
+
+- **Test change:** the route stays pinned to `"stability-w"` on macOS arm64
+  and, everywhere, for the 16400 g/mol state (17/17 over its neighbourhood);
+  off-platform the 53000 g/mol state admits `"stability-w"` or
+  `"linear-iterate"` (`P17_ROUTE_BY_NOISE`), with every numeric assertion
+  unchanged.
 
 ---
 

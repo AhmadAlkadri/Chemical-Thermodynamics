@@ -24,6 +24,7 @@ import math
 
 import numpy as np
 import pytest
+from _capture_identity import assert_matches_capture
 
 import chemthermo as ct
 from chemthermo.eos import PCSAFTEOS
@@ -212,8 +213,16 @@ def test_a_scheme_label_that_agrees_with_the_counts_is_accepted() -> None:
 # --------------------------------------------------------------------------
 
 #: Values pinned in validation Cases P-1 and P-3 for the non-associating
-#: model. They must be reproduced **exactly**, not to a tolerance: the
-#: association term is supposed not to run at all here.
+#: model. They must be reproduced **exactly**, not to a tolerance, on the
+#: platform they were captured on (macOS arm64): the association term is
+#: supposed not to run at all here. Elsewhere `exp`/`log` differ in the last
+#: bits (measured on two Linux x86_64 hosts: at most 3.5e-15 absolute, 32 ULP
+#: of `Z` at liquid density, where `Z = 1 + rho da/drho` cancels), so
+#: off-platform they hold to 5e-14 absolute - 14x the measured move, and the
+#: size of the double-precision floor at which ledger Case P-1 accepted these
+#: very quantities as equal to teqp's (worst |dZ| 2.58e-14, |d ln phi|
+#: 2.66e-14). That the association code adds nothing is also pinned exactly,
+#: on every platform, in-process, by the all-`None` test below. ADR-0032.
 PINNED_NON_ASSOCIATING = {
     "hexane_300_7700": (-5.783742760059239, 0.661534529144653, -5.709015132378622),
     "hexane_300_100": (-0.13257462366272255, 0.8693321635961244, -0.12321246990538429),
@@ -226,21 +235,21 @@ PINNED_HEXANE_ROOTS = (8.868596301913758, 7518.498733715524)
 )
 def test_non_associating_values_are_bit_identical(key: str, density: float) -> None:
     eos = PCSAFTEOS(components=("n-Hexane",))
-    a_res, z_factor, ln_phi = PINNED_NON_ASSOCIATING[key]
-    assert (
-        eos.residual_helmholtz(temperature_K=300.0, volume_m3=1.0 / density, composition=[1.0])
-        == a_res
-    )
-    assert (
-        eos.compressibility_factor(temperature_K=300.0, density_mol_m3=density, composition=[1.0])
-        == z_factor
-    )
-    assert (
-        eos.ln_fugacity_coefficients(
+    computed = {
+        "a_res": eos.residual_helmholtz(
+            temperature_K=300.0, volume_m3=1.0 / density, composition=[1.0]
+        ),
+        "z": eos.compressibility_factor(
             temperature_K=300.0, density_mol_m3=density, composition=[1.0]
-        )[0]
-        == ln_phi
-    )
+        ),
+        "ln_phi": float(
+            eos.ln_fugacity_coefficients(
+                temperature_K=300.0, density_mol_m3=density, composition=[1.0]
+            )[0]
+        ),
+    }
+    pinned = dict(zip(("a_res", "z", "ln_phi"), PINNED_NON_ASSOCIATING[key]))
+    assert_matches_capture(pinned, computed, rtol=0.0, atol=5e-14, label=key)
 
 
 def test_non_associating_density_roots_are_bit_identical() -> None:
