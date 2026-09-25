@@ -386,7 +386,18 @@ def test_results_are_deterministic(propanol_water) -> None:
 def test_results_are_invariant_under_component_reordering(
     tessier2000_payload: dict[str, Any], z: tuple[float, float], temperature_K: float
 ) -> None:
-    """Reordering the components must permute the answer, not change it."""
+    """Reordering the components must permute the answer, not change it.
+
+    Compared trial by trial: each start is named by its label in both orders,
+    and every one must agree to 1e-12 (measured <= 7.1e-15). The *reported*
+    minimizer is compared to 1e-12 too when both orders report the same trial.
+    At ``(0.4, 0.6)`` three trials reach one stationary point with ``tpd``
+    equal to 1e-17, and which of them is reported is decided by the last bit
+    of the summation order - it differs between machines (ADR-0032). Then the
+    tie itself is asserted and the two reported compositions only have to agree
+    to the stationarity tolerance, because one of the tied trials stopped at
+    residual 3.3e-11 against ``StabilitySettings.tol = 1e-10``.
+    """
     forward_names, forward_model = _binary(tessier2000_payload, _PROPANOL, _WATER)
     reverse_names, reverse_model = _binary(tessier2000_payload, _WATER, _PROPANOL)
 
@@ -396,15 +407,35 @@ def test_results_are_invariant_under_component_reordering(
     assert forward.status == reverse.status
     assert forward.feed_branch == reverse.feed_branch
     assert abs(forward.tpd_min - reverse.tpd_min) < 1e-12
+
+    reverse_trials = {trial.label: trial for trial in reverse.trials}
+    # Pure-component starts follow component order, so compare label sets.
+    assert sorted(trial.label for trial in forward.trials) == sorted(reverse_trials)
+    for trial in forward.trials:
+        mirrored = reverse_trials[trial.label]
+        assert (trial.converged, trial.trivial) == (mirrored.converged, mirrored.trivial)
+        assert abs(trial.tpd - mirrored.tpd) < 1e-12, trial.label
+        assert (trial.composition is None) == (mirrored.composition is None)
+        if trial.composition is not None and mirrored.composition is not None:
+            assert (
+                max(abs(a - b) for a, b in zip(trial.composition, reversed(mirrored.composition)))
+                < 1e-12
+            ), trial.label
+
     if forward.trial_composition is not None:
         assert reverse.trial_composition is not None
-        assert (
-            max(
-                abs(a - b)
-                for a, b in zip(forward.trial_composition, reversed(reverse.trial_composition))
-            )
-            < 1e-12
+        reported_move = max(
+            abs(a - b)
+            for a, b in zip(forward.trial_composition, reversed(reverse.trial_composition))
         )
+        forward_label = forward.diagnostics["minimizing_trial"]
+        reverse_label = reverse.diagnostics["minimizing_trial"]
+        if forward_label == reverse_label:
+            assert reported_move < 1e-12
+        else:
+            tied = reverse_trials[str(forward_label)]
+            assert abs(tied.tpd - reverse.tpd_min) < 1e-12
+            assert reported_move < 1e-9
 
 
 def test_the_water_butanol_feed_sees_a_liquid_incipient_phase_from_a_vapor_feed(

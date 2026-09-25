@@ -1,6 +1,12 @@
 # Steering Brief
 
 ## What changed since last brief (files + bullets)
+- `tests/_capture_identity.py` (new), `tests/test_capture_identity.py` (new), `tests/test_flash_refactor_bit_identity.py`, `tests/test_pcsaft_association.py`, `tests/test_stability_eos_surfaces.py`, `tests/test_stability_candidates.py`, `tests/test_pcsaft_polymer.py`, `.agents/brain/adr/0032-cross-platform-capture-identity.md` (new), ledger Cases P-11 and P-17 (slice `cross-platform-guards`, 2026-09-25, first cloud session; no solver or model change)
+  - **Cloud baseline, Linux 6.18 x86_64, CPython 3.11.15, numpy 2.4.6:** ruff/pyright clean; `pytest -q` **5 failed / 764 passed** - the 3 known CI failures plus 2 new ones on this host only; install smoke, golden path, wheel `release_smoke.py`, and `robustness --quick` (224 / 219 / 5 by-design) all pass unchanged.
+  - **All five are platform noise meeting a test that pinned more than the answer.** Three compare against floats captured on macOS arm64; two are ties decided by the last bit (a reordered binary's three tied stability trials; a polymer state whose ladder rung is chosen by a diverged K-loop's wreckage). Measured: flash fixture deterministic run to run, 688 floats move by <= 2.4e-13, **zero discrete fields move** in 155 states; two Linux x86_64 hosts also disagree with *each other*.
+  - **Rule (ADR-0032):** exact on the capture platform; elsewhere every discrete field exact and floats inside a stated, measured bound (1e-12 flash, 5e-14 PC-SAFT literals); ties counted as ties (`TIE_MARGIN = 1e-10`). No test deleted, skipped, `xfail`ed or marked `slow`; the reordering test now compares **every** trial by label instead of only the reported one.
+  - **New finding, queued not fixed:** the Mw 53000 / 15 wt% / 8.1 MPa polymer state refuses (`ConvergenceError`) at one of 17 pressures within +-8 ULP, and takes three different routes at the rest - same tie line whenever it converges (ledger Case P-17 "cross-platform").
+  - **New finding, queued not fixed:** `stability_tp` breaks an exact `tpd` tie by trial order, so it can report a tied trial that stopped at residual 3.3e-11 over one that stopped at 1e-16 - the reported `trial_composition` is then good to the stationarity tolerance only. Preferring the smaller residual on a tie is a solver change (moves captured numbers) and needs its own audit slice.
 - `.github/workflows/ci.yml`, `.agents/brain/adr/0031-versioned-releases.md` (new), `.agents/dev-contract.md`, `tools/release_smoke.py` (new), `.agents/handoffs/` (new), `CHANGELOG.md` (new), version `0.2.0b1` (2026-09-25, handoff session; no solver or model change)
   - **Published.** `dev/sprint` pushed to GitHub for the first time (`5041dd7`, 121 commits over `main`, history intact); prerelease `v0.2.0b1` tagged on `bd37068` with sdist/wheel attached (ADR-0031). Not on PyPI.
   - **First second-platform result: CI on ubuntu-latest fails 3 of 769 default tests** (run 36121300741): two bit-identity fixtures differ in the last ULP, and one PR grid state's minimizing trial surface flips between near-tied minima (verdicts identical, 47/97). Nothing was relaxed; the platform-aware bit-identity guard is the first slice of `.agents/handoffs/continuation-plan.md`.
@@ -382,6 +388,16 @@
   - Validation policy promotion to required CI remains deferred.
 
 ## Risks / unknowns
+- **"Bit-identical" is a same-platform statement (ADR-0032).** Captured-value
+  guards are exact only on macOS arm64; CI and cloud sessions check discrete
+  fields exactly and floats to 1e-12 / 5e-14. A numerical change smaller than
+  that bound is caught only on the capture machine. In-process A/B guards stay
+  exact everywhere.
+- **Chaotic routes on diverged K-loop states.** Where successive substitution
+  diverges (the ADR-0028 ladder states), which rung finishes - and, at 1 of 17
+  measured neighbouring pressures, whether any does - depends on the last bit.
+  Grid-point robustness counts are therefore machine-dependent near those
+  states (ledger Case P-17 "cross-platform").
 - **The map is hard again, and still bounded by what it sweeps (ADR-0027
   amendment).** The 2505-state sweep at `74820b8` found 14 refusals in the
   four families slice `robustness-map-coverage` added - none in the original
@@ -437,6 +453,14 @@
 - (Removed) Unpinned `bibtexparser>=1.4.0` allowed a fresh/non-editable install to resolve `bibtexparser` 2.x, whose removed `bparser`/`customization` modules broke `import chemthermo`; this was invisible locally because the dev venv already had 1.4.4 installed. Now pinned to `>=1.4.0,<2` and covered by `tests/test_packaging_constraints.py`.
 
 ## Next 3 recommended actions
+Sequencing is owned by `.agents/handoffs/continuation-plan.md` (owner
+authorization 2026-09-25): slice B (CLI exposure, contract ADR-0033 first),
+then C (PC-SAFT temperature derivatives = item 3 below), then D/E. The items
+below remain the engineering backlog they were; the two findings of slice
+`cross-platform-guards` (tie-break by residual in `stability_tp`; the
+ULP-sensitive polymer ladder state) are queued in the plan, behind B, because
+neither changes an answer the package currently returns on a grid state.
+
 - **1. A scalar PC-SAFT single-point evaluation path, and the structured multiphase Hessian only as a re-audit (what is left of Stage I after ADR-0030), recommended next.** The (b) half of the old item 1 - the duplicate solves `phase_identity` and the post-split re-evaluation make - is discharged: the call-local memo removes 13-26 % of the density solves in the PC-SAFT cases and 13-24 % of the cubic solves in the Peng-Robinson ones, every result hash identical. The (a) half is measured and declined: the structured Hessian is not bit-identical at 0 of 12 builds (largest relative entry difference 2.5e-04), so shipping it means regenerating `refactor_bit_identity_v3.json` and auditing every moved state in the shape ADR-0017 and ADR-0021 used - a re-audit slice, not a performance one - and the memo has already taken a three-phase build from 36 model evaluations to 20 or 21 against the structured form's 18, so the prize is now about 10 %, not a factor of two. What is left unexamined is **(c)**: the density solve is still ~92 % of a PC-SAFT flash and ~68 % of one solve is ~19 single-point `pressure_and_slope` calls, mostly numpy per-operation overhead on length-1 arrays, and those are *distinct* states that no memo can remove. It is also the only remaining lever on the ~240 s `pytest -q` budget, which this slice narrowed and did not close. Second, smaller: one **uncontended** benchmark pair to replace ADR-0030's, whose wall times were taken with two thirds of the machine's cores held by an unrelated process.
 - **2. Adjudicate the one finding the map surfaced and did not: PC-SAFT 2B water / ethanol at `kij = 0`.** 19 of its 60 states return a *verified* lowest-Gibbs LLE (`z = (0.5, 0.5)`, 290 K, 0.1 MPa: `beta = (0.039887, 0.960113)`, `dG_split/RT = -2.44e-04`, mass balance 7.9e-15, both phases post-split stable) for a pair that is fully miscible in reality. The solver is answering correctly for the model it was handed; the open question is the **parameterization**, and closing it needs a cited `kij` for a water / alcohol cross pair and a reference to check against - neither of which this repository packages (ADR-0014).
 - **3. A PC-SAFT temperature derivative (residual enthalpy/entropy; teqp `Ar10` comparison).** The only gap that blocks a whole *class* of outputs rather than one case: no residual enthalpy or entropy, no caloric properties, no cross-check against teqp's `get_Ar10`, and no access to the Venkatarathnam-Oellrich `Pi` criterion ADR-0017 had to reject for want of it. It is a second analytic derivative chain through hard chain, dispersion **and** now association (where Michelsen-Hendriks again makes the first `T` derivative an explicit partial of `Q`, so it is less work than it looks).

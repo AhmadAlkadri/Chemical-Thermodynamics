@@ -60,6 +60,26 @@ guards protect.
   `slow`/`xfail` to get green.
 - **Release checkpoint:** once CI is green on Linux, `0.2.0b2` (or `0.2.0` if
   nothing else changed and the owner-level policy in ADR-0031 item 3 is met).
+- **Status (2026-09-25, first cloud session):** A done (cloud baseline in
+  handoff section 7). A2 implemented as slice `cross-platform-guards`
+  (ADR-0032): the 3 CI failures plus 2 more that only the cloud host showed
+  (a stability tie in `test_stability_candidates.py`, a polymer ladder route
+  in `test_pcsaft_polymer.py`). See handoff section 7 for the CI result.
+
+Queued by A2's diagnosis (do after B unless evidence reorders them; each is a
+solver change that moves captured numbers, so each needs the ADR-0017/0021
+style audit of `refactor_bit_identity_v3.json` before regenerating it):
+
+- **A3 `stability-tie-break`**: on an exact `tpd` tie, report the trial with
+  the smaller stationarity residual (today trial order wins, so the reported
+  `trial_composition` can carry a 3.3e-11 residual when a tied trial reached
+  1e-16). Acceptance: reordering invariance of the *reported* composition to
+  1e-12 on the three Tessier states; fixture audit shows only tie states move.
+- **A4 `polymer-ladder-neighbourhood`**: ledger Case P-17 "cross-platform" -
+  Mw 53000 / 15 wt% / 8.1 MPa refuses at 1 of 17 pressures within +-8 ULP.
+  Acceptance: a neighbourhood scan (e.g. +-64 ULP and +-1e-6 relative) of the
+  ladder states converges everywhere to the same tie line, pinned as a test;
+  route labels not pinned off the capture platform.
 
 Also queued (docs hygiene, cheap, any time): make `aglint check --repo .`
 pass - fix the renamed paths it reports and decide whether `file::test`
@@ -74,7 +94,7 @@ and deprecated gamma-phi, `cli_schema_version = 1`, exit codes 0/1/2/3,
 golden fixtures `tests/fixtures/cli/tp_flash_v1.json`,
 `tp_flash_gamma_phi_v1.json`, tests `tests/test_cli_tp_flash.py`.
 
-- **B0 contract ADR (ADR-0032).** Decide explicitly: subcommand layout
+- **B0 contract ADR (ADR-0033; ADR-0032 went to slice A2).** Decide explicitly: subcommand layout
   (recommended default: new `chemthermo stability-tp`; extend `tp-flash` with
   `--eos {peng-robinson,pc-saft}` and `--max-phases`, and a way to reach
   `modified-raoult`/`gamma-gamma` only where packaged parameters make it

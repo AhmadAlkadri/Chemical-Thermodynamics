@@ -34,6 +34,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from _capture_identity import on_capture_platform
 
 import chemthermo as ct
 from chemthermo.eos import PCSAFTEOS
@@ -1118,6 +1119,14 @@ P17_LADDER_LLE = {
     ),
 }
 
+#: Ladder states whose *route* (not answer) is decided by last-bit noise.
+#: Over the 17 pressures within +-8 ULP of 8.1 MPa, one Linux x86_64 host took
+#: the `stability-w` rung 12 times, the `linear-iterate` rung 3 times, the
+#: linear stage once, and refused once; every converged answer was this tie
+#: line to <= 4.7e-12. The 16400 g/mol state took `stability-w` 17 times of 17
+#: and stays pinned everywhere. ADR-0032; ledger Case P-17 "cross-platform".
+P17_ROUTE_BY_NOISE = {(53000.0, 0.15, 8.1e6)}
+
 
 @pytest.mark.parametrize(
     ("mw_g_mol", "weight_fraction", "pressure_Pa"),
@@ -1158,7 +1167,13 @@ def test_the_band_the_diverged_k_loop_used_to_end(
     # is what failed - so `k_seed` is still `"stability"`, not `"stability-log"`.
     assert diagnostics["k_seed"] == "stability"
     assert diagnostics["converged_stage"] == "second-order-log"
-    assert diagnostics["log_space_seed"] == "stability-w"
+    if on_capture_platform() or (mw_g_mol, weight_fraction, pressure_Pa) not in P17_ROUTE_BY_NOISE:
+        assert diagnostics["log_space_seed"] == "stability-w"
+    else:
+        # Which rung lands first is decided by the wreckage of a diverged
+        # K-loop, so it is last-bit noise here (ADR-0032, ledger Case P-17
+        # "cross-platform"); the tie line asserted below is not.
+        assert diagnostics["log_space_seed"] in ("stability-w", "linear-iterate")
     assert diagnostics["log_space_curvature_safeguard"] is safeguard
 
     polymer_rich, solvent_rich = _phase_by_polymer(result)

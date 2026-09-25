@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
+from _capture_identity import on_capture_platform
 
 import chemthermo as ct
 from chemthermo.eos import PCSAFTEOS
@@ -59,6 +60,16 @@ GRID_MIXTURES: tuple[tuple[tuple[str, ...], tuple[float, ...]], ...] = (
 )
 GRID_T_K = (170.0, 200.0, 240.0, 280.0, 320.0, 360.0)
 GRID_P_PA = (2.0e5, 1.0e6, 3.0e6, 8.0e6)
+
+#: Two surfaces whose best `tpd` differ by no more than this reached the same
+#: stationary point (ADR-0032): 5 orders above the largest tie measured on the
+#: grid (5e-16), 8 below the smallest real gap (1.7e-02), and 100x below
+#: `StabilitySettings.tpd_tol`, so it cannot hide a difference the verdict
+#: logic would see.
+TIE_MARGIN = 1e-10
+#: Per-surface count of the grid states whose minimizing surface is decisive,
+#: and the ties (ledger Case P-11, "cross-platform").
+DECISIVE_SURFACES = {"vapor": 19, "liquid": 38, "tie": 20}
 
 
 def _mixture(names, z) -> ct.Mixture:
@@ -375,9 +386,22 @@ def test_the_peng_robinson_grid_still_reaches_a_verdict_everywhere() -> None:
     neither surface is decorative. Measured over the grid, the vapour root
     supplies the minimizing trial on 32 states and the liquid root on 45
     (validation Case P-11).
+
+    On 20 of those 77 states both surfaces reach the *same* stationary point
+    (the two best trials' `tpd` agree to 5e-16 and their compositions to
+    6e-13), so which surface "wins" is decided by the last bit of the
+    arithmetic and differs between machines (45/32 on macOS arm64, 46/31 and
+    47/30 on two Linux x86_64 hosts). The platform-independent statement,
+    asserted everywhere, counts a state for a surface only when that surface's
+    best `tpd` beats the other's by more than `TIE_MARGIN`, and counts the
+    rest as ties; the real gaps on this grid are 1.7e-02 and 1.0, the ties at
+    most 5e-16. That gives 19 decisive vapour, 38 decisive liquid, 20 ties:
+    still neither surface decorative. The exact 45/32 split stays pinned on
+    the capture platform (ADR-0032).
     """
     eos = ct.PengRobinsonEOS()
     surfaces: dict[str, int] = {}
+    decisive: dict[str, int] = {}
     statuses: dict[str, int] = {}
     for names, z in GRID_MIXTURES:
         for temperature_K in GRID_T_K:
@@ -392,7 +416,30 @@ def test_the_peng_robinson_grid_still_reaches_a_verdict_everywhere() -> None:
                 surface = result.diagnostics.get("minimizing_trial_surface")
                 if surface is not None:
                     surfaces[str(surface)] = surfaces.get(str(surface), 0) + 1
+                best_by_surface: dict[str, float] = {}
+                for trial in result.trials:
+                    if (
+                        trial.converged
+                        and not trial.trivial
+                        and np.isfinite(trial.tpd)
+                        and trial.surface is not None
+                    ):
+                        previous = best_by_surface.get(trial.surface)
+                        if previous is None or trial.tpd < previous:
+                            best_by_surface[trial.surface] = trial.tpd
+                if not best_by_surface:
+                    continue
+                ranked = sorted(best_by_surface.items(), key=lambda item: item[1])
+                if len(ranked) > 1 and ranked[1][1] - ranked[0][1] <= TIE_MARGIN:
+                    decisive["tie"] = decisive.get("tie", 0) + 1
+                else:
+                    # A decisive winner must be the surface the result reports.
+                    assert surface == ranked[0][0], (names, temperature_K, pressure_Pa)
+                    decisive[ranked[0][0]] = decisive.get(ranked[0][0], 0) + 1
     assert sum(statuses.values()) == 144
     assert "inconclusive" not in statuses
     assert statuses == {"unstable": 47, "stable": 97}
-    assert surfaces == {"vapor": 32, "liquid": 45}
+    assert sum(surfaces.values()) == 77
+    assert decisive == DECISIVE_SURFACES
+    if on_capture_platform():
+        assert surfaces == {"vapor": 32, "liquid": 45}

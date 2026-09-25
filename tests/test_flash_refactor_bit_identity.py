@@ -13,7 +13,11 @@ Every field a caller of ``flash_tp`` can observe - phase names, every phase's
 composition, phase fractions, ``vapor_fraction`` and the full ``diagnostics``
 mapping - is captured for a fixed set of states and pinned, bit-for-bit
 (floats compared with ``==``, ints/bools/strings exact), against
-``tests/fixtures/flash/refactor_bit_identity_v3.json``.
+``tests/fixtures/flash/refactor_bit_identity_v3.json``. Bit for bit holds on
+the platform the fixture was captured on (macOS arm64); on any other platform
+every discrete field stays exact and floats get the stated, justified bound of
+ADR-0032 (``tests/_capture_identity.py``), because ``exp``/``log`` and numpy's
+SIMD kernels are not bit-reproducible across CPUs and C libraries.
 
 Fixture history:
 
@@ -81,6 +85,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import Any, Callable, Sequence
+
+from _capture_identity import assert_matches_capture
 
 import chemthermo as ct
 
@@ -301,5 +307,15 @@ def test_flash_tp_is_bit_identical_to_the_v3_capture(
     assert len(fixture) == 155, len(fixture)
     assert not skipped, skipped
 
+    # Bit for bit on the capture platform (macOS arm64). Elsewhere every
+    # discrete field - phase names, key sets, statuses, verdicts, stages,
+    # iteration counts - is still exact and a float may move by at most
+    # 1e-12 absolute plus 1e-12 relative: every pinned float is an O(1)-scaled
+    # quantity (a mole fraction, a phase fraction, a K-value, a tpd or dG in
+    # units of RT, or a residual of such quantities), the worst cross-platform
+    # move measured over all 688 moved floats was 2.4e-13, and the tightest
+    # solver tolerance (`second_order_tol`) is 1e-12, so a change to the
+    # arithmetic that moves a converged answer by a solver tolerance still
+    # fails here. ADR-0032; ledger Case P-11 "cross-platform".
     for label, expected in fixture.items():
-        assert computed[label] == expected, label
+        assert_matches_capture(expected, computed[label], rtol=1e-12, atol=1e-12, label=label)
