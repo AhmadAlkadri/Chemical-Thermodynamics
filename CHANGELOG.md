@@ -5,7 +5,30 @@ Versions follow PEP 440 and are tagged `v<version>` on one tested commit
 0.3.0b1 were GitHub-only; from 0.4.0 the owner also publishes to PyPI by hand
 (ADR-0038).
 
-## Unreleased
+## 0.4.0 (2026-09-25) - first PyPI release (Beta)
+
+The first release published to PyPI (`pip install chemthermo`), with a short,
+honest README, the reference material moved to `docs/`, and packaging checked
+for PyPI. Beta: validated against independent implementations on macOS arm64
+and Linux x86_64, but the public API may still change before 1.0.
+
+### Breaking
+- **`chemthermo.vlle` is removed** (deprecated since ADR-0013; ADR-0037).
+  `import chemthermo.vlle` raises `ModuleNotFoundError`; three-phase
+  equilibrium is found by `flash_tp` itself (`FlashSettings(max_phases=3)`,
+  the default). `flash_mode="vlle"` still raises `ModelError` with that pointer.
+
+### Packaging
+- PyPI metadata (summary, classifiers, URLs, keywords), `py.typed`, an sdist
+  that carries the library only (tests are excluded: some of their fixtures
+  are not redistributable). Supported and CI-tested on Python 3.11, 3.12 and
+  3.13; CI also runs `twine check --strict`.
+
+### Documentation
+- README rewritten as a summary: quick start, a capability table naming what
+  each claim was checked against, and the limits. The previous detail is in
+  `docs/` (installation, flash, stability, PC-SAFT, CLI, extending,
+  benchmarks). `CONTRIBUTING.md` added.
 
 ### Added
 - PC-SAFT **association** temperature derivative: `residual_helmholtz_temperature_derivative`
@@ -26,6 +49,13 @@ Versions follow PEP 440 and are tagged `v<version>` on one tested commit
   is one converged at least 1000x better, when one exists; flagged by
   `diagnostics["minimizing_trial_tie_break"] = "residual"`. Changes only such
   ties (none on any captured state). ADR-0035.
+
+### Validation for this release
+- Full 2505-state robustness map at `761fd57` (Linux): 2500 converge, 5
+  by-design gamma-phi refusals, 0 invariant violations; identical state by
+  state to the macOS record of 0.3.0b1's era (`benchmarks/robustness_761fd57.*`).
+- Default suite on Python 3.11 / 3.12 / 3.13 (numpy 2.4.6 and 2.5.3), and
+  with the validation extras (teqp, FeOs, thermo) on 3.11.
 
 ## 0.3.0b1 (2026-09-25) - prerelease
 
