@@ -2,10 +2,6 @@
 
 Run examples from the repo root with `python`.
 
-## Scope Policy
-
-VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capability class is categorically out of scope; implementation maturity may vary by module and release.
-
 ## Scripts
 
 - `examples/cli/stability_and_multiphase.sh`

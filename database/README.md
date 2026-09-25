@@ -1,9 +1,5 @@
 # Component database
 
-## Scope Policy
-
-VLLE and PC-SAFT are in scope for Chemical-Thermodynamics. No thermodynamic capability class is categorically out of scope; implementation maturity may vary by module and release.
-
 ## Canonical runtime database path
 
 The canonical packaged runtime component database is:
