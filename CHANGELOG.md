@@ -53,7 +53,7 @@ and Linux x86_64, but the public API may still change before 1.0.
 ### Validation for this release
 - Full 2505-state robustness map at `761fd57` (Linux): 2500 converge, 5
   by-design gamma-phi refusals, 0 invariant violations; identical state by
-  state to the macOS record of 0.3.0b1's era (`benchmarks/robustness_761fd57.*`).
+  state to the earlier macOS record at `f852726` (`benchmarks/robustness_761fd57.*`).
 - Default suite on Python 3.11 / 3.12 / 3.13 (numpy 2.4.6 and 2.5.3), and
   with the validation extras (teqp, FeOs, thermo) on 3.11.
 
