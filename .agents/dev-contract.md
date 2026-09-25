@@ -153,6 +153,8 @@ a published number or another implementation. Use it to rank what to fix, not
 to claim something is right. See `benchmarks/README.md`, ADR-0027 and ledger
 Cases R-MAP-1 and R-MAP-2.
 
+The committed record is `benchmarks/robustness_761fd57.json` (Linux,
+2026-09-25), bucket-for-bucket identical to the macOS `f852726` one.
 At `f852726` it refuses **5** of 2505 states, all of them the deprecated
 `gamma-phi-legacy` path's `rr-no-bracket` behaviour, which is by design
 (ADR-0016 decision 8). The nine `multiphase-solver-failure` states the map
