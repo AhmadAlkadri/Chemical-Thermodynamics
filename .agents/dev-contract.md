@@ -193,7 +193,8 @@ shasum -a 256 dist/*
 
    plus a stability/flash smoke from the installed wheel (see
    `.agents/handoffs/cloud-continuation.md` for the one used at `v0.2.0b1`).
-3. Tag and publish (never `--tags`, never `-f`):
+3. Tag and publish (never `--tags`, never `-f`; the only non-fast-forward
+   updates, the 2026-09-26 attribution rewrite, are recorded in ADR-0039):
 
 ```bash
 git tag -a vX.Y.Z SHA -m "chemthermo X.Y.Z"

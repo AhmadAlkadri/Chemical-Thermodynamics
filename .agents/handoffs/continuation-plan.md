@@ -15,6 +15,13 @@ checks; model/solver slices run the full default suite plus the relevant
 ledger/validation tests; the 37-min sweep only at release boundaries after a
 solver change or when a change could move a map bucket.
 
+> **2026-09-26: commit ids changed.** An owner-directed, metadata-only
+> rewrite (ADR-0039) gave the commits after the stability work new ids with
+> unchanged trees. The ids below are the originals and remain the record of
+> what ran where; translate them with
+> `.agents/reports/history-rewrite-2026-09-26-map.tsv` (e.g. `5041dd7` ->
+> `1b07b8f`, `64130a2` -> `40630c3`, `4aa4753` -> `f2165cd`).
+
 ## A. Cloud baseline (first, every new environment)
 
 (Handoff SHA: the one named in your prompt; the release it contains is

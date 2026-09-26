@@ -6,6 +6,13 @@ the first cloud session. It is self-contained: a fresh session needs this reposi
 and nothing from the original machine, home directory or session memory.
 What to do next is in `.agents/handoffs/continuation-plan.md`.
 
+> **2026-09-26: commit ids changed.** An owner-directed, metadata-only
+> rewrite (ADR-0039) gave the commits after the stability work new ids with
+> unchanged trees. The ids below are the originals and remain the record of
+> what ran where; translate them with
+> `.agents/reports/history-rewrite-2026-09-26-map.tsv` (e.g. `5041dd7` ->
+> `1b07b8f`, `64130a2` -> `40630c3`, `4aa4753` -> `f2165cd`).
+
 ## 1. Checkpoint
 
 | item | value |
