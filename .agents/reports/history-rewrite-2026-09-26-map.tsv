@@ -1,0 +1,140 @@
+# old_sha	new_sha	change	subject
+b7f73d59164da369309f658ed76f6079895c0b0f	e0445ba80032c3d6a93abe91a0d59c217cc561cf	session-trailer	feat(stability): add Michelsen tangent-plane phase stability at T,P
+ef9ceed3bebbd09525bdb03288980bf670efd87b	23fa6df3505d0e396aa76caa393eaa555679df62	session-trailer	docs(stability): record ADR-0005, validation ledger and stability docs
+f23c1709f1d759c67d698ce43d6dbd2a05de30ff	6b224449e83cedf58620dbb813d48b4a78feef4b	session-trailer	fix(packaging): constrain bibtexparser to 1.x API
+d932dcdc749f1f90e1c50f78d2662c5241af9eac	e9e48578068a8909388b1de956661f0a0f26d76d	session-trailer	feat(pr-eos): fix kij diagonal bug and add per-pair kij matrix
+9288594aa070f68e5fbfed8e9da1fa3b3b31255c	62c8f6c4a878246e71cf9538956f6e636391d8a6	session-trailer	docs(pr-eos): record ADR-0006, validation ledger Case K-1
+4a3b2a21958903c57d95423d0edeaf9f25da3490	72b9d75e9cfbaa2c25e4e36164b11e9b326c7cb5	session-trailer	fix(nrtl): use column sums in the activity-coefficient equation
+6e705a50e19b0300dde2b8231866036c9ea304c9	bac85cdffada6c0c6e1910124bb7c792c565469e	session-trailer	test(nrtl): reproduce Tessier 2000 Table 2 stationary points
+b342540f5902e4c9a793e5e7c18e20b7d933d4a5	bad9e8d000ec0711ed76f21cc66335ccfff04619	session-trailer	docs(nrtl): record validation Cases N-1..N-3 and NRTL invariants
+6c4997e5661a2ff746abf45b897786c4d5d4ec0e	6481145dfe5da7cfa43190390006bfec7da36d9a	session-trailer	feat(stability): activity-model tangent-plane stability behind an internal evaluator
+6288d99cd5cedc3157c631e515b4e2f0ec76d791	0426ef3b293007d2e4a9055f350571b58e6885eb	session-trailer	test(stability): reproduce Tessier 2000 Problems 1 and 2 tangent-plane minima
+9a714c9b01027b0010655bc1c03a26288d586219	e06b63fb564d4267758a36534aa30cebba467f64	session-trailer	docs(stability): record ADR-0007 and validation Cases S-6..S-8
+5d616d2fbf793d2bc8c6cd9b718d082acc4fda22	0f0036ec642c78cf5cda8d8384a87f12aec0739d	session-trailer	feat(flash): decide 1-vs-2 phases from a tangent-plane stability test
+dac32ae4b0c7dc1bf2313932bb63e0cc217dbae6	0f16f311551a04f111045b4334c5ff3908a46471	session-trailer	test(flash): pin the phase-detection verdicts, invariants and the thermo grid
+b35a4f9aa09c601f28003ef6b4b204b56279daf2	a3b52a25d4054638ca3c564884f3178ceae33230	session-trailer	docs(flash): record ADR-0008 and validation Cases F-1..F-3
+de207ebb52a2a652c2e83143fe8cdd62005b7157	61d13db605fda184d0fa909804a7f8520fbb0941	session-trailer	test(validation): adjudicate thermo phase-count disagreements
+0b5c21ea53a917d6d4116450122ccdbc4a25db8d	acf7587c236f33f33df56f8e017b1f63a55a5161	session-trailer	feat(flash): solve liquid-liquid equilibrium from an activity model
+705ca302ab21c6e30489ccb8134b96a7e59f1fc9	cbfc6b6c9621b9b6fc17f1ec23805385a545f92c	session-trailer	test(flash): pin the liquid-liquid tie-lines, invariants and post-split grid
+a8fcda12dd2a3580486fa79431d1fe1c906d1ede	8ba6c2382c5a64c83f514ca1b7b64181401a0bde	session-trailer	docs(flash): record ADR-0009 and validation Cases L-1..L-4
+e9276230cbe0cbeb1660a9343e21cf6a54ba5e03	37547c17f60e3501bf81e08a2817958b1385f9b5	session-trailer	fix(flash): give the liquid-liquid split its full budget when second_order is off
+d1096d44f88de81ace43e72540001286b4106a0f	75229f035a95154338ec36d04a8140246edaf748	session-trailer	test(flash): capture pre-refactor bit-identity fixture
+ec43172ce48d13d8307ae43f052e77627fb912c4	2125e03dd3adaf2e1ffcfd03bba5b30e001b1c91	session-trailer	refactor(flash): split tp.py into single-purpose internal modules
+a8980dc78b5e05f3259837fa7c7348735e74bb7a	8d13498b701b311a7a98ad5e1691c0f6b5abcb25	session-trailer	feat(flash): modified-Raoult phase candidates for VLE and LLE from one tangent plane
+9fe24686bec5325731809688964eb34bcdd8a5f0	70e3bd53817c25a234c29817fe3dff83913b7491	session-trailer	test(flash): modified-Raoult VLE/LLE, phase candidates, and a thermo cross-check
+328e504d32817cadb7987b452b08ec9f5d307b3b	506593e17c638071e109825df2c36cf3600e421b	session-trailer	docs(flash): golden paths, ADR-0010, README and ledger for modified Raoult
+2cfa5553afb99a4368f64a9ce21f659c8dc6b91b	17f88b3f9a356ee0629536a6da6edfcf4d20f711	session-trailer	feat(flash): multiphase Rachford-Rice, split and phase addition/removal
+cae35da56e32f0fd6709d9ecc0dbd377d5e52865	91f9d7de9eaafd6c808d7db4c80b8d9e34bbe112	session-trailer	test(flash): Okuno multiphase RR, the ternary tie-triangle and the refusal window
+7b9e858c4c804cdf6168d816c5bc13bd29277316	ef0914c5077237fa42e24c59aeb33af86872e16b	session-trailer	docs(flash): golden paths for the three-phase flash
+8233aa8089dcdade2fe388e5c77b9614f83021a8	a7e450d4c73864f270bd5b07011b3d459bd4bf86	session-trailer	docs(flash): ADR-0011, README multiphase section, brain and ledger Cases V-1..V-4
+cd968b4eb41dd952ab81e9e90f72675702b0098d	a670741d7e0729e40777bd5adbcb826f7c74a4b5	session-trailer	test(flash): check that thermo has no three-phase answer here, and retire two stale notes
+413f7074b7e6bdbea40beeda729aeeae710aba60	e017218213bb638bc0cd84f7f98c0e679115ee25	session-trailer	feat(stability): run each tangent-plane trial on one fixed candidate surface
+d39aa5c9ffd82a9fc4c6cd01a66d1e141f0b820d	9ec79f4a698c5e16018cf8d396dbf26f3a4285b2	session-trailer	test(flash): validation Case V-5, the verdict map of the ternary VLLE region
+ca59a5a7044cf11b630be853b01d3f1419296de3	23594d5716e8e9591963d9db5a2c041f7bf2e811	session-trailer	docs(stability): ADR-0012, README, brain, steering brief, ledger Cases V-5 and V-2
+c4a80d53fbf1b234d8a0f5b6db10aed3bca4a8ad	24de490beab1c7fc5d511c166c717cd79bcdd926	session-trailer	docs(stability): record what equation (7) means once a trial is pinned to a surface
+b9be44701835e7ef42ddeba44fc40f30ed0393e0	a8cfcd0da490a4c39436cee31fec456cc190eee2	session-trailer	fix(vlle): deprecate the plugin boundary, point vlle mode at modified-raoult
+c1dc7c27d95799972b940bce04961bc6ab426805	2d7bf85b42f2a293c767508e36384e73a132bae8	session-trailer	docs(vlle): ADR-0013, amend ADR-0001, README, brain, steering brief
+f0974e2cc40d2a0e71665da4ccb9ac6fcc5f1957	bc50913cd4c43478a5771fada26f8778fa4b6bb8	session-trailer	refactor(models): share the kij contract behind an internal helper
+8eeb02962648c2482f66c3084b9efb3cbb768961	951ccd5433b0d66de9eaea1981424f362ca849a5	session-trailer	feat(pcsaft): real non-associating PC-SAFT behind the existing EOS protocol
+dbab3c5312e14da9af068bbfea00146dea3f24ea	4db3f70327dc9a61e577e0f95f704c8c760719a8	session-trailer	test(pcsaft): teqp cross-check, validation Cases P-1 and P-2
+03365a0c36a2a9c29e47cabe83a7d5fcad0771db	61529c7973c3fb0ca31cb4875aaed746dc87003d	session-trailer	docs(pcsaft): ADR-0014, README, brain, steering brief, ledger Cases P-0..P-2
+d682464ea7e52090ef9f6bc6f114f7b894108d1f	575e5411d0011346bc9648b356160df70f59eedc	session-trailer	feat(pcsaft): density roots at (T, P, x) behind the EquationOfState interface
+8d93d6e3aac93d41fad6d6e4508b707b2b8f815b	3299ab342fd62ec4a951e99b64ce1001703fe5f4	session-trailer	test(pcsaft): density roots, stability and flash, validation Cases P-3..P-5
+e7a3d10e1cd6cf1a2ebd850b08612af15b7f56db	dccce317db4cd78dc7d22949ef089359cdd56586	session-trailer	docs(pcsaft): golden paths for the PC-SAFT flash and its teqp cross-check
+cf846fe02ccfb0033f5791a4e619af99c42c230d	47d95fa4cd7eac2ceb8126b949663e316946673d	session-trailer	docs(pcsaft): ADR-0015, README, examples README, brain, steering brief, ledger P-3..P-5
+186a1952b577f128414ead884bffb2cb7b031663	e128348e01961db62546425299473f1202b71205	session-trailer	feat(flash): negative-flash Rachford-Rice and a second-order phi-phi split
+c18ddedfa0e8e4dd0ee0565c88c1a78a943c5bd7	c6af3ba51cb9d8a3bde08effd4e0a74cfb43a5bd	session-trailer	test(flash): the negative-flash solver, the phi-phi stage, and Case F-4
+32f693b20331a2a9c588c0939b3fa6e61c04e8c3	271dc5bde8dbd84624a6ba7455e2bd3b3a594ab9	session-trailer	docs(flash): ADR-0016, README, brain, steering brief, ledger Case F-4
+3edf2da91f23a428cf8d4a4df48f3711547599f0	3a986ab84d4c3b4fc0b439ccc222c7a1a0045695	session-trailer	feat(flash): phase identity by compressibility
+25951abdfc7df10722eb28d00b2013d2f25f5ff7	35ad64ce2506101e1b90b2f8191e500f258782bc	session-trailer	test(flash): phase-identity coverage, bit-identity v2, and a PC-SAFT grid runtime trim
+1c86d638853dcff746f2fc5b350f375c460de3dd	3a467710fe1ac19ac25ebd6d88415694b13d0a2c	session-trailer	docs(flash): ADR-0017, README, brain, steering brief, dev-contract, ledger Case F-5
+0ab4435a3ed86c49e245c3e6d9a1b0cf554f2228	71c46ba1026a8fac4e87d93eb105e4a526b09fef	session-trailer	feat(pcsaft): association term (Gross & Sadowski 2002)
+d755c78ec1e12919326a2b4f3f571e7c169c2a78	3efb01c1c16601c8b3481f6698df560d3fe26106	session-trailer	test(pcsaft): association against FeOs, derivative discipline, equilibrium exam
+6118353f36aac86e516a70ada4974bcf3abe7f38	6a4a0144a9f30ee75e33d2a1ef4bd6fab7a7d4dc	session-trailer	feat(pcsaft): golden paths for association, and feos in the validation extra
+f3963bbe27a0d6a2b486f4056600bd21f3b536f1	bbb7bcfd3084f805f2036671a3fbc779b48c4b23	session-trailer	docs(pcsaft): ADR-0018, README, brain, steering brief, dev-contract, Cases P-6/P-7
+dd4c54dfef497edf9e9d5c84779c327824457689	414369b229ba4c09dad80b98f9b358f207a5beb1	session-trailer	docs(pcsaft): refresh the module and class docstrings for association
+ef17ee8e374f72e1e667b12a80e530b282230137	bb36d314eb7b26b58b5954ae46fa24c8d0343bc4	session-trailer	feat(flash): each phi-phi phase on its own density root, and liquid1/liquid2
+73c818925c71c8050038758d4bad3be0703893f3	0a870ec6b5acaa0677881fc22918250ee12bb000	session-trailer	test(flash): the EOS liquid-liquid tie line against FeOs (Case P-8)
+e393446ab2cbf49823bbd4c8d1b3bf00ad8c29e7	0daab4fdd2e18369f9a228b11f0649aabd8ae395	session-trailer	feat(examples): golden paths for EOS liquid-liquid equilibrium
+9d8403a7169d26dd5b2fda10482718393a9eca34	997bdd5873edfa23fe9b1ba3a3049d9132cd4b20	session-trailer	docs(flash): ADR-0019, README, brain, steering brief, ledger Case P-8
+a032f938b563e8fb1bde435fb70313fd2a340933	c5b422b450ffa37cf8844133f4cf2ea9f40b778f	session-trailer	feat(flash): the phase addition/removal search on the phi-phi path
+f2caa97e493d6d881150ea55af0d6192f4951a9b	8a113a266a6e9a9d803c839f956c5fc7f9382607	session-trailer	test(flash): three-phase EOS equilibria against independent Newtons and FeOs
+7c25b2e80cb22d45ee95c1d056db3920017175bb	51f5ee400c11427e2be18f5ad408ce2ada5ea6c8	session-trailer	feat(examples): golden paths for three-phase EOS equilibrium
+115243d51375f807820e19543a344edd431e4ca6	a32aec39bc5bd636b794018c2db8e93ccbed79e8	session-trailer	perf(tests): trim the default suite back under four minutes
+58190f5f183ab75b37f82f6d8e50d95de3890698	34ef2602164184445accf2eff0ddd8c1424693e6	session-trailer	docs(flash): ADR-0020, README, brain, steering brief, ledger Cases P-9 and P-10
+3fa21f0665b9a6bdb51571346de752f8a087f650	3d39450ba00abf4ffccf60b5ac08e0647f6ad0f5	session-trailer	feat(stability): pin each EOS tangent-plane trial to one density root
+c35b0a7e2e8b9562d458567e1e8956aad3c2296d	6b7bf7b0c18985f3c6b5644d3aab2e9294f2b386	session-trailer	feat(examples): golden path for the EOS stability root surfaces
+4d32ccbbf1d72665879811e7ca31bf9ae349417c	737023d81315bf78ba9c9fe254817dba9c443464	session-trailer	docs(stability): ADR-0021, README, brain, steering brief, ledger Case P-11
+b415007e2bca9b300535fb29484176676bc7bdd7	381d56af05fb8915f56857d80ba1cb3794b55102	session-trailer	test(flash): bracket T3 instead of comparing to the grid step
+d761016f488e7a75def95aa3b1fc450e611ec1dc	88d138a85b73b75729b19a0396abfd0804815915	session-trailer	docs(stability): record the measured suite times and trim two over-pinned digits
+4e5661fc587f48baf8af3ce1b8c0bfc023889b9a	edbc594c5d2bee5f5a0b1f0bc8f0fe3ac847d1fc	session-trailer	feat(core): custom non-volatile components and segments-per-mass PC-SAFT records
+0b9801e68c1da2a675f1d3d8a8040d720c18c9cd	0f877572ecf5761bf0c1dc2cfc0cd65ec4a3bc71	session-trailer	feat(eos): a log-space route for fugacity coefficients that do not fit a double
+35ca5374ca657c8e4d3abb41943b3e0ba57adf33	1f703d4a34d43fa98b590b78009e9dd6893e46c0	session-trailer	test(pcsaft): the polymer/solvent exam, and the cited fixture it reads from
+50f8460daef5b60037cf1ff076a39d372593e92f	1d5e0ca9952e13c656db64a620e4b9760c5a9a8e	session-trailer	feat(examples): golden paths for a polymer as a PC-SAFT component
+3c73b9367fcb6506117651f12d9f41b067b1acba	7f864b0d5587eac2a43abc5f0fccf9187028c778	session-trailer	docs(pcsaft): ADR-0022, README polymer section, brain, steering brief, Cases P-12/P-13
+b1946c1fd7d7b0261268457cc2280edb935218c0	ae35b5e0cfa41b4f1d0532ed96d3498fe2caec9f	session-trailer	refactor(flash): drop the now-unused phi accessor on _PhaseRoot
+5c27e7a1e61db0ba24a570a7c2ea38412528b75c	227718db9df28828a1b3f34884636e0e34a97506	session-trailer	docs(pcsaft): record the measured suite times for the polymer slice
+3ce68df4a0bccc069e18841ae442d48b0ccc764d	02b2c171b285179336147c17ef8764e131fa3946	session-trailer	feat(bench): a reproducible benchmark record for the reference flash paths
+353726ba4450c57b5b0f714c3065809cf29af220	cc961542aa5e0a5ebb1530b1c24fe7ae714d64c2	session-trailer	perf(bench): commit the pre-optimization baseline record
+a5e25abfd17d2bef47b9c52c8fbea9bf524a2767	28c6f738bb29ddbe18d646e653a8ec93bc7cdd18	session-trailer	perf(eos): one root solve serves every fugacity branch
+2ca41bf604f3a25f045d00d7288b91a18f5e6e8b	65224d6e899efd0835cbad8032740edd78ebfc20	session-trailer	perf(pcsaft): stop recomputing what the density scan already knows
+5949a8ebec62d6d7bc40d50356be491c43cbfc52	0092fb895ea1ffcbf90ec47adc66c6f005cdc7fd	session-trailer	docs(perf): ADR-0023, the benchmark records, and validation Case B-1
+e23dfba62a721758cb0cfd743fbfd7ec5fafc3bd	083b40322eac61c1b801a5d0e440cb2e59c29280	session-trailer	feat(flash): solve a split whose compositions leave machine range
+29df3945179e15ba69c186f69f43e2f91c0b9b50	02520860e946c8a723c89dd4ed16c7d4004117bc	session-trailer	test(flash): the two pinned polymer defects, pinned the other way round
+aa4a666df97b88ce518526af7a3cb6560a32fb00	0013f41bfa1be8986c7b18dc61701618298aa775	session-trailer	docs(flash): ADR-0024, validation Case P-14 and the golden path
+f05a1110f9ef1d688fd3ef84231b4a06fc62307c	00b260245abca102430a4b3e02aa842b6da69d0a	session-trailer	feat(stability): find a stationary point whose mole numbers leave machine range
+8f1600a25a3a9ef3acd44075dff47b996a8b8859	d06372f7d7a97a0dd4b514d8fae52e9dfc745a7f	session-trailer	test(stability): the log-space route, its dormancy, and the pinned miss reversed
+6b559ca4b32f0cd53c64529502ee1021dd3c9771	c2f985f3e56f4699edff1a94cee7646a1e2e09bd	session-trailer	docs(stability): ADR-0025, validation Case P-15 and the golden path
+d0541a96b39c5c2b62f61555407cd57224b8623f	b6bc8af1f89593718d903d738bd6c19c12a9dba9	session-trailer	docs(brain): consolidate architecture, roadmap and validation TOC; fix garbled sentence
+584c5086ea5e10933ec7a423c773725021af577e	5a4fcaafbb558bd20733156fafbc080afb0691f8	session-trailer	test(validation): mark two pure-repetition parametrizations slow
+80fdf7b72729778f01a2da83e323f8817f0ba5aa	457229ac9653a71425399ab15f3dfffdbbea30be	session-trailer	fix(flash): Rachford-Rice keeps a K under the spacing of doubles at one
+2c11b639b388166cb4bccf32c0f53dacc226cc64	595b6e02303776784f5795c796b589d61fa28e4c	session-trailer	fix(flash): a curvature safeguard, and the last six polymer refusals converge
+87f08208a98c8279d6bf276081280763141ef74e	09cb3b1d0eaba47daa5aa7974f1236e01143ae1d	session-trailer	docs(flash): ADR-0026, validation Case P-16 and the examples that measure them
+47aca4af0edcc5798c170fc9f1c779c9d674b421	fbf6789910a91a4fc511b41afaadf27ec487b8f6	session-trailer	feat(bench): a robustness map, and every refusal it finds is pinned
+b41c0508cf9bd6cfe357de12efb16b350bcaf963	aa6bf24a1fa7f19c7f166631f59150e27b7dd301	session-trailer	docs(bench): the map at 87f0820 - 36 refusals, all of them one polymer
+ece25d673820bf56776968029cafb0dce4aae329	d9888d83a7545a6232f1e8a6298fddad4b9d0ebd	session-trailer	docs(brain): ADR-0027, Case R-MAP-1, and a roadmap ranked by a count
+3ab783a91de600f4e1c70046796fdfd55c56d2e4	54ae94874db15ec2522898750d69ef6b29ec8aac	session-trailer	docs(brain): record the measured time of the slow full-sweep test
+db7f61b37b046fb268adbabc85de18beacddde02	79f0ce2554d546f618d03c6dde01af7c3b7204d2	session-trailer	feat(flash): seed the log-space split from the stability point, not the K-loop
+9adf390b2b4815cbb44cda533cdcd2923a885cfd	3eee3d9ae98e248d240061382fd78e7d61ad2936	session-trailer	feat(stability): give substitution its full budget when no trial converged
+42a60bb3d49c880e638a5f5265977a39c09adee4	ac965f8fa9a6a159fe194e3d7ed9b21411b4a78f	session-trailer	test(bench): the map at 9adf390 - 2110 states, 0 refusals, and a runtime trim
+ce098adfb3d73b9b4c7ebd9c149951487d4c2538	bcd87fac2ac827f6679ed217334e14962a9149d1	session-trailer	docs: ADR-0028, Case P-17, and a roadmap the map can no longer rank
+74820b81b4366c8d0bbbf9cafbb69039da1dd1f2	004c07d8677ef2f47bd3d99828840dec414c841e	session-trailer	docs: correct the suite-time claim - parity, not a saving
+dbbea6383d5f23f5238fc61a954ee6d30d8821ad	2ada11649903fe658e4837d711cff7405cde76e6	session-trailer	feat(bench): sweep EOS three-phase windows, legacy gamma-phi, near-critical PR and associating ternaries
+3b79b91e3974592a9c0f269e46ba74b41fc1072c	ac1d519c1dc7527a1a7705bb6d3b8219bc3b0656	session-trailer	test(bench): the coverage map at 74820b8 - 2505 states, 14 refusals, two families hard again
+0541f9cd5f54f3fcb417b562b8b3c7eafbc3637f	79899c10637c1a0f43bf50aeb6c7c7e6ec84d091	session-trailer	docs: ADR-0027 amendment, Case R-MAP-2, and a roadmap re-ranked from two new refusal classes
+ec75d9a9ab15a1431b4e323c842cdcc4ef37f568	2e6e79451719640e4a84b9a4cea72b64a2806e69	session-trailer	fix(flash): a removal the multiphase search can take back, and a log-space stage for it
+64831bdc2586b2376456f0f9a7919e58970956a9	3b6233d36cb4788189b314fac8e251e28cfe3b19	session-trailer	test(flash): the nine repaired states, each verified independently
+246759f3abcd5f60bbb1536254365c326fadbaf7	13b29b1c88d436d1c82b989f0fb2fae893a9565a	session-trailer	test(bench): the coverage map at 64831bd - 2505 states, 5 refusals, nine repaired
+d8814de40c8de3e5424e167c36ac4c23f953a72f	d55924e9be60739c1e4432315a502364497adbf8	session-trailer	docs: ADR-0029, Case P-18, and a roadmap the map no longer ranks
+3169a39b5be5b311fbc6c5a8cf0e51e53eaa7074	1ea00b6046b0231d9a647e142085db9be23c97b5	session-trailer	perf(eos): a call-local memo for the density-root solve, not a cache on the model
+f852726ca9775c6e2002995678b8756970913de7	f03071168d834810cd10e6c1b4431fe6bafa8bc0	session-trailer	test(eos): the memo answers exactly what re-solving answers
+07bf0b38e4d052b415f4bc25342269dcf8d8ea60	97c077e705b583d4a6a2d27fbae47954259fbef3	session-trailer	test(eos): the memo is a ContextVar, so two threads never share one
+3c4fb94a036ab72d34afd759632f37840f614f95	490f8813d9887f1b54be29f5c98a30595b889c78	session-trailer	test(bench): the pair, the interleaved re-measurement, and the map at f852726
+5041dd7071c6fd7128456cf643d59cac07f8583b	1b07b8f29118fbe8191e665d6c1020f73ba78ea1	session-trailer	docs: ADR-0030, Case B-2, and a roadmap item half discharged and half declined
+060b1b3bc6eb7da4062dcd569d7e9e3f5df6a387	24f5832bc635e2fc18955d04d096ec6b836ca868	parent-only	ci: releases pin one tested commit (ADR-0031); aglint best-effort in public CI
+e5a09b857a94e4f2aa23651968f54a8c4bd0a393	882c18b1c79f01094a465b81a5bd9fe5dade8650	parent-only	docs(handoff): a self-contained cloud continuation handoff and plan
+bd370681056baf487f0419a6dd05213b2d83932c	b5956d8ef8bc45576618a2932f949a4bafc16750	parent-only	release: chemthermo 0.2.0b1
+5864ab0c9fe43a9a792a87b12b590aa1c644438d	ff7cd6c13d19fd92e4f77ad6a0386bcf1e66fb8a	parent-only	docs(handoff): record v0.2.0b1, fresh verification, and the first Linux CI result
+67ce78ecf6b11330b6b625d5ec9f1f4bc116fd8c	ceec170633919a675033dab3bf06a3cae158f7cc	author,committer,coauthor-trailer,session-trailer,signature-dropped	docs(handoff): cloud baseline on Linux x86_64 at 5864ab0
+f53bf0ce26d567481a4733987c4153f4dcdb80aa	1910f04206a86f9ceeb1dbe3c11100d61058f72b	author,committer,coauthor-trailer,session-trailer,signature-dropped	test: captured-value guards exact on macOS arm64, bounded elsewhere (ADR-0032)
+dd821beef7b6393901ac956a6e3972f2c36d722a	ef371ba0f49c66f51500b1dd605bb06053c652b0	author,committer,coauthor-trailer,session-trailer,signature-dropped	test(flash): phase fractions off-platform get the lever rule's conditioning
+8620fa3c052fa923917318f564dd8fda48e74129	2afb4d6ab1ecd4cf486f7dca2658146f7208fc72	author,committer,coauthor-trailer,session-trailer,signature-dropped	docs(adr): ADR-0033, the CLI's stability and EOS-selection contract
+a14c5f0ccb507c3380962caa448ed69a935d3000	b6a863c0653fd929e0ba84c5ed14096a4d6a959a	author,committer,coauthor-trailer,session-trailer,signature-dropped	feat(cli): stability-tp, tp-flash --eos pc-saft and --max-phases (ADR-0033)
+2279951515111168c3882d83af8dd7b42cce0433	d93bea7a0a3d99003409af4769542ab727d96fd5	author,committer,coauthor-trailer,session-trailer,signature-dropped	test(validation): the FeOs file's copy of the n-hexane pins follows ADR-0032
+7c0c4ef84049637070e138f886edc0c2a9f406fb	35cebf76fa45a614012aa199cdf7f1b7ce7ecdd4	author,committer,coauthor-trailer,session-trailer,signature-dropped	feat(pcsaft): temperature derivative and residual properties (ADR-0034)
+64130a2d5373e88cc65c28fdd047807f04a5daf4	40630c312171820e8b9bdc9d4d378eb111c06eb6	author,committer,coauthor-trailer,session-trailer,signature-dropped	release: chemthermo 0.3.0b1
+84fa22d0e83b157e0cab0a39338ba8b1fa078e4e	ec2c81e076430113cd9e55661f3c43bb3eacde59	author,committer,coauthor-trailer,session-trailer,signature-dropped	docs(handoff): first cloud session record and the v0.3.0b1 release packet
+d4fc0e18f183b3a70d6173a1aa22c7b402e6a3fd	a8faa24c90d8ed9aa887dff3e1f6e6c40518e3d3	author,committer,coauthor-trailer,session-trailer,signature-dropped	docs(handoff): real commit ids in section 7b; plan state after this session
+a9163707968861ce716986980a273b7b0bb74194	d87ec58570577f49b1b74337c6c731d4f00f2d6a	parent-only	docs(handoff): v0.3.0b1 published locally; macOS arm64 check passes
+b58ed0326b6e50c341e29f5ff569d6a9628b0860	1973925bba52bec5b3d81048b7bee5c379abe6e9	author,committer,coauthor-trailer,session-trailer,signature-dropped	feat(pcsaft): association temperature derivative; residual properties for water (ADR-0034 C2)
+5a57344f460ca3192d4857ba129d63a7eadb1746	cdd17c6a09fb1b9f14949176843022804e6aa98f	author,committer,coauthor-trailer,session-trailer,signature-dropped	fix(stability): report a tpd tie from the better-converged trial (ADR-0035)
+761fd57e2456967e5df7fb385533b462621f93d9	41cd3fd9ed4abafa2987bf8a4d39288edd028dac	author,committer,coauthor-trailer,session-trailer,signature-dropped	fix(flash): a trivial split is not a converged split (ADR-0036)
+6716dd12b1c751faa9fb9fa1aab652c80cbcd4ff	be0c1128195eb008808361d93b5c6704197a40f6	author,committer,coauthor-trailer,session-trailer,signature-dropped	docs(plan): item D re-measured - the suite is inside its budget on macOS
+8173c38eb0c36d04a70bd3e481982df8e147e098	722055a54e1b7c9fea7c348f4c844edbaec9ca36	author,committer,coauthor-trailer,session-trailer,signature-dropped	chore(release): remove chemthermo.vlle and stray root files (ADR-0037)
+a91908c354ed2eec01931e870b8eeb20653c9061	6a8c6bff0ac63b4ee497cb2265d399388c21daa2	author,committer,coauthor-trailer,session-trailer,signature-dropped	docs: a short, honest README; the detail moves to docs/
+bc92c5b37e77f33c26fb8abfee9c2bd38bfa07fd	f9c5f3de4d8af54d255464d59320b8968e8bd029	author,committer,coauthor-trailer,session-trailer,signature-dropped	build: PyPI-ready metadata, a clean sdist, and CI on Python 3.11-3.13
+e47e8ab07f50f788f9580386ff3919052ecce6db	61c05b6139c574c433487dd71dba316900824a31	author,committer,coauthor-trailer,session-trailer,signature-dropped	docs(adr): ADR-0038 - the owner publishes chemthermo to PyPI by hand from 0.4.0
+558f8ea0cfb9a7c02543521f56ac0aa7a02edd9a	413c96360ef505b9c7d576023a42a5861d7f98fa	author,committer,coauthor-trailer,session-trailer,signature-dropped	test(bench): the full robustness map at 761fd57, the first on Linux
+bd7566c985dc6b8cca4fc389bdc000caee3d154e	674fa8fe4e98ec50dbacab7ab10afaafc14c0cd6	author,committer,coauthor-trailer,session-trailer,signature-dropped	release: chemthermo 0.4.0
+4aa475385791b29f7da76e68332ebfdd39870f1e	f2165cd016352e4e123612fd9af0543de9fda4e9	author,committer,coauthor-trailer,session-trailer,signature-dropped	release: chemthermo 0.4.0 (changelog wording)
+e95ae69a0af714e70d713ada802ee91b141e9156	ad28c142689bbbc03acb9bf31af34369053686c5	author,committer,coauthor-trailer,session-trailer,signature-dropped	docs(handoff): the 0.4.0 release packet and the session-2 record

@@ -390,6 +390,7 @@ Cheap checks
   - `.agents/brain/adr/0036-flash-trivial-split-is-not-converged.md` (Adopted 2026-09-25; amends ADR-0028: a split whose two phases are the same (`ln x` equal to 1e-6) is not physical, so the stability-seed ladder runs; the Mw 53000 ladder state's +-64 ULP neighbourhood goes from 29 refusals to 0; full 2505-state map unchanged field for field)
   - `.agents/brain/adr/0037-remove-vlle-plugin-package.md` (Adopted 2026-09-25; deletes the ADR-0013-deprecated `chemthermo.vlle` package before the first PyPI release; `flash_mode="vlle"` still refused with a pointer; gamma-phi kept for the CLI v1 contract)
   - `.agents/brain/adr/0038-pypi-publication.md` (Adopted 2026-09-25; amends ADR-0031 item 8: distribution `chemthermo` on PyPI from 0.4.0 (Beta), published by the owner by hand via TestPyPI then PyPI; no publishing automation or stored token)
+  - `.agents/brain/adr/0039-attribution-history-rewrite.md` (Adopted 2026-09-26; one owner-directed, metadata-only rewrite of commit attribution on `dev/sprint`, `v0.2.0b1` and `v0.3.0b1`: trees, parent order and dates unchanged; a migrated tag names a commit with its original target's tree; historical records keep their original ids, mapped in `.agents/reports/history-rewrite-2026-09-26-map.tsv`; amends ADR-0031 item 5 for those two tags only)
 - ADR rules: one decision per ADR; keep under 1 page; include status and supersedes fields.
 
 ## 9) Roadmap: next 3 increments (vertical slices)
