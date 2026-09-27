@@ -24,6 +24,7 @@ What to do next is in `.agents/handoffs/continuation-plan.md`.
 | handoff commits | on top of `5041dd7`: CI fix, ADR-0031, `tools/release_smoke.py`, these files, `CHANGELOG.md`, version `0.2.0b1` |
 | release | `v0.2.0b1` (GitHub prerelease, source + wheel; not on PyPI) - see section 7 |
 | first cloud session (2026-09-25) | slices `cloud-baseline`, `cross-platform-guards` (ADR-0032), `cli-contract` + `cli-stability-multiphase` (ADR-0033), `pcsaft-temperature-derivative` (ADR-0034), `release`; tag `v0.3.0b1` on `64130a2d5373e88cc65c28fdd047807f04a5daf4` - section 7b |
+| 2026-09-26 (owner side) | attribution rewrite (ADR-0039; new ids, same trees; map in `.agents/reports/`); PR #1 merged by fast-forward; **`v0.4.0` on `afc43dbf9862d5548a0bcb4d1c26167e7feaa66a`, on GitHub, TestPyPI and PyPI** - record at the top of `release-packet-v0.4.0.md`; open item: the macOS CPython 3.12/3.13 exact-guard finding there |
 
 Verify before editing: `git merge-base --is-ancestor 5041dd7071c6fd7128456cf643d59cac07f8583b HEAD`
 must succeed, and `HEAD` must be the SHA your prompt names (or a descendant

@@ -1,3 +1,32 @@
+> **Published 2026-09-26.** Tag `v0.4.0` = tag object
+> `e730a2ceb4056dc8c7812ce90986043227ad419e`, peeling to the release commit
+> `afc43dbf9862d5548a0bcb4d1c26167e7feaa66a` (= `main` at release; PR #1 merged
+> by fast-forward). GitHub release
+> https://github.com/AhmadAlkadri/Chemical-Thermodynamics/releases/tag/v0.4.0,
+> TestPyPI https://test.pypi.org/project/chemthermo/0.4.0/, PyPI
+> https://pypi.org/project/chemthermo/0.4.0/, all carrying the same two files,
+> built once from a clean clone of the tag:
+>
+> ```
+> 09e26d38cf9802d0c51e7814241d73bf7e0388c085e0efc62ca5b65fc3940fd2  chemthermo-0.4.0-py3-none-any.whl
+> d301b30c0a3dacf2e022dd1e144235fccfdea69d18cea0cca00f65322e203b0f  chemthermo-0.4.0.tar.gz
+> ```
+>
+> Fresh validation on `afc43db` (the GitHub release notes have the table): CI
+> green on 3.11 / 3.12 / 3.13 (runs 36280528513, 36280529393); macOS arm64
+> CPython 3.11.6: `pytest -q` 824 passed / 0 failed, exact-mode guards 199
+> passed, validation extras 1021 passed; the wheel from the tag, from TestPyPI
+> and from PyPI passed `pip check`, `release_smoke.py`, CLI and citation checks.
+> **Open finding, released with the owner's agreement:** on macOS arm64 with
+> CPython 3.12 / 3.13, `test_flash_tp_is_bit_identical_to_the_v3_capture` fails
+> exact comparison for `gamma-gamma-tessier2000-near-plait` (last-bit moves that
+> follow the CPython version, not numpy; passes under ADR-0032's off-platform
+> bound). It predates the release and needs a test-only fix in a later slice.
+> This commit is a record after the tag; it also removes a stale copy of the
+> 2026-09-25 steps 5-8 and licensing note that the 2026-09-26 revision left in
+> this file by mistake (the copy at the tagged commit still has it; `.agents/`
+> is not in the sdist or wheel).
+
 # Release packet: chemthermo 0.4.0 - merge to main, tag, GitHub release, PyPI
 
 Prepared 2026-09-25 by the cloud session; updated 2026-09-26 by the owner-side
@@ -94,42 +123,6 @@ source verification was done for it. The PC-SAFT parameters are published
 values cross-checked against FeOs / Clapeyron.jl; the two NRTL pairs are
 synthetic; the DECHEMA-derived Tessier fixtures are test-only and are **not**
 in the sdist or wheel.
-
----
-
-## chemthermo 0.4.0" down, with the
-   checksums replaced by the ones just printed and the macOS row filled in.
-6. **TestPyPI** (needs a TestPyPI account and API token; `twine` reads
-   `TWINE_USERNAME=__token__` / `TWINE_PASSWORD=<token>` or `~/.pypirc`):
-   ```bash
-   .venv/bin/twine upload --repository testpypi dist/*
-   python3.11 -m venv /tmp/tp && /tmp/tp/bin/pip install \
-     --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ chemthermo==0.4.0
-   cd /tmp && /tmp/tp/bin/python <path-to>/rel-040/tools/release_smoke.py --expect-version 0.4.0
-   /tmp/tp/bin/chemthermo --help
-   ```
-   Check the rendered project page on test.pypi.org (README, links, classifiers).
-7. **PyPI:**
-   ```bash
-   .venv/bin/twine upload dist/*
-   python3.11 -m venv /tmp/pp && /tmp/pp/bin/pip install chemthermo==0.4.0
-   cd /tmp && /tmp/pp/bin/python <path-to>/rel-040/tools/release_smoke.py --expect-version 0.4.0
-   ```
-8. **Record it** on `dev/sprint` (docs-only commit, `Slice: handoff`): handoff
-   section 7e with the macOS result, tag peel, release URL, PyPI URL and the
-   uploaded files' SHA-256; then fast-forward `main` to that commit the same
-   way as step 3 if you want `main` to carry the record.
-
-**One licensing note for the owner to judge before uploading.** The packaged
-component table (82 components: critical constants, acentric factors, Antoine
-coefficients) cites Koretsky, *Engineering and Chemical Thermodynamics*
-(Wiley), as its source (`src/chemthermo/data/references.bib`). These are
-physical constants rather than creative text, and the table has shipped in the
-public GitHub repository since v0.1.0, but redistributing a textbook appendix
-on PyPI is a call for the owner. The PC-SAFT parameters are published values
-cross-checked against FeOs / Clapeyron.jl; the two NRTL pairs are synthetic;
-the DECHEMA-derived Tessier fixtures are test-only and are **not** in the
-sdist or wheel.
 
 ---
 
