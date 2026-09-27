@@ -2,8 +2,9 @@
 
 Versions follow PEP 440 and are tagged `v<version>` on one tested commit
 (policy: `.agents/brain/adr/0031-versioned-releases.md`). Releases up to
-0.3.0b1 were GitHub-only; from 0.4.0 the owner also publishes to PyPI by hand
-(ADR-0038).
+0.3.0b1 were GitHub-only. From 0.4.0 final releases are also on PyPI (ADR-0038),
+published from a GitHub Release by the release workflow or by hand with the
+same gates (ADR-0040).
 
 ## 0.4.0 (2026-09-26) - first PyPI release (Beta)
 

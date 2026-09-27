@@ -168,15 +168,21 @@ in *this* grid refuses" (or "this is what *this* grid refuses"), not as a
 coverage claim - and note that regenerating the record at a new commit means a
 new file, so the superseded JSON is pruned and its `.md` summary kept.
 
-## Releases (ADR-0031)
+## Releases (ADR-0031, ADR-0040)
 
-Policy is ADR-0031; this is the procedure. `X.Y.Z` below is the version being
-released, `SHA` the full commit the gates ran on.
+Policy is ADR-0031 (versions, tags, gates) and ADR-0040 (who publishes and
+how); this is the procedure. `X.Y.Z` below is the version being released, and
+`SHA` is the full commit the gates ran on. Never `git push --tags`, never `-f`.
+The only non-fast-forward updates, the 2026-09-26 attribution rewrite, are
+recorded in ADR-0039. A PyPI version can never be re-uploaded, so a bad
+release is fixed by the next patch version.
 
-1. On the release commit: set `version` in `pyproject.toml` and `__version__`
-   in `src/chemthermo/__init__.py` to `X.Y.Z`, add its `CHANGELOG.md` section,
-   commit (`Slice: release`), push the branch.
-2. Gate from a clean clone fetched from GitHub, never the working checkout:
+1. **Version commit.** Set `version` in `pyproject.toml` and `__version__` in
+   `src/chemthermo/__init__.py` to `X.Y.Z`, add its `CHANGELOG.md` section,
+   commit (`Slice: release`), push the branch, and get CI green on it.
+2. **Gates from a clean clone** fetched from GitHub, never the working
+   checkout, on macOS arm64 under CPython 3.11. That is the ADR-0032 capture
+   runtime, where the captured-value guards compare with `==`:
 
 ```bash
 git clone --branch <branch> https://github.com/AhmadAlkadri/Chemical-Thermodynamics.git rel && cd rel
@@ -184,31 +190,65 @@ git rev-parse HEAD            # must equal SHA
 python3.11 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 .venv/bin/ruff format --check src tests && .venv/bin/ruff check src tests
 .venv/bin/pyright && .venv/bin/pytest -q
-.venv/bin/python -m build --outdir dist/
-python3.11 -m venv /tmp/wheel-venv && /tmp/wheel-venv/bin/pip install dist/chemthermo-X.Y.Z-py3-none-any.whl
-cd /tmp && /tmp/wheel-venv/bin/python -c "import chemthermo; print(chemthermo.__version__)"
-/tmp/wheel-venv/bin/chemthermo tp-flash --help
-shasum -a 256 dist/*
 ```
 
-   plus a stability/flash smoke from the installed wheel (see
-   `.agents/handoffs/cloud-continuation.md` for the one used at `v0.2.0b1`).
-3. Tag and publish (never `--tags`, never `-f`; the only non-fast-forward
-   updates, the 2026-09-26 attribution rewrite, are recorded in ADR-0039):
+   Also run `pytest -q` under CPython 3.12 and 3.13, where those guards use
+   ADR-0032's bounded comparison.
+3. **`main` and the tag.** Fast-forward `main` to `SHA`, then tag it. The
+   release workflow refuses a commit that is not on `main`:
 
 ```bash
+git fetch origin && git merge-base --is-ancestor origin/main SHA && git push origin SHA:refs/heads/main
 git tag -a vX.Y.Z SHA -m "chemthermo X.Y.Z"
 git push origin refs/tags/vX.Y.Z
-gh release create vX.Y.Z --verify-tag --title "chemthermo X.Y.Z" --notes-file notes.md dist/*  # add --prerelease for X.Y.ZbN
 git ls-remote origin 'refs/tags/vX.Y.Z^{}'   # must print SHA
 ```
 
-4. **PyPI (owner only, ADR-0038).** From a clean clone of the tag, after the
-   GitHub release: `python -m build --outdir dist/`, `twine check --strict dist/*`,
-   `twine upload --repository testpypi dist/*`, install from TestPyPI into a
-   fresh venv and run `tools/release_smoke.py --expect-version X.Y.Z`, then
-   `twine upload dist/*`. Agents never upload and never store a token; they
-   prepare `.agents/handoffs/release-packet-vX.Y.Z.md` instead.
+   A pushed tag never moves. Merging a PR from `dev/sprint` deletes the branch
+   (`delete_branch_on_merge`), so a direct fast-forward push is preferred.
+   After any merge, check that `dev/sprint` still exists.
+4. **Publish by one path, never both** (ADR-0040):
+   - **Automated (preferred; needs the trusted publishers of ADR-0040 item 2
+     registered).** Optionally rehearse first: `gh workflow run release.yml
+     -f tag=vX.Y.Z`, which runs preflight, CI, build and smoke and uploads
+     nothing. Then publish the Release with no files attached (the workflow
+     attaches the frozen ones):
+     `gh release create vX.Y.Z --verify-tag --title "chemthermo X.Y.Z" --notes-file notes.md`.
+     Watch it with `gh run watch`. The environments `testpypi` and `pypi`
+     can be given required reviewers in the repository settings for a manual
+     approval before each upload.
+   - **Manual (`twine`, the owner's `~/.pypirc`).** From a clean clone of the
+     tag, with `build==1.6.1 twine==7.0.0` in a tooling venv:
+
+```bash
+git clone --branch vX.Y.Z https://github.com/AhmadAlkadri/Chemical-Thermodynamics.git rel-tag && cd rel-tag
+OUT="$(mktemp -d)"                                                  # outside the clone
+python tools/release_preflight.py --tag vX.Y.Z --sha SHA --require-on main
+python -m build --outdir dist/ && twine check --strict dist/*
+python tools/release_artifacts.py check-dist --version X.Y.Z dist
+python tools/release_artifacts.py sums dist > $OUT/SHA256SUMS      # the frozen files
+#   install dist/*.whl and dist/*.tar.gz in fresh venvs outside the tree (3.11-3.13):
+#   pip check; python tools/release_smoke.py --expect-version X.Y.Z
+gh release create vX.Y.Z --draft --verify-tag --title "chemthermo X.Y.Z" --notes-file notes.md dist/* $OUT/SHA256SUMS
+twine upload --repository testpypi dist/*
+python tools/release_artifacts.py verify-index --index testpypi --version X.Y.Z --sums $OUT/SHA256SUMS --download-dir $OUT/tp
+#   install $OUT/tp/*.whl in a fresh venv (dependencies from PyPI only); pip check; release_smoke
+twine upload dist/*
+python tools/release_artifacts.py verify-index --index pypi --version X.Y.Z --sums $OUT/SHA256SUMS --download-dir $OUT/pypi
+#   fresh venv: pip install chemthermo==X.Y.Z; pip check; release_smoke
+gh release edit vX.Y.Z --draft=false     # the workflow now audits instead of uploading
+```
+
+     The owner runs this, or an agent does so under an explicit owner
+     authorization for that release (ADR-0040 item 4; 0.4.1 has one).
+     `twine` reads `~/.pypirc` itself. Never print, echo, pass on a command
+     line, copy or commit a token, and never edit the owner's `~/.pypirc`.
+     Without an authorization, an agent prepares
+     `.agents/handoffs/release-packet-vX.Y.Z.md` instead.
+5. **Record** on `dev/sprint` (docs-only, `Slice: handoff`), clearly after
+   the tagged commit: the validation, the tag object and peel, the Release,
+   TestPyPI and PyPI URLs, and the SHA-256 of both files. The tag stays where
+   it is.
 
 ## Slice evidence
 

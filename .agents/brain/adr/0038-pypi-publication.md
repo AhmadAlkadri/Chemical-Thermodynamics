@@ -2,6 +2,10 @@
 
 Status: accepted
 Date: 2026-09-25
+Amended by: ADR-0040 (2026-09-26). Item 3 no longer holds as written:
+PyPI is published by `.github/workflows/release.yml` with Trusted Publishing,
+or by hand with `twine` by the owner or an agent the owner has explicitly
+authorized for that release.
 
 ## Context
 ADR-0031 item 8 kept releases to GitHub and required "a separate explicit

@@ -2,6 +2,9 @@
 
 Status: accepted
 Date: 2026-09-25
+Amended by: ADR-0038 (item 8: PyPI from 0.4.0), ADR-0039 (item 5: two migrated
+tags) and ADR-0040 (item 8: publication paths; final releases are cut from
+`main`).
 
 ## Context
 Until this ADR the repository had one tag, `v0.1.0`, on the old `main`
