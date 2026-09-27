@@ -14,10 +14,12 @@ composition, phase fractions, ``vapor_fraction`` and the full ``diagnostics``
 mapping - is captured for a fixed set of states and pinned, bit-for-bit
 (floats compared with ``==``, ints/bools/strings exact), against
 ``tests/fixtures/flash/refactor_bit_identity_v3.json``. Bit for bit holds on
-the platform the fixture was captured on (macOS arm64); on any other platform
-every discrete field stays exact and floats get the stated, justified bound of
-ADR-0032 (``tests/_capture_identity.py``), because ``exp``/``log`` and numpy's
-SIMD kernels are not bit-reproducible across CPUs and C libraries.
+the runtime the fixture was captured on (macOS arm64, CPython 3.11); on any
+other runtime every discrete field stays exact and floats get the stated,
+justified bound of ADR-0032 (``tests/_capture_identity.py``), because
+``exp``/``log`` and numpy's SIMD kernels are not bit-reproducible across CPUs
+and C libraries, and CPython 3.12's compensated ``sum()`` rounds float sums
+differently on the same machine.
 
 Fixture history:
 
@@ -307,7 +309,10 @@ def test_flash_tp_is_bit_identical_to_the_v3_capture(
     assert len(fixture) == 155, len(fixture)
     assert not skipped, skipped
 
-    # Bit for bit on the capture platform (macOS arm64). Elsewhere every
+    # Bit for bit on the capture runtime (macOS arm64, CPython 3.11). On
+    # macOS arm64 under CPython 3.12 / 3.13 two states move in four near-zero
+    # post-split tpd diagnostics, by at most 1.0e-15 (the compensated
+    # built-in sum() of 3.12; ADR-0032 amendment). Elsewhere every
     # discrete field - phase names, key sets, statuses, verdicts, stages,
     # iteration counts - is still exact and a float may move by at most
     # 1e-12 absolute plus 1e-12 relative: every pinned float is an O(1)-scaled

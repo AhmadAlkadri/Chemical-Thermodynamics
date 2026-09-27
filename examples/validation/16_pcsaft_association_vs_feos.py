@@ -72,6 +72,7 @@ import argparse
 import json
 import math
 import platform
+import sys
 
 import numpy as np
 
@@ -410,17 +411,23 @@ def non_associating_unchanged() -> None:
     )[0]
     print(f"    A^res/RT {a_res!r}\n    Z        {z_factor!r}\n    ln phi   {ln_phi!r}")
     computed = (a_res, z_factor, float(ln_phi))
-    # Pinned on macOS arm64. Bit for bit there; elsewhere exp/log differ in
-    # the last bits, so 5e-14 absolute - the floor at which Case P-1 accepted
-    # these quantities as equal to teqp's (ADR-0032).
-    if platform.system() == "Darwin" and platform.machine() == "arm64":
+    # Pinned on macOS arm64 under CPython 3.11. Bit for bit there; elsewhere
+    # exp/log (and, from CPython 3.12, float sum()) can differ in the last
+    # bits, so 5e-14 absolute - the floor at which Case P-1 accepted these
+    # quantities as equal to teqp's (ADR-0032).
+    if (
+        platform.system() == "Darwin"
+        and platform.machine() == "arm64"
+        and platform.python_implementation() == "CPython"
+        and sys.version_info[:2] == (3, 11)
+    ):
         record(
             "n-hexane at 300 K / 7700 mol/m^3 is bit-identical to the pinned values",
             computed == PINNED_HEXANE,
         )
     else:
         worst = max(abs(c - p) for c, p in zip(computed, PINNED_HEXANE))
-        print(f"    off the capture platform: worst |diff| from the pins {worst:.2e}")
+        print(f"    off the capture runtime: worst |diff| from the pins {worst:.2e}")
         record(
             "n-hexane at 300 K / 7700 mol/m^3 matches the macOS-pinned values to 5e-14",
             worst <= 5e-14,

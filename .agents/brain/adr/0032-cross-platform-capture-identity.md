@@ -1,7 +1,10 @@
-# ADR-0032: Captured-value guards are exact on their capture platform and bounded elsewhere
+# ADR-0032: Captured-value guards are exact on their capture runtime and bounded elsewhere
 
 Status: accepted
 Date: 2026-09-25
+Amended: 2026-09-26 - the capture "platform" is a runtime: OS, CPU **and**
+CPython minor version (see the amendment at the end; the title said
+"platform" before it).
 
 ## Context
 Three kinds of identity guard protect refactors and speed-ups here
@@ -44,7 +47,8 @@ guards, 3 of 769 tests, and nothing else. Measured on a second Linux x86_64 host
    one machine.
 2. **Kind 2 is exact on the capture platform** (`platform.system() == "Darwin"`
    and `platform.machine() == "arm64"`, `tests/_capture_identity.py`): the
-   comparison there is the same `==` as before.
+   comparison there is the same `==` as before. *Amended 2026-09-26: the
+   capture runtime also fixes the interpreter, CPython 3.11; see below.*
 3. **Elsewhere, every discrete field stays exact** (dict keys, sequence lengths,
    strings, ints, bools, `None`, non-finite floats) and a finite float passes
    when `|a - e| <= atol + rtol * max(|a|, |e|)`, with the bound stated at the
@@ -102,6 +106,56 @@ guards, 3 of 769 tests, and nothing else. Measured on a second Linux x86_64 host
   measured on.
 - Evidence: ledger Case P-11, "Cross-platform (ADR-0032)"; negative controls
   for the comparison itself in `tests/test_capture_identity.py`.
+
+## Amendment (2026-09-26, slice `capture-runtime-contract`): the capture runtime includes the interpreter
+
+**Finding.** The 0.4.0 release checks (`.agents/handoffs/release-packet-v0.4.0.md`)
+found that on macOS arm64 under CPython 3.12 and 3.13,
+`test_flash_tp_is_bit_identical_to_the_v3_capture` failed its exact comparison,
+while CPython 3.11.6 on the same machine passed. Decision 2 had defined the
+capture platform by OS and CPU only, so it asked for `==` on a runtime that
+had never produced the capture. The fixture was right and `flash_tp` was
+right. The test's contract was wrong.
+
+**Cause, measured 2026-09-26** on one macOS arm64 machine (CPython 3.11.6 with
+numpy 2.4.2; CPython 3.12.14 and 3.13.7 with numpy 2.5.3). From 3.12, CPython's
+built-in `sum()` of floats uses compensated (Neumaier) summation
+(CPython gh-100425), so float sums in the library round differently from the
+3.11 left fold. With `builtins.sum` replaced by a plain left fold, 3.12 and
+3.13 reproduce all 155 states **bit for bit** (numpy 2.5.3), so numpy is not a
+factor. With the built-in `sum`, 2 of the 155 states move, in 4 floats, all of
+them near-zero post-split `tpd` diagnostics:
+
+| state | fields | pinned (3.11) | 3.12 / 3.13 | abs. move |
+| --- | --- | --- | --- | --- |
+| `gamma-gamma-tessier2000-near-plait` | `phase_stability_tpd_min_liquid2`, `post_split_tpd_min` | -1.4138e-16 | -3.5876e-16 | 2.2e-16 |
+| `phi-phi-grid` Methane-Ethane-Propane (0.5, 0.3, 0.2), 240 K, 3 MPa | `phase_stability_tpd_min_liquid`, `post_split_tpd_min` | -5.17497273e-10 | -5.17498290e-10 | 1.0e-15 |
+
+No composition, phase fraction, phase name, key, status, stage or iteration
+count moves. The largest move is 0.1% of decision 3's 1e-12 bound. The other
+captured-value guards (PC-SAFT literals, the 45/32 surface count, the Case
+P-17 route) happen to reproduce exactly under 3.12 and 3.13 on this machine.
+
+**Decision.** The capture runtime is
+`Runtime(system="Darwin", machine="arm64", implementation="CPython", python=(3, 11))`
+(`tests/_capture_identity.CAPTURE_RUNTIME`). The major.minor version is part of
+the gate and the patch level is not. numpy is recorded but not gated. Kind 2 is
+exact only on that runtime. Everywhere else, including macOS arm64 under
+CPython 3.12 / 3.13, another implementation, or another OS or CPU, decision 3
+applies unchanged: every discrete field is exact and floats are held to the
+same stated bounds. No fixture, literal or bound changed. `on_capture_platform()`
+is renamed `on_capture_runtime()`. `tests/test_capture_identity.py` pins the
+predicate (the capture runtime and eight neighbours that are not it) and the
+interpreter behaviour it tracks (`sum([1.0, 1e100, 1.0, -1e100])` is `2.0` from
+CPython 3.12 and `0.0` before).
+
+**Consequence.** Decision 5 still holds: there is no second exact capture per
+runtime. A change smaller than the bounds is caught only under CPython 3.11
+on macOS arm64. A claim of "bit-identical" names the runtime it was measured on,
+and the release gates run the guards under CPython 3.11 on macOS arm64. If the development default
+moves to a newer CPython, the fixture can be recaptured under it. That needs
+its own audited slice, like ADR-0021, and it changes `CAPTURE_RUNTIME` in
+the same commit.
 
 ## Supersedes (optional)
 Amends the bit-identity statements of ADR-0017, ADR-0021, ADR-0023 and ADR-0030

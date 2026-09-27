@@ -34,7 +34,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from _capture_identity import on_capture_platform
+from _capture_identity import on_capture_runtime
 
 import chemthermo as ct
 from chemthermo.eos import PCSAFTEOS
@@ -1167,7 +1167,7 @@ def test_the_band_the_diverged_k_loop_used_to_end(
     # is what failed - so `k_seed` is still `"stability"`, not `"stability-log"`.
     assert diagnostics["k_seed"] == "stability"
     assert diagnostics["converged_stage"] == "second-order-log"
-    if on_capture_platform() or (mw_g_mol, weight_fraction, pressure_Pa) not in P17_ROUTE_BY_NOISE:
+    if on_capture_runtime() or (mw_g_mol, weight_fraction, pressure_Pa) not in P17_ROUTE_BY_NOISE:
         assert diagnostics["log_space_seed"] == "stability-w"
     else:
         # Which rung lands first is decided by the wreckage of a diverged

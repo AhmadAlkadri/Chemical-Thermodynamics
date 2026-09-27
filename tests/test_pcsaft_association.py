@@ -214,8 +214,8 @@ def test_a_scheme_label_that_agrees_with_the_counts_is_accepted() -> None:
 
 #: Values pinned in validation Cases P-1 and P-3 for the non-associating
 #: model. They must be reproduced **exactly**, not to a tolerance, on the
-#: platform they were captured on (macOS arm64): the association term is
-#: supposed not to run at all here. Elsewhere `exp`/`log` differ in the last
+#: runtime they were captured on (macOS arm64, CPython 3.11): the association
+#: term is supposed not to run at all here. Elsewhere `exp`/`log` differ in the last
 #: bits (measured on two Linux x86_64 hosts: at most 3.5e-15 absolute, 32 ULP
 #: of `Z` at liquid density, where `Z = 1 + rho da/drho` cancels), so
 #: off-platform they hold to 5e-14 absolute - 14x the measured move, and the

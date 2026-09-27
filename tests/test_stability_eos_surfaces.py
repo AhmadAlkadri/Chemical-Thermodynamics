@@ -31,7 +31,7 @@ from __future__ import annotations
 
 import numpy as np
 import pytest
-from _capture_identity import on_capture_platform
+from _capture_identity import on_capture_runtime
 
 import chemthermo as ct
 from chemthermo.eos import PCSAFTEOS
@@ -397,7 +397,7 @@ def test_the_peng_robinson_grid_still_reaches_a_verdict_everywhere() -> None:
     rest as ties; the real gaps on this grid are 1.7e-02 and 1.0, the ties at
     most 5e-16. That gives 19 decisive vapour, 38 decisive liquid, 20 ties:
     still neither surface decorative. The exact 45/32 split stays pinned on
-    the capture platform (ADR-0032).
+    the capture runtime, macOS arm64 under CPython 3.11 (ADR-0032).
     """
     eos = ct.PengRobinsonEOS()
     surfaces: dict[str, int] = {}
@@ -441,5 +441,5 @@ def test_the_peng_robinson_grid_still_reaches_a_verdict_everywhere() -> None:
     assert statuses == {"unstable": 47, "stable": 97}
     assert sum(surfaces.values()) == 77
     assert decisive == DECISIVE_SURFACES
-    if on_capture_platform():
+    if on_capture_runtime():
         assert surfaces == {"vapor": 32, "liquid": 45}

@@ -449,9 +449,9 @@ def _assert_matches_capture(*args: object, **kwargs: object) -> None:
 
 
 def test_non_associating_hexane_is_unchanged() -> None:
-    """Case P-1's pinned n-hexane numbers: bit for bit on macOS arm64, where
-    they were captured, and to 5e-14 elsewhere (ADR-0032; the same pins and
-    bound as ``tests/test_pcsaft_association.py``)."""
+    """Case P-1's pinned n-hexane numbers: bit for bit on macOS arm64 under
+    CPython 3.11, where they were captured, and to 5e-14 elsewhere (ADR-0032;
+    the same pins and bound as ``tests/test_pcsaft_association.py``)."""
     eos = PCSAFTEOS(components=("n-Hexane",))
     assert not eos.associates()
     computed = {

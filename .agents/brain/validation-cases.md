@@ -3475,6 +3475,20 @@ compositions to <= 6e-13). On the other 57 the winner is decisive
 - **Not claimed:** bit-identity on Linux. The in-process A/B guards
   (ADR-0023/0030) remain exact on every platform.
 
+### Cross-interpreter (ADR-0032 amendment, 2026-09-26)
+
+On macOS arm64, the capture machine, CPython 3.12.14 and 3.13.7
+(numpy 2.5.3) move 2 of the 155 flash-fixture states. The Tessier near-plait
+feed and the Methane-Ethane-Propane (0.5, 0.3, 0.2) / 240 K / 3 MPa grid state
+each move their `phase_stability_tpd_min_*` and `post_split_tpd_min`: 4 floats,
+worst 1.0e-15 absolute. No discrete field moves. CPython 3.11.6 reproduces the
+fixture exactly with numpy 2.4.2. The cause is CPython 3.12's compensated
+float `sum()`: with `builtins.sum` replaced by a left fold, 3.12 and 3.13 are
+bit-identical to the capture. The capture runtime is now macOS arm64
+**CPython 3.11** (`tests/_capture_identity.CAPTURE_RUNTIME`). Other interpreter
+versions get the bounded comparison above, which passes at 0.1% of its bound.
+Nothing in `src/` changed.
+
 ---
 
 ## Case P-12: PC-SAFT properties for a polymer, against FeOs
