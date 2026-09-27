@@ -152,7 +152,7 @@ jobs:
           python -m build --outdir release/dist/
           python -m twine check --strict release/dist/*
           python .release-tooling/tools/release_artifacts.py check-dist --version "$VERSION" release/dist
-          python .release-tooling/tools/release_artifacts.py sums release/dist | sed 's|  |  dist/|' > release/SHA256SUMS
+          python .release-tooling/tools/release_artifacts.py sums release/dist > release/SHA256SUMS
           cat release/SHA256SUMS
           {
             echo "### chemthermo ${VERSION} build"
@@ -198,7 +198,7 @@ jobs:
 
       - name: Install the frozen wheel and sdist outside the tree and smoke-test them
         run: |
-          (cd release && shasum -a 256 -c SHA256SUMS)
+          (cd release/dist && shasum -a 256 -c ../SHA256SUMS)
           smoke="$PWD/.release-tooling/tools/release_smoke.py"
           for kind in whl tar.gz; do
             venv="$RUNNER_TEMP/venv-${kind}"
@@ -224,7 +224,7 @@ jobs:
           path: release
 
       - name: Verify the frozen files
-        run: cd release && sha256sum -c SHA256SUMS
+        run: cd release/dist && sha256sum -c ../SHA256SUMS
 
       - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
         with:
@@ -287,7 +287,7 @@ jobs:
           path: release
 
       - name: Verify the frozen files
-        run: cd release && sha256sum -c SHA256SUMS
+        run: cd release/dist && sha256sum -c ../SHA256SUMS
 
       - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
         with:
