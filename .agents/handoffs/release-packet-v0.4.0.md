@@ -22,6 +22,10 @@
 > exact comparison for `gamma-gamma-tessier2000-near-plait` (last-bit moves that
 > follow the CPython version, not numpy; passes under ADR-0032's off-platform
 > bound). It predates the release and needs a test-only fix in a later slice.
+> *Resolved in 0.4.1 (2026-09-26): the cause is CPython 3.12's compensated
+> float `sum()`, the exact guard is now gated on CPython 3.11 as well
+> (ADR-0032 amendment), and the fixture is unchanged. See
+> `release-record-v0.4.1.md`.*
 > This commit is a record after the tag; it also removes a stale copy of the
 > 2026-09-25 steps 5-8 and licensing note that the 2026-09-26 revision left in
 > this file by mistake (the copy at the tagged commit still has it; `.agents/`
