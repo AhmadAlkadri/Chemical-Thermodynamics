@@ -3,6 +3,18 @@ name: ci
 on:
   push:
   pull_request:
+  # release.yml runs this same matrix on the release commit before it builds
+  # anything (ADR-0040); `ref` is that commit, empty for push/pull_request.
+  workflow_call:
+    inputs:
+      ref:
+        description: "Commit to test (defaults to the triggering ref)"
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
 
 jobs:
   test:
@@ -13,11 +25,16 @@ jobs:
         # Every version the package metadata advertises (pyproject classifiers).
         python-version: ["3.11", "3.12", "3.13"]
     steps:
+      # Actions are pinned to full commit SHAs (tag in the comment), so a moved
+      # or compromised tag cannot change what runs here (ADR-0040).
       - name: Check out repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref }}
+          persist-credentials: false
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: ${{ matrix.python-version }}
           cache: "pip"

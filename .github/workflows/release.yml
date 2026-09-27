@@ -1,0 +1,390 @@
+name: release
+
+# Publishes chemthermo to TestPyPI and then PyPI when a GitHub Release is
+# published (ADR-0040). The GitHub Release is the explicit production signal:
+# pushing a tag publishes nothing. The order is preflight -> the full CI matrix
+# on the tagged commit -> build once -> smoke-test those exact files on Linux
+# and macOS, 3.11-3.13 -> TestPyPI -> verify TestPyPI serves the same bytes ->
+# PyPI -> verify PyPI serves the same bytes -> attach the same files to the
+# GitHub Release. Every upload is the one artifact built in `build`, checked
+# against its SHA256SUMS before each use; nothing is rebuilt.
+#
+# Uploads use PyPI Trusted Publishing (OIDC): no PyPI token is stored in GitHub.
+# The PyPI and TestPyPI projects must list this repository, this workflow file
+# (release.yml) and the environment (`pypi`, `testpypi`) as a trusted publisher.
+#
+# If the version is already on PyPI (published by hand with twine, which
+# ADR-0040 also allows), nothing is uploaded: the `audit` job instead checks
+# that PyPI and the GitHub Release carry the same bytes and that they install.
+#
+# `workflow_dispatch` is a rehearsal: it runs preflight, CI, build and smoke
+# (or the audit) for an existing tag and never uploads anything.
+#
+# Actions are pinned to full commit SHAs (tag in the comment), because a tag
+# can be moved and this workflow can publish.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag vX.Y.Z to rehearse (nothing is uploaded)"
+        required: true
+        type: string
+
+permissions: {}
+
+defaults:
+  run:
+    # An explicit `bash` runs as `bash -eo pipefail`: a failing check piped
+    # into tee or sed fails the step (the implicit default has no pipefail).
+    shell: bash
+
+concurrency:
+  group: release-${{ github.event.release.tag_name || inputs.tag }}
+  cancel-in-progress: false
+
+env:
+  TAG: ${{ github.event.release.tag_name || inputs.tag }}
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  BUILD_REQUIREMENTS: "build==1.6.1 twine==7.0.0"
+
+jobs:
+  preflight:
+    # Prereleases (X.Y.ZbN) stay GitHub-only (ADR-0031).
+    if: github.event_name == 'workflow_dispatch' || !github.event.release.prerelease
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      version: ${{ steps.check.outputs.version }}
+      sha: ${{ steps.check.outputs.sha }}
+      published: ${{ steps.index.outputs.published }}
+    steps:
+      - name: Check out the tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: refs/tags/${{ env.TAG }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Check out the release tooling (this workflow's commit)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          path: .release-tooling
+          sparse-checkout: tools
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+
+      - name: Tag, commit and version strings agree
+        id: check
+        env:
+          # On a release event this is the commit the tag names; a dispatch
+          # runs from a branch, so it has no expected commit of its own.
+          EXPECTED_SHA: ${{ github.event_name == 'release' && github.sha || '' }}
+        run: |
+          git fetch --force origin "+refs/tags/${TAG}:refs/tags/${TAG}"
+          args=(--tag "$TAG" --require-on main)
+          if [ -n "$EXPECTED_SHA" ]; then args+=(--sha "$EXPECTED_SHA"); fi
+          result="$(python .release-tooling/tools/release_preflight.py "${args[@]}")"
+          echo "$result" | tee -a "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Is this version already on PyPI?
+        id: index
+        env:
+          VERSION: ${{ steps.check.outputs.version }}
+        run: |
+          code=$(curl -s -o /dev/null -w '%{http_code}' "https://pypi.org/pypi/chemthermo/${VERSION}/json")
+          case "$code" in
+            200) echo "published=true" >> "$GITHUB_OUTPUT"
+                 echo "::notice::chemthermo ${VERSION} is already on PyPI; auditing instead of uploading." ;;
+            404) echo "published=false" >> "$GITHUB_OUTPUT" ;;
+            *)   echo "::error::PyPI answered HTTP ${code}"; exit 1 ;;
+          esac
+
+  ci:
+    needs: preflight
+    permissions:
+      contents: read
+    uses: ./.github/workflows/ci.yml
+    with:
+      ref: ${{ needs.preflight.outputs.sha }}
+
+  build:
+    needs: [preflight, ci]
+    if: needs.preflight.outputs.published == 'false'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.preflight.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.preflight.outputs.sha }}
+          persist-credentials: false
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          path: .release-tooling
+          sparse-checkout: tools
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+
+      - name: Build the sdist and wheel once
+        run: |
+          python -m pip install $BUILD_REQUIREMENTS
+          # Commit time as the archive timestamp: that makes the wheel rebuild
+          # byte for byte (the sdist still differs). Nothing relies on it; the
+          # files built here are the ones published.
+          export SOURCE_DATE_EPOCH="$(git log -1 --format=%ct)"
+          python -m build --outdir release/dist/
+          python -m twine check --strict release/dist/*
+          python .release-tooling/tools/release_artifacts.py check-dist --version "$VERSION" release/dist
+          python .release-tooling/tools/release_artifacts.py sums release/dist | sed 's|  |  dist/|' > release/SHA256SUMS
+          cat release/SHA256SUMS
+          {
+            echo "### chemthermo ${VERSION} build"
+            echo '```'
+            cat release/SHA256SUMS
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-${{ env.VERSION }}
+          path: release/
+          if-no-files-found: error
+
+  smoke:
+    needs: [preflight, build]
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+        python-version: ["3.11", "3.12", "3.13"]
+    runs-on: ${{ matrix.os }}
+    env:
+      VERSION: ${{ needs.preflight.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          path: .release-tooling
+          sparse-checkout: tools
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-${{ env.VERSION }}
+          path: release
+
+      - name: Install the frozen wheel and sdist outside the tree and smoke-test them
+        run: |
+          (cd release && shasum -a 256 -c SHA256SUMS)
+          smoke="$PWD/.release-tooling/tools/release_smoke.py"
+          for kind in whl tar.gz; do
+            venv="$RUNNER_TEMP/venv-${kind}"
+            python -m venv "$venv"
+            "$venv/bin/python" -m pip install release/dist/chemthermo-*."${kind}"
+            "$venv/bin/python" -m pip check
+            (cd "$RUNNER_TEMP" && "$venv/bin/python" "$smoke" --expect-version "$VERSION")
+          done
+
+  publish-testpypi:
+    needs: [preflight, smoke]
+    if: github.event_name == 'release' && needs.preflight.outputs.published == 'false'
+    runs-on: ubuntu-latest
+    environment:
+      name: testpypi
+      url: https://test.pypi.org/project/chemthermo/${{ needs.preflight.outputs.version }}/
+    permissions:
+      id-token: write # Trusted Publishing; nothing else in this job
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-${{ needs.preflight.outputs.version }}
+          path: release
+
+      - name: Verify the frozen files
+        run: cd release && sha256sum -c SHA256SUMS
+
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          repository-url: https://test.pypi.org/legacy/
+          packages-dir: release/dist/
+          # A re-run after a partial upload; verify-testpypi still requires
+          # TestPyPI to hold exactly these bytes before PyPI is touched.
+          skip-existing: true
+          print-hash: true
+
+  verify-testpypi:
+    needs: [preflight, publish-testpypi]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.preflight.outputs.version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          path: .release-tooling
+          sparse-checkout: tools
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-${{ env.VERSION }}
+          path: release
+
+      - name: TestPyPI serves the frozen bytes, and they install
+        run: |
+          python .release-tooling/tools/release_artifacts.py verify-index --index testpypi \
+            --version "$VERSION" --sums release/SHA256SUMS --download-dir "$RUNNER_TEMP/testpypi"
+          # The package from TestPyPI (as downloaded and re-hashed above), its
+          # dependencies from PyPI only: indexes are never mixed.
+          python -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/python" -m pip install "$RUNNER_TEMP/testpypi/chemthermo-${VERSION}-py3-none-any.whl"
+          "$RUNNER_TEMP/venv/bin/python" -m pip check
+          smoke="$PWD/.release-tooling/tools/release_smoke.py"
+          (cd "$RUNNER_TEMP" && "$RUNNER_TEMP/venv/bin/python" "$smoke" --expect-version "$VERSION")
+
+  publish-pypi:
+    needs: [preflight, verify-testpypi]
+    if: github.event_name == 'release' && needs.preflight.outputs.published == 'false'
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/project/chemthermo/${{ needs.preflight.outputs.version }}/
+    permissions:
+      id-token: write # Trusted Publishing; nothing else in this job
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-${{ needs.preflight.outputs.version }}
+          path: release
+
+      - name: Verify the frozen files
+        run: cd release && sha256sum -c SHA256SUMS
+
+      - uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
+        with:
+          packages-dir: release/dist/
+          print-hash: true
+
+  verify-pypi:
+    needs: [preflight, publish-pypi]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # attach the frozen files to the GitHub Release
+    env:
+      VERSION: ${{ needs.preflight.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          path: .release-tooling
+          sparse-checkout: tools
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-${{ env.VERSION }}
+          path: release
+
+      - name: PyPI serves the frozen bytes, and `pip install chemthermo==X.Y.Z` works
+        run: |
+          python .release-tooling/tools/release_artifacts.py verify-index --index pypi \
+            --version "$VERSION" --sums release/SHA256SUMS --download-dir "$RUNNER_TEMP/pypi"
+          python -m venv "$RUNNER_TEMP/venv"
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            "$RUNNER_TEMP/venv/bin/python" -m pip install --no-cache-dir "chemthermo==${VERSION}" && break
+            sleep 30
+          done
+          "$RUNNER_TEMP/venv/bin/python" -m pip check
+          smoke="$PWD/.release-tooling/tools/release_smoke.py"
+          (cd "$RUNNER_TEMP" && "$RUNNER_TEMP/venv/bin/python" "$smoke" --expect-version "$VERSION")
+
+      - name: Attach the same files to the GitHub Release
+        run: |
+          # Never --clobber: an asset that is already there must be these bytes.
+          existing="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
+          for file in release/dist/* release/SHA256SUMS; do
+            name="$(basename "$file")"
+            if printf '%s\n' "$existing" | grep -qx "$name"; then
+              gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "$name" --dir "$RUNNER_TEMP/assets"
+              cmp "$file" "$RUNNER_TEMP/assets/$name"
+            else
+              gh release upload "$TAG" "$file" --repo "$GITHUB_REPOSITORY"
+            fi
+          done
+
+  audit:
+    # The version was published by hand (twine and ~/.pypirc, ADR-0040): check
+    # what is out there instead of uploading.
+    needs: [preflight, ci]
+    if: needs.preflight.outputs.published == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      VERSION: ${{ needs.preflight.outputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          path: .release-tooling
+          sparse-checkout: tools
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.11"
+
+      - name: PyPI and the GitHub Release carry the same bytes, and they install
+        run: |
+          mkdir -p "$RUNNER_TEMP/release/dist"
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern "chemthermo-${VERSION}*" \
+              --dir "$RUNNER_TEMP/release/dist" --clobber || true
+            [ "$(ls "$RUNNER_TEMP/release/dist" | wc -l)" -eq 2 ] && break
+            echo "waiting for both files on the GitHub Release"; sleep 30
+          done
+          python .release-tooling/tools/release_artifacts.py check-dist --version "$VERSION" "$RUNNER_TEMP/release/dist"
+          python .release-tooling/tools/release_artifacts.py sums "$RUNNER_TEMP/release/dist" > "$RUNNER_TEMP/SHA256SUMS"
+          cat "$RUNNER_TEMP/SHA256SUMS"
+          python .release-tooling/tools/release_artifacts.py verify-index --index pypi \
+            --version "$VERSION" --sums "$RUNNER_TEMP/SHA256SUMS" --download-dir "$RUNNER_TEMP/pypi"
+          python -m venv "$RUNNER_TEMP/venv"
+          "$RUNNER_TEMP/venv/bin/python" -m pip install --no-cache-dir "chemthermo==${VERSION}"
+          "$RUNNER_TEMP/venv/bin/python" -m pip check
+          smoke="$PWD/.release-tooling/tools/release_smoke.py"
+          (cd "$RUNNER_TEMP" && "$RUNNER_TEMP/venv/bin/python" "$smoke" --expect-version "$VERSION")

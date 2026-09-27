@@ -7,14 +7,19 @@ outside the source tree, so the import cannot resolve to ``src/``::
     cd /tmp && /path/to/venv/bin/python /path/to/tools/release_smoke.py
 
 It checks phase counts, stability verdicts and mass-balance residuals of four
-fixed states (ADR-0031 release gate). It is a smoke test, not validation: the
-numbers are checked against the published solver's own invariants, not against
-a reference. Pass ``--expect-version X`` to also pin ``chemthermo.__version__``.
+fixed states (ADR-0031 release gate), that the packaged bibliography resolves
+a citation, and that the installed ``chemthermo`` console script runs a
+stability test. It is a smoke test, not validation: the numbers are checked
+against the published solver's own invariants, not against a reference. Pass
+``--expect-version X`` to also pin ``chemthermo.__version__``.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -74,8 +79,41 @@ def main() -> int:
             f"{'ok  ' if ok else 'FAIL'} {label:<17} stability={stability.status:<9} "
             f"phases={sorted(result.phases)} mass_balance={balance}"
         )
+
+    # Packaged bibliography: a databank value and a parameter set both cite.
+    water = ct.Component.from_database("Water")
+    citations = {
+        "Water Tc": water.get_citation("Tc"),
+        "Water antoine": ct.cite("Water", "antoine"),
+    }
+    for label, citation in citations.items():
+        ok = isinstance(citation, str) and bool(citation.strip())
+        failures += not ok
+        print(f"{'ok  ' if ok else 'FAIL'} citation {label:<13} {citation!r}")
+
+    # The console script the wheel installs, next to this interpreter.
+    script = shutil.which("chemthermo", path=str(Path(sys.executable).parent))
+    if script is None:
+        failures += 1
+        print("FAIL cli: no chemthermo console script beside the interpreter")
+    else:
+        command = [
+            script, "stability-tp", "--components", "Methane,n-Hexane", "--z", "0.5,0.5",
+            "--temperature-k", "300", "--pressure-pa", "2e6", "--eos", "pc-saft",
+            "--format", "json",
+        ]  # fmt: skip
+        completed = subprocess.run(command, capture_output=True, text=True, check=False)
+        try:
+            status = json.loads(completed.stdout)["result"]["status"]
+        except (ValueError, KeyError, TypeError):
+            status = None
+        ok = completed.returncode == 0 and status == "unstable"
+        failures += not ok
+        print(f"{'ok  ' if ok else 'FAIL'} cli stability-tp  exit={completed.returncode} "
+              f"status={status}")  # fmt: skip
+
     if failures:
-        print(f"FAIL: {failures} case(s)")
+        print(f"FAIL: {failures} check(s)")
         return 1
     print("chemthermo release smoke passed")
     return 0
