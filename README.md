@@ -1,5 +1,11 @@
 # chemthermo
 
+[![PyPI](https://img.shields.io/pypi/v/chemthermo)](https://pypi.org/project/chemthermo/)
+[![Python versions](https://img.shields.io/pypi/pyversions/chemthermo)](https://pypi.org/project/chemthermo/)
+[![CI](https://github.com/AhmadAlkadri/Chemical-Thermodynamics/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/AhmadAlkadri/Chemical-Thermodynamics/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/pypi/l/chemthermo)](https://github.com/AhmadAlkadri/Chemical-Thermodynamics/blob/main/LICENSE)
+[![Status: beta](https://img.shields.io/pypi/status/chemthermo)](https://pypi.org/project/chemthermo/)
+
 Phase equilibrium for chemical engineering in Python: tangent-plane
 stability, multiphase TP flash, Peng-Robinson, PC-SAFT (with association and
 polymers) and NRTL, in SI units, with every numerical claim traceable to a

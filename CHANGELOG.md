@@ -38,6 +38,10 @@ changed.
   manual `twine` upload, behind the same gates.
 - The 0.4.0 date is corrected to 2026-09-26 (the day it was published).
 
+### Documentation
+- README badges: PyPI version, supported Python versions, CI status, licence
+  and development status.
+
 ## 0.4.0 (2026-09-26) - first PyPI release (Beta)
 
 The first release published to PyPI (`pip install chemthermo`), with a short,
