@@ -5,7 +5,7 @@ stability, multiphase TP flash, Peng-Robinson, PC-SAFT (with association and
 polymers) and NRTL, in SI units, with every numerical claim traceable to a
 recorded cross-check.
 
-**Status: beta (0.4.0).** The science is checked against independent
+**Status: beta (0.4.1).** The science is checked against independent
 implementations, but the public API may still change before 1.0. Python
 >= 3.11; tested on macOS arm64 and Linux x86_64. MIT licence.
 
@@ -18,7 +18,7 @@ pip install chemthermo
 or pin a tagged commit from GitHub:
 
 ```bash
-pip install "chemthermo @ git+https://github.com/AhmadAlkadri/Chemical-Thermodynamics.git@v0.4.0"
+pip install "chemthermo @ git+https://github.com/AhmadAlkadri/Chemical-Thermodynamics.git@v0.4.1"
 ```
 
 Runtime dependencies: numpy, pydantic, bibtexparser (< 2).

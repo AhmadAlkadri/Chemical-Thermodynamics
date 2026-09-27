@@ -6,6 +6,38 @@ Versions follow PEP 440 and are tagged `v<version>` on one tested commit
 published from a GitHub Release by the release workflow or by hand with the
 same gates (ADR-0040).
 
+## 0.4.1 (2026-09-26) - test contract and release engineering
+
+A patch release. The installed library is the same as 0.4.0 apart from the
+version string: no solver, model, parameter, tolerance or numerical result
+changed.
+
+### Fixed (tests only)
+- The one finding recorded at 0.4.0 was a test-contract issue, not a defect
+  in `flash_tp`. On macOS arm64 under CPython 3.12 and 3.13, the exact
+  captured-value guard `test_flash_tp_is_bit_identical_to_the_v3_capture`
+  failed on 4 near-zero `tpd` diagnostics in 2 of 155 states (worst move
+  1.0e-15). CPython 3.12 made the built-in `sum()` of floats compensated, so
+  the last bits differ from the CPython 3.11 capture. With a plain left-fold
+  `sum` the capture is reproduced exactly. The exact comparison now applies
+  only on the capture runtime (macOS arm64, CPython 3.11). Every other
+  runtime uses the bounded comparison that CI already uses on Linux, with
+  every discrete field still exact. The fixture is unchanged. ADR-0032
+  amendment; ledger Case P-11.
+
+### Release engineering
+- `.github/workflows/release.yml` publishes to TestPyPI and then PyPI when a
+  GitHub Release is published. It uses PyPI Trusted Publishing (no stored
+  token), runs the full CI matrix on the tagged commit, builds once, smoke
+  tests the files on Linux and macOS under 3.11-3.13, and checks that each
+  index serves the same SHA-256. Pushing a tag publishes nothing. New
+  `tools/release_preflight.py` and `tools/release_artifacts.py`.
+  `tools/release_smoke.py` now also checks packaged citations and the
+  installed CLI. ADR-0040.
+- The release policy describes both supported paths, the workflow and a
+  manual `twine` upload, behind the same gates.
+- The 0.4.0 date is corrected to 2026-09-26 (the day it was published).
+
 ## 0.4.0 (2026-09-26) - first PyPI release (Beta)
 
 The first release published to PyPI (`pip install chemthermo`), with a short,
