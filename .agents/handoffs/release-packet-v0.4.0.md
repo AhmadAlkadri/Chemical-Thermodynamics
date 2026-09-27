@@ -40,7 +40,7 @@ releases), ADR-0038 (PyPI by hand), ADR-0039 (the rewrite).
 | its library content | identical to `f2165cd` (was `4aa4753` before the rewrite): the commits after it touch `.agents/` only, which neither the sdist (`MANIFEST.in` prunes it) nor the wheel ship |
 | version in the code | `0.4.0` (`pyproject.toml`, `chemthermo.__version__`) |
 | PR | https://github.com/AhmadAlkadri/Chemical-Thermodynamics/pull/1 (`dev/sprint` -> `main`) |
-| `main` today | `a7a8ca7` (`v0.1.0`, untouched by the rewrite), an ancestor of `dev/sprint`: a fast-forward, no merge commit |
+| `main` before the merge (as prepared) | `a7a8ca7` (`v0.1.0`, untouched by the rewrite), an ancestor of `dev/sprint`: a fast-forward, no merge commit. After the release `main` = `afc43db`, then the record commits |
 | PyPI / TestPyPI name | `chemthermo` (no project on either index on 2026-09-26) |
 
 ## Steps
@@ -153,7 +153,8 @@ table and the limits.
 ### Validation for this release
 Rows marked *inherited* ran on the original commit named, whose tree the
 rewritten commit in parentheses has unchanged; they did not run on the new id.
-The fresh rows on the release commit itself are added when the release is cut.
+The fresh rows on the release commit itself are in the header of this file and
+the GitHub release notes.
 
 | where | what | result |
 | --- | --- | --- |
@@ -164,7 +165,7 @@ The fresh rows on the release commit itself are added when the release is cut.
 | *inherited:* Linux, validation extras (teqp 0.23.2, FeOs 0.10.1, thermo 0.6.1) | `pytest -q` incl. `tests/validation/` at `4aa4753` (`f2165cd`) | **1021 passed**, 0 failed, 99 deselected |
 | *inherited:* Linux, full robustness map at `761fd57` (`41cd3fd`, after the last solver change) | 2505 states | 2500 converge, 5 by-design gamma-phi refusals, 0 invariant violations; identical state by state to the macOS record at `f852726` (`f030711`) |
 | *inherited:* GitHub Actions `ubuntu-latest`, Python 3.11 / 3.12 / 3.13 | CI on `4aa4753` (`f2165cd`) | green (run 36186404223) |
-| macOS arm64 | step 2 above, on the release commit | *(filled in when the release is cut)* |
+| macOS arm64 | step 2 above, on the release commit `afc43db` | CPython 3.11.6: 824 passed / 0 failed, exact-mode guards 199 passed, validation extras 1021 passed. Under CPython 3.12 / 3.13 the exact capture guard failed on last bits. That was a test-contract finding, corrected in 0.4.1 (ADR-0032 amendment) |
 
 **Not claimed:** agreement with experiment. The checks compare code with
 independent implementations (teqp, FeOs, `thermo`) and published worked

@@ -5,7 +5,7 @@ Versions follow PEP 440 and are tagged `v<version>` on one tested commit
 0.3.0b1 were GitHub-only; from 0.4.0 the owner also publishes to PyPI by hand
 (ADR-0038).
 
-## 0.4.0 (2026-09-25) - first PyPI release (Beta)
+## 0.4.0 (2026-09-26) - first PyPI release (Beta)
 
 The first release published to PyPI (`pip install chemthermo`), with a short,
 honest README, the reference material moved to `docs/`, and packaging checked
